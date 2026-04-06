@@ -60,4 +60,13 @@ services:
       - LLM_URL=http://llm:8003
       - COGNEE_DATASET_MASTER=${COGNEE_DATASET_MASTER}
       - COGNEE_DATASET_OVERLAY=${COGNEE_DATASET_OVERLAY}
+      - COGNEE_API_URL=http://cognee-api:8000
+    networks:
+      - default
+      - cognee-net
     restart: unless-stopped
+
+networks:
+  cognee-net:
+    external: true
+    name: cognee-mcp_cognee-net

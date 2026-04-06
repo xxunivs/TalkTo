@@ -7,11 +7,15 @@ TalkTo Userbot entrypoint.
 """
 import os
 import sys
+import json
+import random
 import signal
 import asyncio
 import logging
 
+import yaml
 from pyrogram import Client
+from pytgcalls import PyTgCalls
 
 from orchestrator.scheduler import run_forever
 from orchestrator.pipeline import run_call_loop
@@ -31,6 +35,22 @@ log = logging.getLogger("talkto.main")
 CALL_MAX_DURATION = int(os.environ.get("CALL_MAX_DURATION_SECONDS", "300"))
 TARGET_USER_ID = int(os.environ.get("TARGET_USER_ID", "0"))
 DATA_DIR = Path(os.environ.get("DATA_DIR", "/app/data/calls"))
+CONFIG_DIR = Path(os.environ.get("CONFIG_DIR", "/app/config"))
+
+
+def _pick_opening_question() -> str:
+    """Pick a random opening question from personas.yaml."""
+    personas_path = CONFIG_DIR / "personas.yaml"
+    try:
+        with open(personas_path, encoding="utf-8") as f:
+            config = yaml.safe_load(f)
+        questions = config.get("opening_questions", [])
+        if questions:
+            return random.choice(questions)
+    except Exception:
+        log.warning("Failed to load personas.yaml, using default question")
+    return "오늘 하루 어땠어? 특별한 일 있었어?"
+
 
 # Graceful shutdown event
 _shutdown = asyncio.Event()
@@ -41,7 +61,7 @@ def _signal_handler() -> None:
     _shutdown.set()
 
 
-async def trigger_call(client: Client) -> None:
+async def trigger_call(client: Client, pytgcalls_client: PyTgCalls) -> None:
     """Single call cycle: dial -> conversation loop -> post-call ingest."""
     call_id = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
     call_dir = DATA_DIR / call_id
@@ -55,16 +75,14 @@ async def trigger_call(client: Client) -> None:
         audio_dir=call_dir,
     )
 
-    controller = CallController(client)
+    controller = CallController(client, pytgcalls_client)
 
     try:
         # Start the voice call
         await controller.start_call(TARGET_USER_ID)
 
-        # Opening question from config or default
-        opening = os.environ.get(
-            "OPENING_QUESTION", "오늘 하루 어땠어? 특별한 일 있었어?"
-        )
+        # Opening question from personas.yaml
+        opening = _pick_opening_question()
 
         # Run conversation loop
         session = await run_call_loop(
@@ -121,9 +139,13 @@ async def main() -> None:
     await client.start()
     log.info("Pyrogram client connected (user: %s)", client.me.first_name if client.me else "unknown")
 
+    pytgcalls_client = PyTgCalls(client)
+    await pytgcalls_client.start()
+    log.info("PyTgCalls started")
+
     try:
         scheduler_task = asyncio.create_task(
-            run_forever(lambda: trigger_call(client))
+            run_forever(lambda: trigger_call(client, pytgcalls_client))
         )
         # Wait until shutdown signal
         await _shutdown.wait()
