@@ -1,30 +1,31 @@
 """
-TalkTo Userbot entrypoint.
+TalkTo Bot entrypoint.
 
-- Pyrogram (MTProto) client initialization + session loading
-- Scheduler-driven call trigger loop
-- Orchestrator delegates call_session control
+- Telegram Bot API로 음성/텍스트 메시지 기반 대화
+- 주기적으로 대상에게 음성 질문 → 답변 대기 → 꼬리질문 반복
 """
 import os
-import sys
 import json
 import random
-import signal
 import asyncio
 import logging
-
-import yaml
-from pyrogram import Client
-from pytgcalls import PyTgCalls
-
-from orchestrator.scheduler import run_forever
-from orchestrator.pipeline import run_call_loop
-from orchestrator.call_session import CallSession
-from userbot.call_controller import CallController
-from ingest import post_call
-
 from datetime import datetime
 from pathlib import Path
+from io import BytesIO
+
+import yaml
+from telegram import Update
+from telegram.ext import (
+    Application,
+    ContextTypes,
+    MessageHandler,
+    filters,
+)
+
+from orchestrator.pipeline import speak, transcribe, next_question
+from orchestrator.call_session import CallSession
+from ingest import post_call
+from ingest.cognee_overlay import save_sync as save_overlay
 
 logging.basicConfig(
     level=logging.INFO,
@@ -32,14 +33,19 @@ logging.basicConfig(
 )
 log = logging.getLogger("talkto.main")
 
-CALL_MAX_DURATION = int(os.environ.get("CALL_MAX_DURATION_SECONDS", "300"))
-TARGET_USER_ID = int(os.environ.get("TARGET_USER_ID", "0"))
+BOT_TOKEN = os.environ["BOT_TOKEN"]
+TARGET_CHAT_ID = int(os.environ["TARGET_CHAT_ID"])
+INTERVAL_MIN = int(os.environ.get("CALL_INTERVAL_MINUTES", "10"))
+MAX_TURNS = int(os.environ.get("MAX_TURNS", "10"))
+REPLY_TIMEOUT = int(os.environ.get("REPLY_TIMEOUT_SECONDS", "120"))
 DATA_DIR = Path(os.environ.get("DATA_DIR", "/app/data/calls"))
 CONFIG_DIR = Path(os.environ.get("CONFIG_DIR", "/app/config"))
 
+# Reply queue: handler pushes, conversation loop pops
+_reply_queue: asyncio.Queue | None = None
+
 
 def _pick_opening_question() -> str:
-    """Pick a random opening question from personas.yaml."""
     personas_path = CONFIG_DIR / "personas.yaml"
     try:
         with open(personas_path, encoding="utf-8") as f:
@@ -48,60 +54,128 @@ def _pick_opening_question() -> str:
         if questions:
             return random.choice(questions)
     except Exception:
-        log.warning("Failed to load personas.yaml, using default question")
+        log.warning("Failed to load personas.yaml, using default")
     return "오늘 하루 어땠어? 특별한 일 있었어?"
 
 
-# Graceful shutdown event
-_shutdown = asyncio.Event()
+async def handle_reply(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle incoming voice, audio, video_note, or text from target user."""
+    if update.effective_chat.id != TARGET_CHAT_ID:
+        return
+    if _reply_queue is None:
+        return
+
+    msg = update.message
+    voice = msg.voice or msg.audio
+    video_note = msg.video_note
+
+    if voice:
+        file = await context.bot.get_file(voice.file_id)
+        data = await file.download_as_bytearray()
+        log.info("Received voice reply (%d bytes)", len(data))
+        await _reply_queue.put(("voice", bytes(data)))
+    elif video_note:
+        file = await context.bot.get_file(video_note.file_id)
+        data = await file.download_as_bytearray()
+        log.info("Received video_note reply (%d bytes)", len(data))
+        await _reply_queue.put(("voice", bytes(data)))
+    elif msg.text:
+        log.info("Received text reply: %s", msg.text[:80])
+        await _reply_queue.put(("text", msg.text))
 
 
-def _signal_handler() -> None:
-    log.info("Shutdown signal received")
-    _shutdown.set()
+async def send_and_wait(app: Application, text: str) -> tuple[str, str | bytes] | None:
+    """TTS → send voice message → wait for reply (voice or text)."""
+    global _reply_queue
+
+    wav_bytes = await speak(text)
+    await app.bot.send_voice(
+        chat_id=TARGET_CHAT_ID,
+        voice=BytesIO(wav_bytes),
+        caption=text,
+    )
+    log.info("Sent voice message: %s", text[:60])
+
+    # Drain any stale messages in queue
+    while not _reply_queue.empty():
+        try:
+            _reply_queue.get_nowait()
+        except asyncio.QueueEmpty:
+            break
+
+    try:
+        result = await asyncio.wait_for(_reply_queue.get(), timeout=REPLY_TIMEOUT)
+        return result
+    except asyncio.TimeoutError:
+        log.info("No reply within %ds", REPLY_TIMEOUT)
+        return None
 
 
-async def trigger_call(client: Client, pytgcalls_client: PyTgCalls) -> None:
-    """Single call cycle: dial -> conversation loop -> post-call ingest."""
-    call_id = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-    call_dir = DATA_DIR / call_id
+async def run_conversation(app: Application) -> None:
+    """Run a single conversation session."""
+    session_id = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    call_dir = DATA_DIR / session_id
     call_dir.mkdir(parents=True, exist_ok=True)
 
-    log.info("Starting call %s to user %s", call_id, TARGET_USER_ID)
-
     session = CallSession(
-        call_id=call_id,
-        target_user_id=TARGET_USER_ID,
+        call_id=session_id,
+        target_user_id=TARGET_CHAT_ID,
         audio_dir=call_dir,
     )
 
-    controller = CallController(client, pytgcalls_client)
+    question = _pick_opening_question()
+    empty_count = 0
 
-    try:
-        # Start the voice call
-        await controller.start_call(TARGET_USER_ID)
+    for turn in range(MAX_TURNS):
+        log.info("Turn %d/%d", turn + 1, MAX_TURNS)
 
-        # Opening question from personas.yaml
-        opening = _pick_opening_question()
+        reply = await send_and_wait(app, question)
+        session.add_turn("assistant", question)
 
-        # Run conversation loop
-        session = await run_call_loop(
-            session=session,
-            controller=controller,
-            opening_question=opening,
-            max_duration=CALL_MAX_DURATION,
-        )
-    except Exception:
-        log.exception("Error during call %s", call_id)
-    finally:
-        try:
-            await controller.end_call(call_id)
-        except Exception:
-            log.exception("Error ending call %s", call_id)
+        if reply is None:
+            empty_count += 1
+            session.add_turn("user", "")
+            if empty_count >= 2:
+                log.info("No reply 2x, ending conversation")
+                break
+            continue
+
+        reply_type, reply_data = reply
+
+        if reply_type == "voice":
+            answer_text = await transcribe(reply_data)
+            log.info("Transcribed: %s", answer_text[:120] if answer_text else "(empty)")
+        else:
+            answer_text = reply_data
+            log.info("Text reply: %s", answer_text[:120])
+
+        session.add_turn("user", answer_text)
+
+        # 실시간 cognee 저장 (매 턴마다 overlay에 기록, 별도 스레드)
+        if answer_text.strip():
+            try:
+                await asyncio.to_thread(save_overlay, [answer_text], session_id)
+                log.info("Saved to cognee overlay: %s", answer_text[:60])
+            except Exception:
+                log.exception("Realtime cognee save failed")
+
+        if not answer_text.strip():
+            empty_count += 1
+            if empty_count >= 2:
+                log.info("Empty 2x, ending conversation")
+                break
+            continue
+        else:
+            empty_count = 0
+
+        if turn < MAX_TURNS - 1:
+            try:
+                question = await next_question(answer_text)
+            except Exception:
+                log.exception("LLM follow-up failed")
+                break
 
     # Save transcript
-    import json
-
     transcript_path = call_dir / "transcript.json"
     transcript_path.write_text(
         json.dumps(session.transcript, ensure_ascii=False, indent=2),
@@ -109,55 +183,45 @@ async def trigger_call(client: Client, pytgcalls_client: PyTgCalls) -> None:
     )
     log.info("Transcript saved: %s (%d turns)", transcript_path, len(session.transcript))
 
-    # Post-call analysis + cognee ingest (routing handled inside post_call.run)
-    try:
-        analysis = post_call.run(call_dir)
-        log.info("Post-call analysis complete for %s: emotion=%s, topics=%s",
-                 call_id, analysis.get("emotion"), analysis.get("topics"))
-    except Exception:
-        log.exception("Post-call ingest failed for %s", call_id)
-
-
-async def main() -> None:
-    api_id = int(os.environ["TELEGRAM_API_ID"])
-    api_hash = os.environ["TELEGRAM_API_HASH"]
-    phone = os.environ["TELEGRAM_PHONE_NUMBER"]
-
-    client = Client(
-        name="talkto_userbot",
-        api_id=api_id,
-        api_hash=api_hash,
-        phone_number=phone,
-        workdir="/app/session",
-    )
-
-    loop = asyncio.get_running_loop()
-    for sig in (signal.SIGINT, signal.SIGTERM):
-        loop.add_signal_handler(sig, _signal_handler)
-
-    log.info("Starting Pyrogram client...")
-    await client.start()
-    log.info("Pyrogram client connected (user: %s)", client.me.first_name if client.me else "unknown")
-
-    pytgcalls_client = PyTgCalls(client)
-    await pytgcalls_client.start()
-    log.info("PyTgCalls started")
-
-    try:
-        scheduler_task = asyncio.create_task(
-            run_forever(lambda: trigger_call(client, pytgcalls_client))
-        )
-        # Wait until shutdown signal
-        await _shutdown.wait()
-        scheduler_task.cancel()
+    if len(session.transcript) >= 2:
         try:
-            await scheduler_task
-        except asyncio.CancelledError:
-            pass
-    finally:
-        await client.stop()
-        log.info("Pyrogram client stopped")
+            analysis = post_call.run(call_dir)
+            log.info("Analysis complete: emotion=%s, topics=%s",
+                     analysis.get("emotion"), analysis.get("topics"))
+        except Exception:
+            log.exception("Post-call ingest failed for %s", session_id)
+
+
+async def scheduler_loop(app: Application) -> None:
+    """Periodically trigger conversations."""
+    while True:
+        try:
+            await run_conversation(app)
+        except Exception:
+            log.exception("Conversation failed")
+        log.info("Next conversation in %d minutes", INTERVAL_MIN)
+        await asyncio.sleep(INTERVAL_MIN * 60)
+
+
+async def post_init(app: Application) -> None:
+    global _reply_queue
+    _reply_queue = asyncio.Queue()
+    asyncio.create_task(scheduler_loop(app))
+
+
+def main() -> None:
+    app = Application.builder().token(BOT_TOKEN).build()
+
+    app.add_handler(MessageHandler(
+        filters.VOICE | filters.AUDIO | filters.VIDEO_NOTE | filters.TEXT & (~filters.COMMAND),
+        handle_reply,
+    ))
+
+    app.post_init = post_init
+
+    log.info("Starting TalkTo bot...")
+    app.run_polling(drop_pending_updates=True)
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

@@ -1,5 +1,5 @@
 fastapi>=0.115
 uvicorn[standard]>=0.30
-kokoro-tts
+kokoro-onnx>=0.3
 numpy>=1.26
 soundfile>=0.12

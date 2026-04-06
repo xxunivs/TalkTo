@@ -43,24 +43,24 @@ services:
       - stt
       - llm
     volumes:
-      - ./userbot/session:/app/session
       - ./data/calls:/app/data/calls
       - ./config:/app/config:ro
       - ./ingest:/app/ingest:ro
       - ./orchestrator:/app/orchestrator:ro
     environment:
-      - TELEGRAM_API_ID=${TELEGRAM_API_ID}
-      - TELEGRAM_API_HASH=${TELEGRAM_API_HASH}
-      - TELEGRAM_PHONE_NUMBER=${TELEGRAM_PHONE_NUMBER}
-      - TARGET_USER_ID=${TARGET_USER_ID}
+      - BOT_TOKEN=${BOT_TOKEN}
+      - TARGET_CHAT_ID=${TARGET_CHAT_ID}
       - CALL_INTERVAL_MINUTES=${CALL_INTERVAL_MINUTES}
-      - CALL_MAX_DURATION_SECONDS=${CALL_MAX_DURATION_SECONDS}
+      - MAX_TURNS=${MAX_TURNS}
+      - REPLY_TIMEOUT_SECONDS=${REPLY_TIMEOUT_SECONDS}
       - TTS_URL=http://tts:8001
       - STT_URL=http://stt:8002
       - LLM_URL=http://llm:8003
       - COGNEE_DATASET_MASTER=${COGNEE_DATASET_MASTER}
       - COGNEE_DATASET_OVERLAY=${COGNEE_DATASET_OVERLAY}
       - COGNEE_API_URL=http://cognee-api:8000
+      - COGNEE_USER=${COGNEE_USER}
+      - COGNEE_PASS=${COGNEE_PASS}
     networks:
       - default
       - cognee-net
