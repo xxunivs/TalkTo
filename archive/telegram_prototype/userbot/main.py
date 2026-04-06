@@ -35,7 +35,7 @@ log = logging.getLogger("talkto.main")
 
 BOT_TOKEN = os.environ["BOT_TOKEN"]
 TARGET_CHAT_ID = int(os.environ["TARGET_CHAT_ID"])
-INTERVAL_MIN = int(os.environ.get("CALL_INTERVAL_MINUTES", "10"))
+SCHEDULE_HOUR = int(os.environ.get("SCHEDULE_HOUR", "22"))  # 매일 밤 10시
 MAX_TURNS = int(os.environ.get("MAX_TURNS", "10"))
 REPLY_TIMEOUT = int(os.environ.get("REPLY_TIMEOUT_SECONDS", "120"))
 DATA_DIR = Path(os.environ.get("DATA_DIR", "/app/data/calls"))
@@ -193,14 +193,20 @@ async def run_conversation(app: Application) -> None:
 
 
 async def scheduler_loop(app: Application) -> None:
-    """Periodically trigger conversations."""
+    """매일 SCHEDULE_HOUR시에 대화 트리거."""
+    from datetime import datetime, timedelta
     while True:
+        now = datetime.now()
+        target = now.replace(hour=SCHEDULE_HOUR, minute=0, second=0, microsecond=0)
+        if target <= now:
+            target += timedelta(days=1)
+        wait_seconds = (target - now).total_seconds()
+        log.info("Next conversation at %s (%d seconds)", target.strftime("%Y-%m-%d %H:%M"), int(wait_seconds))
+        await asyncio.sleep(wait_seconds)
         try:
             await run_conversation(app)
         except Exception:
             log.exception("Conversation failed")
-        log.info("Next conversation in %d minutes", INTERVAL_MIN)
-        await asyncio.sleep(INTERVAL_MIN * 60)
 
 
 async def post_init(app: Application) -> None:
