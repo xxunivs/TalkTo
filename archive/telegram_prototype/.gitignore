@@ -5,19 +5,30 @@
 *.token
 credentials/
 
+# Telegram session (contains auth)
+userbot/session/
+*.tdlib
+
+# Models (large files)
+data/models/
+models/
+
+# Call data (audio, transcripts)
+data/calls/
+data/logs/
+
 # Python
 __pycache__/
 *.pyc
 *.pyo
 .venv/
 venv/
+*.egg-info/
 
-# State / runtime
-*.lock
-*-offset.json
-state/dynamic-question.json
-state/question-history.json
+# Docker volumes
+.docker-volumes/
 
 # OS
 .DS_Store
 Thumbs.db
+.omc/

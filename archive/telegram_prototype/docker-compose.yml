@@ -1,0 +1,63 @@
+version: "3.9"
+
+services:
+  tts:
+    build: ./services/tts
+    container_name: talkto-tts
+    ports:
+      - "127.0.0.1:8001:8001"
+    volumes:
+      - ./data/models/kokoro:/models/kokoro:ro
+    restart: unless-stopped
+
+  stt:
+    build: ./services/stt
+    container_name: talkto-stt
+    ports:
+      - "127.0.0.1:8002:8002"
+    volumes:
+      - ./data/models/whisper:/models/whisper:ro
+    environment:
+      - WHISPER_MODEL=${WHISPER_MODEL}
+      - WHISPER_DEVICE=${WHISPER_DEVICE}
+      - WHISPER_COMPUTE_TYPE=${WHISPER_COMPUTE_TYPE}
+    restart: unless-stopped
+
+  llm:
+    build: ./services/llm
+    container_name: talkto-llm
+    ports:
+      - "127.0.0.1:8003:8003"
+    volumes:
+      - ./data/models/qwen:/models/qwen:ro
+    environment:
+      - QWEN_MODEL_PATH=${QWEN_MODEL_PATH}
+      - QWEN_CONTEXT_SIZE=${QWEN_CONTEXT_SIZE}
+    restart: unless-stopped
+
+  userbot:
+    build: ./userbot
+    container_name: talkto-userbot
+    depends_on:
+      - tts
+      - stt
+      - llm
+    volumes:
+      - ./userbot/session:/app/session
+      - ./data/calls:/app/data/calls
+      - ./config:/app/config:ro
+      - ./ingest:/app/ingest:ro
+      - ./orchestrator:/app/orchestrator:ro
+    environment:
+      - TELEGRAM_API_ID=${TELEGRAM_API_ID}
+      - TELEGRAM_API_HASH=${TELEGRAM_API_HASH}
+      - TELEGRAM_PHONE_NUMBER=${TELEGRAM_PHONE_NUMBER}
+      - TARGET_USER_ID=${TARGET_USER_ID}
+      - CALL_INTERVAL_MINUTES=${CALL_INTERVAL_MINUTES}
+      - CALL_MAX_DURATION_SECONDS=${CALL_MAX_DURATION_SECONDS}
+      - TTS_URL=http://tts:8001
+      - STT_URL=http://stt:8002
+      - LLM_URL=http://llm:8003
+      - COGNEE_DATASET_MASTER=${COGNEE_DATASET_MASTER}
+      - COGNEE_DATASET_OVERLAY=${COGNEE_DATASET_OVERLAY}
+    restart: unless-stopped

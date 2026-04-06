@@ -1,0 +1,19 @@
+아래는 한 통화의 전체 대화 기록입니다.
+당신의 역할은 이 대화를 분석하여 페르소나 지식그래프에 저장할 형태로 정리하는 것입니다.
+
+출력(JSON):
+{
+  "emotion": "neutral|joy|sadness|anger|anxiety|excitement",
+  "emotion_intensity": 0.0~1.0,
+  "topics": ["주제1", "주제2"],
+  "summary": "1-2문장 요약",
+  "facts_master": ["안정적 사실1", "안정적 사실2"],   // 잘 안 바뀌는 정보 → Master 레이어
+  "facts_overlay": ["일시 상태1", "맥락 정보2"]        // 지금-여기 맥락 → Overlay 레이어
+}
+
+분류 기준:
+- Master: 이름, 직업, 관계, 가치관, 장기 목표, 취향 등 변동 낮은 속성
+- Overlay: 오늘 기분, 최근 이벤트, 일시적 불편, 특정 시점 계획 등 맥락성
+
+대화:
+{transcript}
