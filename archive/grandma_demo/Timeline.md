@@ -17,7 +17,6 @@ PersonaAI/
 │   ├── voice_raw/           할머니 음성 원본 wav 13개 (GitHub 미포함)
 │   ├── 전사본분석_임시.md    할머니 말투/성격/기억 분석 (화자분리 후 확정)
 │   └── 전사본_화자표시_임시.md  화자 표시 (화자분리 후 확정)
-├── .vscode/launch.json      VS Code 실행 설정 (F5로 실행 가능)
 ├── Timeline.md              이 파일
 └── README.md
 ```
