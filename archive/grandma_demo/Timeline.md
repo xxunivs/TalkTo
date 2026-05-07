@@ -6,12 +6,12 @@ TalkTo 사후 Phase(Persona AI)의 AI 파트 전체 개발 타임라인
 
 ```
 PersonaAI/
-├── llm/            ← GPT 호출 (history 받아서 답변 생성)
-├── prompt/          ← 시스템 프롬프트 조립, 감정/품질 가이드라인 포함
-├── memory/          ← 장기/단기 기억, 임베딩, KG, RAG 검색
-├── voice/           ← STT, TTS
-├── monitoring/      ← 사용 이벤트, 오류 로그, 피드백
-└── data/            ← 전사본, 파인튜닝 데이터, 페르소나 JSON
+├── llm/         GPT 호출 (history 받아서 답변 생성)
+├── prompt/      시스템 프롬프트 조립, 감정/품질 가이드라인 포함
+├── memory/      장기/단기 기억, 임베딩, KG, RAG 검색
+├── voice/       STT, TTS
+├── monitoring/  사용 이벤트, 오류 로그, 피드백
+└── data/        전사본, 파인튜닝 데이터, 페르소나 JSON
 ```
 
 ---
