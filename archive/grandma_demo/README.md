@@ -27,9 +27,9 @@ OPENAI_API_KEY=여기에_API_키_입력
 ### 4. 테스트 실행
 ```bash
 source venv/bin/activate
-python llm/test_api.py
+python -m llm.core
 ```
-GPT 응답이 출력되면 환경 세팅 완료!
+할머니 말투로 응답이 출력되면 환경 세팅 완료!
 
 ## 코드 구조
 ```

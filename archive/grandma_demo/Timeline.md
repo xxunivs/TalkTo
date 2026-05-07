@@ -1,6 +1,6 @@
-# TalkTo Persona AI — 전체 개발 타임라인
+# TalkTo Persona AI — 개발 타임라인
 
-TalkTo 사후 Phase(Persona AI)의 AI 파트 전체 개발 타임라인
+TalkTo 사후 Phase(Persona AI)의 AI 파트 개발 타임라인
 
 ## 코드 구조 (기능별)
 
