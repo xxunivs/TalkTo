@@ -22,7 +22,7 @@ pip install openai python-dotenv
 ```
 OPENAI_API_KEY=여기에_API_키_입력
 ```
-※ API 키는 팀원에게 개별 전달받으세요. .env 파일은 GitHub에 올라가지 않습니다.
+※ API 키는 팀원에게 개별 전달받으세요.
 
 ### 4. 테스트 실행
 ```bash
@@ -34,13 +34,13 @@ GPT 응답이 출력되면 환경 세팅 완료!
 ## 코드 구조
 ```
 PersonaAI/
-├── llm/             ← GPT 호출 (history 받아서 답변 생성)
-├── prompt/          ← 시스템 프롬프트 조립, 감정/품질 가이드라인
-├── memory/          ← 장기/단기 기억, 임베딩, KG, RAG 검색
-├── voice/           ← STT, TTS
-├── monitoring/      ← 사용 이벤트, 오류 로그, 피드백
-├── data/            ← 전사본, 파인튜닝 데이터, 페르소나 JSON
-├── Timeline.md      ← 전체 개발 타임라인
+├── llm/          GPT 호출 (history 받아서 답변 생성)
+├── prompt/       시스템 프롬프트 조립, 감정/품질 가이드라인
+├── memory/       장기/단기 기억, 임베딩, KG, RAG 검색
+├── voice/        STT, TTS
+├── monitoring/   사용 이벤트, 오류 로그, 피드백
+├── data/         전사본, 파인튜닝 데이터, 페르소나 JSON
+├── Timeline.md   전체 개발 타임라인
 └── README.md
 ```
 
