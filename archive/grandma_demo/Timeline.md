@@ -6,30 +6,41 @@ TalkTo 사후 Phase(Persona AI)의 AI 파트 개발 타임라인
 
 ```
 PersonaAI/
-├── llm/         GPT 호출 (history 받아서 답변 생성)
-├── prompt/      시스템 프롬프트 조립, 감정/품질 가이드라인 포함
-├── memory/      장기/단기 기억, 임베딩, KG, RAG 검색
-├── voice/       STT, TTS
-├── monitoring/  사용 이벤트, 오류 로그, 피드백
-└── data/        전사본, 파인튜닝 데이터, 페르소나 JSON
+├── llm/
+│   └── core.py              generate_response() — GPT 호출 핵심 함수
+├── prompt/
+│   └── system_prompt.py     시스템 프롬프트 (Stage 진행하면서 고도화)
+├── memory/                  장기/단기 기억, 임베딩, KG, RAG 검색
+├── voice/                   STT, TTS
+├── monitoring/              사용 이벤트, 오류 로그, 피드백
+├── data/
+│   ├── 전사본분석_임시.md    할머니 말투/성격/기억 분석 (음성 화자분리 후 확정)
+│   └── 전사본_화자표시_임시.md  화자 표시 (음성 화자분리 후 확정)
+├── .vscode/launch.json      VS Code 실행 설정 (F5로 실행 가능)
+├── Timeline.md              이 파일
+└── README.md
 ```
 
 ---
 
-## Stage 1: 최소 동작 챗봇
+## Stage 1: 최소 동작 챗봇 ✅
 
-> 폴더: `llm/`, `prompt/`
+> 폴더: `llm/core.py`, `prompt/system_prompt.py`
 
-### 1-1. GPT 호출 함수 작성
-- 기본 GPT 모델 (gpt-4o-mini) 호출하는 함수 구현
+### 1-1. GPT 호출 함수 작성 ✅
+- `llm/core.py` → `generate_response(message, history)` 함수
+- 기본 GPT 모델 (gpt-4o-mini) 호출
 - 입력: 사용자 메시지, 대화 히스토리 → 출력: 할머니 답변 텍스트
+- 대화형 테스트 루프 포함 (터미널에서 연속 대화 가능)
 
-### 1-2. 간단한 시스템 프롬프트 작성
+### 1-2. 간단한 시스템 프롬프트 작성 ✅
+- `prompt/system_prompt.py` → SYSTEM_PROMPT 변수
 - "너는 83세 할머니 신금자야" 수준의 최소 프롬프트
 
 ### 1-3. 백엔드 연동 인터페이스 협의
-- 백엔드 담당자와 함수 입력/출력 형식 합의
-- AI 모듈을 백엔드가 가져다 쓸 수 있는 구조로 제공
+- 백엔드 담당자에게 함수 구조 공유 완료
+- `generate_response(message: str, history: list) -> str`
+- history는 백엔드가 관리, AI는 받아서 GPT에 전달
 
 ### 이 Stage가 끝나면:
 > `generate_response("할머니야, 안녕", history)` 호출하면 할머니 말투로 답한다. 백엔드가 이 함수를 API 엔드포인트에서 호출할 수 있다.

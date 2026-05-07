@@ -33,14 +33,16 @@ python -m llm.core
 
 ## 코드 구조
 ```
-PersonaAI/
-├── llm/          GPT 호출 (history 받아서 답변 생성)
-├── prompt/       시스템 프롬프트 조립, 감정/품질 가이드라인
-├── memory/       장기/단기 기억, 임베딩, KG, RAG 검색
-├── voice/        STT, TTS
-├── monitoring/   사용 이벤트, 오류 로그, 피드백
-├── data/         전사본, 파인튜닝 데이터, 페르소나 JSON
-├── Timeline.md   전체 개발 타임라인
+TalkTo_AI/
+├── llm/
+│   └── core.py              generate_response() — GPT 호출 핵심 함수
+├── prompt/
+│   └── system_prompt.py     시스템 프롬프트
+├── memory/                  장기/단기 기억, 임베딩, KG, RAG 검색
+├── voice/                   STT, TTS
+├── monitoring/              사용 이벤트, 오류 로그, 피드백
+├── data/                    전사본, 파인튜닝 데이터, 페르소나 JSON
+├── Timeline.md
 └── README.md
 ```
 
@@ -50,7 +52,7 @@ PersonaAI/
 
 | Stage | 내용 | 상태 |
 |---|---|---|
-| 1 | 최소 동작 챗봇 | |
+| 1 | 최소 동작 챗봇 | ✅ |
 | 2 | 프롬프팅 강화 | |
 | 3 | 파인튜닝 | |
 | 4 | 장기 기억 + RAG | |
