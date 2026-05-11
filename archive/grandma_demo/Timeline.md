@@ -27,14 +27,14 @@ PersonaAI/
 
 > 폴더: `llm/core.py`, `prompt/system_prompt.py`
 
-### 1-1. GPT 호출 함수 작성 ✅
+### 1-1. GPT 호출 함수 작성 
 
 - `llm/core.py` → `generate_response(message, history)` 함수
 - 기본 GPT 모델 (gpt-4o-mini) 호출
 - 입력: 사용자 메시지, 대화 히스토리 → 출력: 할머니 답변 텍스트
 - 대화형 테스트 루프 포함 (터미널에서 연속 대화 가능)
 
-### 1-2. 간단한 시스템 프롬프트 작성 ✅
+### 1-2. 간단한 시스템 프롬프트 작성 
 
 - `prompt/system_prompt.py` → SYSTEM_PROMPT 변수
 - "너는 83세 할머니 신금자야" 수준의 최소 프롬프트
