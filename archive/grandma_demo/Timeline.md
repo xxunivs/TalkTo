@@ -51,7 +51,7 @@ PersonaAI/
 
 ---
 
-## Stage 2: 화자 분리 + 전사본 분석
+## Stage 2: 화자 분리 + 전사본 분석 ✅
 
 > 폴더: `data/`
 
@@ -74,7 +74,7 @@ PersonaAI/
 
 ---
 
-## Stage 3: 프롬프팅 강화
+## Stage 3: 프롬프팅 강화 ← 지금 여기
 
 > 폴더: `prompt/`, `data/`
 
