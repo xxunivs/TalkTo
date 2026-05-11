@@ -1,0 +1,8 @@
+{
+    "python.terminal.activateEnvironment": true,
+    "terminal.integrated.cwd": "${workspaceFolder}",
+    "python.terminal.executeInFileDir": false,
+    "code-runner.executorMap": {
+        "python": "cd ${workspaceFolder} && ${pythonPath} -m ${relativeFileDirname}.${fileBasenameNoExtension}"
+    }
+}
