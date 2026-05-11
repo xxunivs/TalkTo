@@ -97,7 +97,7 @@ PersonaAI/
 
 ---
 
-## Stage 4: 파인튜닝 ← 지금 여기
+## Stage 4: 파인튜닝 ✅
 
 > 폴더: `data/`
 
@@ -128,7 +128,7 @@ PersonaAI/
 
 ---
 
-## Stage 5: 장기 기억 + RAG
+## Stage 5: 장기 기억 + RAG ← 지금 여기
 
 > 폴더: `memory/`, `data/`
 
