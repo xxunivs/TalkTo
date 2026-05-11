@@ -164,54 +164,24 @@ PersonaAI/
 
 ---
 
-## Stage 6: KG + 하이브리드 검색
-
-> 폴더: `memory/`
-
-### 6-1. 엔티티 추출
-
-- spaCy NER로 기억 chunk에서 엔티티 추출 (인물, 장소, 사건, 시기)
-
-### 6-2. 지식 그래프 구축
-
-- NetworkX로 엔티티 간 관계 그래프 구축
-- 각 노드에 linked_memory_ids 속성 저장 (HippoRAG 적용)
-
-### 6-3. PPR 검색 구현
-
-- 사용자 질문에서 엔티티 추출 → KG의 시드 노드로 설정
-- Personalized PageRank로 관련 노드 탐색
-- 노드에서 memory_id를 거쳐 실제 기억 텍스트로 변환
-
-### 6-4. 하이브리드 검색 통합
-
-- 기존 임베딩 검색 (70%) + KG PPR 검색 (30%) 가중 결합
-- 기존 RAG 파이프라인의 검색 부분을 하이브리드로 교체
-
-### 이 Stage가 끝나면:
-
-> "이종서 아들은 뭐해?"처럼 관계를 따라가는 질문에도 정확하게 답한다. "할머니 → 이종서 → 이준혁 → 의예과" 관계를 추론한다.
-
----
-
-## Stage 7: 품질 보정
+## Stage 6: 품질 보정
 
 > 폴더: `llm/`, `prompt/`
 
-### 7-1. 프롬프트 기반 품질 가이드라인 강화
+### 6-1. 프롬프트 기반 품질 가이드라인 강화
 
 - "1~2문장으로 답하되 너무 짧게는 하지 마"
 - "이전에 한 말을 반복하지 마"
 - "기억에 없는 건 지어내지 말고 모른다고 해"
 - 프롬프트 수정으로 해결 가능한 부분 먼저 처리
 
-### 7-2. 코드 기반 보정 (프롬프트로 안 되는 경우)
+### 6-2. 코드 기반 보정 (프롬프트로 안 되는 경우)
 
 - 단답 감지 → 재생성 요청
 - 반복 감지 (Jaccard ≥ 0.6) → 재생성 요청
 - 할루시네이션 감지 → 회피 답변 유도
 
-### 7-3. RAG 캐시
+### 6-3. RAG 캐시
 
 - 같은 질문이 45초 안에 다시 오면 캐시된 검색 결과 사용
 - 중복 API 호출 방지
@@ -222,31 +192,31 @@ PersonaAI/
 
 ---
 
-## Stage 8: 음성 (STT/TTS)
+## Stage 7: 음성 (STT/TTS)
 
 > 폴더: `voice/`
 
-### 8-1. STT 구현
+### 7-1. STT 구현
 
 - Whisper API로 음성 → 텍스트 변환하는 함수
 - 잡음 필터링 처리
 
-### 8-2. TTS 구현
+### 7-2. TTS 구현
 
 - ElevenLabs PVC로 텍스트 → 할머니 목소리 변환하는 함수
 - 이미 클로닝된 voice_id 사용
 
-### 8-3. voice-first 흐름 구현
+### 7-3. voice-first 흐름 구현
 
 - Push-to-talk 입력 → STT → 답변 생성 → 할머니 음성 먼저 재생 → 재생 끝나면 텍스트 표시
 - 음성 재생 중 Push-to-talk 비활성화
 
-### 8-4. fallback 처리
+### 7-4. fallback 처리
 
 - TTS 실패 → 텍스트 답변만 표시
 - STT 실패 → "다시 말씀해주세요" 안내
 
-### 8-5. 보안
+### 7-5. 보안
 
 - 생성된 음성 다운로드 금지 (signed URL 짧은 만료)
 
@@ -256,37 +226,37 @@ PersonaAI/
 
 ---
 
-## Stage 9: 단기 기억
+## Stage 8: 단기 기억
 
 > 폴더: `memory/`
 
-### 9-1. 단기 기억 스키마 정의
+### 8-1. 단기 기억 스키마 정의
 
 - 필드: content, category, importance (1~10), strength (기본 1.0), recall_count, last_recalled_at, archived
 - 저장 형태: JSON + 임베딩 파일
 
-### 9-2. 중요도 평가 (ImportanceEvaluator)
+### 8-2. 중요도 평가 (ImportanceEvaluator)
 
 - 매 assistant 답변 직후 5차원 중요도 평가
 - 감정 30%, 관계 25%, 개인정보 15%, 기억가치 20%, 연속성 10%
 - GPT 보조 모델 + 휴리스틱 하이브리드, 일일 100회 제한
 
-### 9-3. 기억 요약 + 저장 (EnhancedMemorySummarizer)
+### 8-3. 기억 요약 + 저장 (EnhancedMemorySummarizer)
 
 - importance ≥ 6이면 요약 생성 (제목, 내용, 인사이트, 감정톤)
 - 임베딩 생성 후 단기 기억 DB에 추가
 
-### 9-4. 단기 기억 검색 — Generative Agents 적용
+### 8-4. 단기 기억 검색 — Generative Agents 적용
 
 - 세 가지 점수 합산: Relevance + Recency + Importance
 - 장기 top-3 + 단기 top-2를 합쳐서 프롬프트에 주입
 
-### 9-5. 회상 시 강도 갱신 — MemoryBank 적용
+### 8-5. 회상 시 강도 갱신 — MemoryBank 적용
 
 - 단기 기억이 검색 결과에 포함되면 strength +1
 - 자주 회상되는 기억은 강해지고, 안 불리는 기억은 약해짐
 
-### 9-6. Reflection
+### 8-6. Reflection
 
 - 코드 작성하되 MVP에서는 비활성화 (REFLECTION_ENABLED=false)
 - 단기 기억 50개 이상 누적 시 메타 인사이트 생성 가능
@@ -297,21 +267,21 @@ PersonaAI/
 
 ---
 
-## Stage 10: 감정 엔진
+## Stage 9: 감정 엔진
 
 > 폴더: `prompt/`
 
-### 10-1. EmotionDetector
+### 9-1. EmotionDetector
 
 - 한국어 키워드 기반 감정 추론
 - 9가지 감정: happy, excited, calm, neutral, sad, worried, stressed, angry, affectionate
 
-### 10-2. EmotionTracker
+### 9-2. EmotionTracker
 
 - EMA(지수이동평균)로 감정 안정화
 - 히스테리시스 + 디바운스로 감정이 갑자기 왔다갔다 안 하게 처리
 
-### 10-3. ToneMapper
+### 9-3. ToneMapper
 
 - 감정 → LLM 프롬프트 톤 지시 조절
 - 감정 → ElevenLabs TTS 설정 조절 (stability, similarity_boost)
@@ -323,34 +293,34 @@ PersonaAI/
 
 ---
 
-## Stage 11: 운영/모니터링
+## Stage 10: 운영/모니터링
 
 > 폴더: `monitoring/`
 
-### 11-1. 사용 이벤트 저장
+### 10-1. 사용 이벤트 저장
 
 - usage_events: ptt_pressed, voice_play_started, text_revealed 등
 
-### 11-2. 오류 로그 저장
+### 10-2. 오류 로그 저장
 
 - error_logs: STT/TTS/LLM/RAG 오류를 provider별로 분리 저장
 
-### 11-3. 피드백 분류
+### 10-3. 피드백 분류
 
 - "사실이 틀렸어요", "기억에 없는 말을 지어냈어요" → 기억 보강 큐
 - "섬뜩하거나 불편했어요" → 윤리/UX 검토 큐
 
-### 11-4. 단기 기억 망각 배치 — MemoryBank 적용
+### 10-4. 단기 기억 망각 배치 — MemoryBank 적용
 
 - 일 1회 cron 실행
 - 14일간 한 번도 회상 안 된 기억은 강도 자연 감쇠
 - 강도 0.1 미만이면 archived 처리
 
-### 11-5. 기억 보강 사이클
+### 10-5. 기억 보강 사이클
 
 - 부정 피드백 → 대표가 가족과 통화 → 장기 기억 수정 → 재임베딩 → 재테스트
 
-### 11-6. 개발자 통계/피드백 페이지 API
+### 10-6. 개발자 통계/피드백 페이지 API
 
 - 통계 카드, 피드백 테이블, 부정 피드백 큐, 오류 로그 조회
 
@@ -360,26 +330,26 @@ PersonaAI/
 
 ---
 
-## Stage 12: 테스트 후 조정
+## Stage 11: 테스트 후 조정
 
 > 폴더: 전체
 
-### 12-1. Reflection 활성화 검토
+### 11-1. Reflection 활성화 검토
 
 - 단기 기억 50개 이상 누적?
 - "맥락 못 짚는다", "같은 말 반복한다" 피드백?
 - 둘 다 Yes → REFLECTION_ENABLED=true
 
-### 12-2. 검색 가중치 조정
+### 11-2. 검색 가중치 조정
 
 - relevance, recency, importance 비율 미세 조정
 - 가족 만족도 기반
 
-### 12-3. 추출 임계값 조정
+### 11-3. 추출 임계값 조정
 
 - 단기 기억이 너무 적으면 5점으로, 너무 많으면 7점으로
 
-### 12-4. 장기/단기 우선순위 재검토
+### 11-4. 장기/단기 우선순위 재검토
 
 - 충돌 사례 발생 시 정책 재검토
 
