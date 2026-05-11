@@ -74,7 +74,7 @@ PersonaAI/
 
 ---
 
-## Stage 3: 프롬프팅 강화 ← 지금 여기
+## Stage 3: 프롬프팅 강화 ✅
 
 > 폴더: `prompt/`, `data/`
 
@@ -97,7 +97,7 @@ PersonaAI/
 
 ---
 
-## Stage 4: 파인튜닝
+## Stage 4: 파인튜닝 ← 지금 여기
 
 > 폴더: `data/`
 
