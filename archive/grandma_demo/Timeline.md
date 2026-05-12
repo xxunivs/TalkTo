@@ -128,7 +128,7 @@ PersonaAI/
 
 ---
 
-## Stage 5: 장기 기억 + RAG ← 지금 여기
+## Stage 5: 장기 기억 + RAG ✅
 
 > 폴더: `memory/`, `data/`
 
@@ -136,27 +136,23 @@ PersonaAI/
 
 - 전사본 + 가족 정보에서 기억을 하나씩 정리
 - 각 chunk에 id, category, title, content, importance 부여
-- 6대 차원 분류 (언어 / 심리 / 관계 / 가치관 / 기억 소환 / 논리 추론)
+- `data/memories.json`에 37개 chunk 저장
 
 ### 5-2. 임베딩 생성
 
 - 각 기억 chunk를 벡터로 변환 (text-embedding-3-small, 1536차원)
-- 임베딩 인덱스 파일로 저장
+- `data/memory_embeddings.json`에 저장
 
 ### 5-3. RAG 검색 구현
 
+- `memory/embeddings.py` → `search_memories(query, top_k=5)` 함수
 - 사용자 질문을 임베딩 → 기억 chunk와 코사인 유사도 비교
 - 관련 기억 top-5를 프롬프트에 주입
-- 장기 기억 우선 원칙 적용
+- `llm/core.py`에 RAG 연결 완료
 
 ### 5-4. 재임베딩 스크립트
 
-- 기억 추가/수정 시 해당 chunk만 재임베딩하는 도구
-- 전체 재임베딩 명령도 별도 제공
-
-### 5-5. 페르소나 프로필에 기억 반영
-
-- Stage 3에서 만든 JSON의 memories 배열에 기억 chunk 채우기
+- `python -m memory.embeddings --build`로 전체 재임베딩
 
 ### 이 Stage가 끝나면:
 
@@ -164,7 +160,7 @@ PersonaAI/
 
 ---
 
-## Stage 6: 품질 보정
+## Stage 6: 품질 보정 ← 지금 여기
 
 > 폴더: `llm/`, `prompt/`
 
