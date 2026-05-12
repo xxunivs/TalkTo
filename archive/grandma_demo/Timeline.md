@@ -7,17 +7,39 @@ TalkTo 사후 Phase(Persona AI)의 AI 파트 개발 타임라인
 ```
 PersonaAI/
 ├── llm/
-│   └── core.py              generate_response() — GPT 호출 핵심 함수
+│   └── core.py                     generate_response() — GPT 호출 + RAG 연결
 ├── prompt/
-│   └── system_prompt.py     시스템 프롬프트 (Stage 진행하면서 고도화)
-├── memory/                  장기/단기 기억, 임베딩, KG, RAG 검색
-├── voice/                   STT, TTS
-├── monitoring/              사용 이벤트, 오류 로그, 피드백
+│   ├── system_prompt.py            현재 사용 중인 프롬프트 (A를 가리킴)
+│   ├── system_prompt_A.py          상세 프롬프트 (기본 GPT용)
+│   ├── system_prompt_B.py          최소 프롬프트 (파인튜닝용)
+│   ├── system_prompt_C.py          상세 프롬프트 (파인튜닝용, A와 동일)
+│   ├── eval_questions.py           평가 질문 20개
+│   ├── eval_run.py                 평가 실행
+│   ├── eval_all.py                 9가지 조합 평가
+│   └── eval_prototype.py           대표 모델 평가
+├── memory/
+│   ├── embeddings.py               임베딩 생성 + RAG 검색 (top_k=5)
+│   └── short_term.py               단기 기억 스키마 + 저장/조회/강도갱신
+├── voice/
+│   ├── stt.py                      transcribe() — Whisper 음성→텍스트
+│   └── tts.py                      synthesize() — ElevenLabs 텍스트→할머니 목소리
+├── monitoring/                     (미구현)
 ├── data/
-│   ├── voice_raw/           할머니 음성 원본 wav 13개 (GitHub 미포함)
-│   ├── 전사본분석_임시.md    할머니 말투/성격/기억 분석 (화자분리 후 확정)
-│   └── 전사본_화자표시_임시.md  화자 표시 (화자분리 후 확정)
-├── Timeline.md              이 파일
+│   ├── voice_raw/                  할머니 음성 원본 wav 13개 (GitHub 미포함)
+│   ├── 전사본.txt                  1~13 순서 정렬
+│   ├── 전사본_화자구분.txt          화자 분리 완료
+│   ├── 할머니_분석.md              7개 카테고리 분석
+│   ├── memories.json               장기 기억 chunk 37개
+│   ├── memory_embeddings.json      장기 기억 임베딩 벡터
+│   ├── short_term_memories.json    단기 기억 (대화 중 자동 저장)
+│   ├── finetune_train.jsonl        파인튜닝 학습 데이터 262건
+│   ├── finetune_val.jsonl          파인튜닝 검증 데이터 30건
+│   └── eval_comparison.md          9가지 조합 비교 결과
+├── tools/
+│   ├── build_finetune_dataset.py   전사본 → JSONL 변환
+│   ├── run_finetune.py             파인튜닝 실행/상태 확인
+│   └── reorder_transcript.py       전사본 순서 정렬
+├── Timeline.md
 └── README.md
 ```
 
@@ -25,23 +47,20 @@ PersonaAI/
 
 ## Stage 1: 최소 동작 챗봇 ✅
 
-> 폴더: `llm/core.py`, `prompt/system_prompt.py`
-
-### 1-1. GPT 호출 함수 작성 
+### 1-1. GPT 호출 함수 작성
 
 - `llm/core.py` → `generate_response(message, history)` 함수
-- 기본 GPT 모델 (gpt-4o-mini) 호출
+- 기본 GPT 모델 (gpt-4.1-mini) 호출
 - 입력: 사용자 메시지, 대화 히스토리 → 출력: 할머니 답변 텍스트
 - 대화형 테스트 루프 포함 (터미널에서 연속 대화 가능)
 
-### 1-2. 간단한 시스템 프롬프트 작성 
+### 1-2. 간단한 시스템 프롬프트 작성
 
-- `prompt/system_prompt.py` → SYSTEM_PROMPT 변수
-- "너는 83세 할머니 신금자야" 수준의 최소 프롬프트
+- `prompt/system_prompt.py` → 현재 사용 중인 프롬프트 선택 (A를 가리킴)
 
 ### 1-3. 백엔드 연동 인터페이스 협의
 
-- 백엔드 담당자에게 함수 구조 공유 완료
+- 백엔드 담당자에게 함수 구조 공유
 - `generate_response(message: str, history: list) -> str`
 - history는 백엔드가 관리, AI는 받아서 GPT에 전달
 
@@ -53,20 +72,16 @@ PersonaAI/
 
 ## Stage 2: 화자 분리 + 전사본 분석 ✅
 
-> 폴더: `data/`
-
 ### 2-1. 화자 분리
 
 - 음성 원본 파일 수령 완료 (wav 13개, `data/voice_raw/`)
-- 전사본을 Claude에 넣어서 맥락 기반 화자 분리 (할머니 / 손자 / 손녀 구분)
-- 화자 표시된 전사본 확정
+- `tools/reorder_transcript.py`로 전사본 1~13 순서 정렬 → `data/전사본.txt`
+- Claude에 넣어서 맥락 기반 화자 분리 → `data/전사본_화자구분.txt`
 
 ### 2-2. 전사본 분석
 
-- 화자 분리된 전사본 기반으로 분석
-- 할머니 말투 패턴 정리 (사투리, 자주 쓰는 표현, 문장 끝 처리)
-- 성격/감정 패턴 정리 (걱정, 칭찬, 관심 표현 방식)
-- 사실 정보 추출 (가족관계, 요리법, 경험, 가치관)
+- 화자 분리된 전사본 기반으로 7개 카테고리 분석 → `data/할머니_분석.md`
+- 기본정보, 언어적 특징, 성격/심리, 관계, 가치관, 기억/경험, 대화패턴
 
 ### 이 Stage가 끝나면:
 
@@ -76,51 +91,42 @@ PersonaAI/
 
 ## Stage 3: 프롬프팅 강화 ✅
 
-> 폴더: `prompt/`, `data/`
+### 3-1. 시스템 프롬프트 A/B/C 작성
 
-### 3-1. 시스템 프롬프트 개선
+- `prompt/system_prompt_A.py` — 상세 프롬프트 (말투+성격+규칙, 기본 GPT용)
+- `prompt/system_prompt_B.py` — 최소 프롬프트 (사실 정보+금지 사항만, 파인튜닝용)
+- `prompt/system_prompt_C.py` — 상세 프롬프트 (파인튜닝 모델용, A와 동일)
 
-- Stage 2 분석 결과를 시스템 프롬프트에 반영
-- 말투 예시, 행동 가이드라인, 성격 특성, 감정/품질 가이드라인 포함
-- Stage 1의 간단한 프롬프트를 교체
+### 3-2. 말투 평가 세트 구축
 
-### 3-2. 페르소나 프로필 JSON 작성
-
-- metadata: 이름, 나이, 관계
-- personality: 핵심 성격 특성
-- system_prompt: 기본 프롬프트 + 행동 가이드라인 + 말투 예시
-- memories: 빈 배열 (Stage 5에서 채움)
+- `prompt/eval_questions.py` — 평가 질문 20개 (실제 할머니 답변 포함)
+- `prompt/eval_run.py` — 평가 자동 실행 스크립트
 
 ### 이 Stage가 끝나면:
 
-> 시스템 프롬프트가 정교해져서 할머니 말투/성격이 더 자연스럽다. 전라도 사투리, 걱정 표현, 요리 설명 스타일이 반영된다.
+> 시스템 프롬프트가 정교해져서 할머니 말투/성격이 더 자연스럽다.
 
 ---
 
 ## Stage 4: 파인튜닝 ✅
 
-> 폴더: `data/`
-
 ### 4-1. 파인튜닝 데이터셋 구축
 
-- 화자 분리된 전사본에서 user(손자/손녀) - assistant(할머니) 대화쌍 추출
-- OpenAI 파인튜닝 JSONL 형식으로 변환
-- 슬라이딩 윈도우로 학습 데이터 증강
+- `tools/build_finetune_dataset.py` — 전사본 → JSONL 변환 (슬라이딩 윈도우)
+- `data/finetune_train.jsonl` — 학습 데이터 262건
+- `data/finetune_val.jsonl` — 검증 데이터 30건
 
 ### 4-2. 파인튜닝 실행
 
-- OpenAI Fine-tuning API로 모델 학습 (gpt-4o-mini 기반)
-- 학습 완료 후 모델 ID 발급
+- `tools/run_finetune.py` — OpenAI Fine-tuning API 실행/상태 확인
+- 모델: `ft:gpt-4.1-mini-2025-04-14:talkto::DeJqGFij`
 
-### 4-3. 프롬프팅 vs 파인튜닝 비교 테스트
+### 4-3. 9가지 조합 비교 테스트
 
-- 동일한 질문 세트로 두 방식 비교
-- 할머니다움, 말투 자연스러움, 사실 정확도 평가
-- 결과에 따라 방향 결정 (프롬프팅만 / 파인튜닝 / 둘 다)
-
-### 4-4. 챗봇에 적용
-
-- 결정된 방식으로 기존 챗봇의 모델/프롬프트 교체
+- `prompt/eval_all.py` — 기본/파인튜닝 × 상세/최소 × RAG유무 = 8가지 + 대표 모델
+- `prompt/eval_prototype.py` — 대표 파인튜닝 모델 평가
+- `data/eval_comparison.md` — 9가지 조합 비교 결과
+- 결론: 기본 GPT + 상세 프롬프트 A + RAG (조합 3)이 현재 최선
 
 ### 이 Stage가 끝나면:
 
@@ -130,33 +136,24 @@ PersonaAI/
 
 ## Stage 5: 장기 기억 + RAG ✅
 
-> 폴더: `memory/`, `data/`
-
 ### 5-1. 기억 chunk 추출
 
-- 전사본 + 가족 정보에서 기억을 하나씩 정리
-- 각 chunk에 id, category, title, content, importance 부여
-- `data/memories.json`에 37개 chunk 저장
+- `data/memories.json` — 장기 기억 chunk 37개 (가족, 요리, 추억, 가치관 등)
+- 할머니_분석.md 기반, 관계 정보 보강 포함
 
 ### 5-2. 임베딩 생성
 
-- 각 기억 chunk를 벡터로 변환 (text-embedding-3-small, 1536차원)
-- `data/memory_embeddings.json`에 저장
+- `data/memory_embeddings.json` — 37개 chunk의 임베딩 벡터
+- `python -m memory.embeddings --build`로 생성/재생성
 
 ### 5-3. RAG 검색 구현
 
 - `memory/embeddings.py` → `search_memories(query, top_k=5)` 함수
-- 사용자 질문을 임베딩 → 기억 chunk와 코사인 유사도 비교
-- 관련 기억 top-5를 프롬프트에 주입
-- `llm/core.py`에 RAG 연결 완료
-
-### 5-4. 재임베딩 스크립트
-
-- `python -m memory.embeddings --build`로 전체 재임베딩
+- `llm/core.py`에 RAG 연결 — 검색된 기억을 프롬프트에 주입
 
 ### 이 Stage가 끝나면:
 
-> "할머니 불고기 어떻게 만들어?"에 실제 할머니가 알려준 레시피 기반으로 답한다. 기억 없이 지어내던 이전과 달리, 실제 데이터에 근거한 답변을 한다.
+> "할머니 불고기 어떻게 만들어?"에 실제 할머니가 알려준 레시피 기반으로 답한다.
 
 ---
 
@@ -166,10 +163,8 @@ PersonaAI/
 
 ### 6-1. 프롬프트 기반 품질 가이드라인 강화
 
-- "1~2문장으로 답하되 너무 짧게는 하지 마"
-- "이전에 한 말을 반복하지 마"
-- "기억에 없는 건 지어내지 말고 모른다고 해"
-- 프롬프트 수정으로 해결 가능한 부분 먼저 처리
+- 프롬프트 A에 기본 가이드라인 이미 포함
+- 추후 실제 테스트 피드백 반영해서 개선
 
 ### 6-2. 코드 기반 보정 (프롬프트로 안 되는 경우)
 
@@ -180,41 +175,27 @@ PersonaAI/
 ### 6-3. RAG 캐시
 
 - 같은 질문이 45초 안에 다시 오면 캐시된 검색 결과 사용
-- 중복 API 호출 방지
-
-### 이 Stage가 끝나면:
-
-> 너무 짧게 답하거나, 같은 말 반복하거나, 모르는 걸 지어내지 않는다.
 
 ---
 
 ## Stage 7: 음성 (STT/TTS) ✅
 
-> 폴더: `voice/`
-
 ### 7-1. STT 구현
 
-- Whisper API로 음성 → 텍스트 변환하는 함수
-- 잡음 필터링 처리
+- `voice/stt.py` → `transcribe(audio_path)` 함수
+- Whisper API로 음성 → 텍스트 변환
+- 에러 처리 포함 (success/error 반환)
 
 ### 7-2. TTS 구현
 
-- ElevenLabs PVC로 텍스트 → 할머니 목소리 변환하는 함수
-- 이미 클로닝된 voice_id 사용
+- `voice/tts.py` → `synthesize(text, output_path)` 함수
+- ElevenLabs PVC로 텍스트 → 할머니 목소리 변환
+- voice_id: `lTmcD2Kp43w1lHsMQmq7` (대표가 클로닝 완료)
+- 에러 처리 포함 (success/error 반환)
 
-### 7-3. voice-first 흐름 구현
+### 7-3~7-5. voice-first 흐름, fallback, 보안
 
-- Push-to-talk 입력 → STT → 답변 생성 → 할머니 음성 먼저 재생 → 재생 끝나면 텍스트 표시
-- 음성 재생 중 Push-to-talk 비활성화
-
-### 7-4. fallback 처리
-
-- TTS 실패 → 텍스트 답변만 표시
-- STT 실패 → "다시 말씀해주세요" 안내
-
-### 7-5. 보안
-
-- 생성된 음성 다운로드 금지 (signed URL 짧은 만료)
+- 프론트/백엔드 영역. AI는 함수만 제공.
 
 ### 이 Stage가 끝나면:
 
@@ -228,8 +209,9 @@ PersonaAI/
 
 ### 8-1. 단기 기억 스키마 정의
 
-- 필드: content, category, importance (1~10), strength (기본 1.0), recall_count, last_recalled_at, archived
-- 저장 형태: JSON + 임베딩 파일
+- `memory/short_term.py` — 스키마, 저장/조회/강도갱신 함수
+- `data/short_term_memories.json` — 단기 기억 저장 파일
+- 필드: id, content, category, importance, strength, recall_count, created_at, last_recalled_at, archived
 
 ### 8-2. 중요도 평가 (ImportanceEvaluator)
 
