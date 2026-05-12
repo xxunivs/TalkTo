@@ -157,43 +157,22 @@ PersonaAI/
 
 ---
 
-## Stage 6: 품질 보정 (보류)
+## Stage 6: 음성 (STT/TTS) ✅
 
-> 폴더: `llm/`, `prompt/`
-
-### 6-1. 프롬프트 기반 품질 가이드라인 강화
-
-- 프롬프트 A에 기본 가이드라인 이미 포함
-- 추후 실제 테스트 피드백 반영해서 개선
-
-### 6-2. 코드 기반 보정 (프롬프트로 안 되는 경우)
-
-- 단답 감지 → 재생성 요청
-- 반복 감지 (Jaccard ≥ 0.6) → 재생성 요청
-- 할루시네이션 감지 → 회피 답변 유도
-
-### 6-3. RAG 캐시
-
-- 같은 질문이 45초 안에 다시 오면 캐시된 검색 결과 사용
-
----
-
-## Stage 7: 음성 (STT/TTS) ✅
-
-### 7-1. STT 구현
+### 6-1. STT 구현
 
 - `voice/stt.py` → `transcribe(audio_path)` 함수
 - Whisper API로 음성 → 텍스트 변환
 - 에러 처리 포함 (success/error 반환)
 
-### 7-2. TTS 구현
+### 6-2. TTS 구현
 
 - `voice/tts.py` → `synthesize(text, output_path)` 함수
 - ElevenLabs PVC로 텍스트 → 할머니 목소리 변환
 - voice_id: `lTmcD2Kp43w1lHsMQmq7` (대표가 클로닝 완료)
 - 에러 처리 포함 (success/error 반환)
 
-### 7-3~7-5. voice-first 흐름, fallback, 보안
+### 6-3. voice-first 흐름, fallback, 보안
 
 - 프론트/백엔드 영역. AI는 함수만 제공.
 
@@ -203,41 +182,28 @@ PersonaAI/
 
 ---
 
-## Stage 8: 단기 기억 ✅
+## Stage 7: 단기 기억 ✅
 
-> 폴더: `memory/`
-
-### 8-1. 단기 기억 스키마 정의
+### 7-1. 단기 기억 스키마 정의
 
 - `memory/short_term.py` — 스키마, 저장/조회/강도갱신 함수
 - `data/short_term_memories.json` — 단기 기억 저장 파일
-- 필드: id, content, category, importance, strength, recall_count, created_at, last_recalled_at, archived
 
-### 8-2. 중요도 평가 (ImportanceEvaluator)
+### 7-2. 중요도 평가
 
-- 매 assistant 답변 직후 5차원 중요도 평가
-- 감정 30%, 관계 25%, 개인정보 15%, 기억가치 20%, 연속성 10%
-- GPT 보조 모델 + 휴리스틱 하이브리드, 일일 100회 제한
+- `memory/importance.py` → `evaluate_importance(user_msg, assistant_msg)` 함수
+- GPT 기반 5차원 중요도 평가 (감정, 관계, 개인정보, 기억가치, 연속성)
 
-### 8-3. 기억 요약 + 저장 (EnhancedMemorySummarizer)
+### 7-3. 기억 추출 + 저장
 
-- importance ≥ 6이면 요약 생성 (제목, 내용, 인사이트, 감정톤)
-- 임베딩 생성 후 단기 기억 DB에 추가
+- `memory/extract.py` → `extract_and_save(user_msg, assistant_msg)` 함수
+- importance ≥ 6이면 단기 기억에 자동 저장
+- `llm/core.py` 대화 루프에 연결 완료
 
-### 8-4. 단기 기억 검색 — Generative Agents 적용
+### 7-4. 단기 기억 검색
 
-- 세 가지 점수 합산: Relevance + Recency + Importance
-- 장기 top-3 + 단기 top-2를 합쳐서 프롬프트에 주입
-
-### 8-5. 회상 시 강도 갱신 — MemoryBank 적용
-
-- 단기 기억이 검색 결과에 포함되면 strength +1
-- 자주 회상되는 기억은 강해지고, 안 불리는 기억은 약해짐
-
-### 8-6. Reflection
-
-- 코드 작성하되 MVP에서는 비활성화 (REFLECTION_ENABLED=false)
-- 단기 기억 50개 이상 누적 시 메타 인사이트 생성 가능
+- `llm/core.py`에서 장기 top-3 + 단기 최근 2개 합쳐서 프롬프트에 주입
+- 회상된 단기 기억은 `on_memory_recalled()`로 strength +1
 
 ### 이 Stage가 끝나면:
 
@@ -245,92 +211,47 @@ PersonaAI/
 
 ---
 
-## Stage 9: 감정 엔진
+## Stage 8: 프롬프트 조정 ← 다음
 
-> 폴더: `prompt/`
+> 파일: `prompt/system_prompt_A.py`
 
-### 9-1. EmotionDetector
+### 8-1. eval 결과 기반 문제점 파악
 
-- 한국어 키워드 기반 감정 추론
-- 9가지 감정: happy, excited, calm, neutral, sad, worried, stressed, angry, affectionate
+- `python -m prompt.eval_run`으로 20개 질문 답변 확인
+- `data/eval_comparison.md` 9가지 조합 비교 참고
+- 현재 최선 조합: 기본 GPT (gpt-4.1-mini) + 상세 프롬프트 A + RAG
 
-### 9-2. EmotionTracker
+### 8-2. 말투 자연스러움 개선
 
-- EMA(지수이동평균)로 감정 안정화
-- 히스테리시스 + 디바운스로 감정이 갑자기 왔다갔다 안 하게 처리
+- GPT가 만들어내는 잘못된 사투리 금지 목록 확대 (~한디, ~다꼬, ~구먼, ~당께, ~했슈 등)
+- 실제 할머니 사투리만 허용 (께름하다, 질력나다, 그러니끼 등)
+- `data/할머니_분석.md` 언어적 특징 섹션 참고
 
-### 9-3. ToneMapper
+### 8-3. 답변 길이/톤 조정
 
-- 감정 → LLM 프롬프트 톤 지시 조절
-- 감정 → ElevenLabs TTS 설정 조절 (stability, similarity_boost)
-- 슬플 때 → 따뜻한 위로 톤, 기쁠 때 → 밝은 톤
+- 안부 대화: 1~2문장 유지
+- 요리 설명: 길게 허용하되 할머니 말투로
+- 위로/칭찬: 너무 빈약하지 않게 (현재 "어. 왜?" 수준 → 개선)
+- "밖에서 사먹는 거 어때?" 같은 가치관 질문에 할머니답게 답하게
 
-### 이 Stage가 끝나면:
+### 8-4. 매번 붙는 패턴 방지
 
-> 슬픈 메시지에는 따뜻한 위로, 기쁜 메시지에는 칭찬. 할머니 톤이 감정에 맞게 변한다.
+- "사랑한다"는 작별 인사 때만
+- "건강은 괜찮니?", "날씨는 춥지 않지?" 매번 안 붙이기
+- 질문은 한 번에 1개만
 
----
+### 8-5. 파인튜닝 모델 재학습 검토
 
-## Stage 10: 운영/모니터링
+- 프롬프트 조정 후 파인튜닝 데이터셋도 업데이트 필요한지 판단
+- 파인튜닝 모델이 RAG 기억을 무시하는 문제 해결 방안 검토
+- 필요하면 파인튜닝 데이터에 RAG 기억 포함시켜 재학습
 
-> 폴더: `monitoring/`
+### 8-6. eval 재실행 + 비교
 
-### 10-1. 사용 이벤트 저장
-
-- usage_events: ptt_pressed, voice_play_started, text_revealed 등
-
-### 10-2. 오류 로그 저장
-
-- error_logs: STT/TTS/LLM/RAG 오류를 provider별로 분리 저장
-
-### 10-3. 피드백 분류
-
-- "사실이 틀렸어요", "기억에 없는 말을 지어냈어요" → 기억 보강 큐
-- "섬뜩하거나 불편했어요" → 윤리/UX 검토 큐
-
-### 10-4. 단기 기억 망각 배치 — MemoryBank 적용
-
-- 일 1회 cron 실행
-- 14일간 한 번도 회상 안 된 기억은 강도 자연 감쇠
-- 강도 0.1 미만이면 archived 처리
-
-### 10-5. 기억 보강 사이클
-
-- 부정 피드백 → 대표가 가족과 통화 → 장기 기억 수정 → 재임베딩 → 재테스트
-
-### 10-6. 개발자 통계/피드백 페이지 API
-
-- 통계 카드, 피드백 테이블, 부정 피드백 큐, 오류 로그 조회
+- 프롬프트 수정 후 `python -m prompt.eval_run`으로 재평가
+- 이전 결과와 비교해서 개선 여부 확인
+- 만족스러울 때까지 8-2 ~ 8-6 반복
 
 ### 이 Stage가 끝나면:
 
-> 피드백/오류를 추적하고, 부정 피드백 → 기억 보강 → 재테스트 사이클이 돌아간다.
-
----
-
-## Stage 11: 테스트 후 조정
-
-> 폴더: 전체
-
-### 11-1. Reflection 활성화 검토
-
-- 단기 기억 50개 이상 누적?
-- "맥락 못 짚는다", "같은 말 반복한다" 피드백?
-- 둘 다 Yes → REFLECTION_ENABLED=true
-
-### 11-2. 검색 가중치 조정
-
-- relevance, recency, importance 비율 미세 조정
-- 가족 만족도 기반
-
-### 11-3. 추출 임계값 조정
-
-- 단기 기억이 너무 적으면 5점으로, 너무 많으면 7점으로
-
-### 11-4. 장기/단기 우선순위 재검토
-
-- 충돌 사례 발생 시 정책 재검토
-
-### 이 Stage가 끝나면:
-
-> 가족 테스트 데이터 기반으로 최적화된 최종 MVP.
+> 할머니 말투가 자연스럽고, 요리법은 정확하고, 감정 표현도 적절한 수준의 챗봇이 완성된다.
