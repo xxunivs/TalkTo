@@ -6,8 +6,8 @@ TalkTo 사후 Phase — 할머니 페르소나 AI 챗봇의 AI 파트
 
 ### 1. 레포 클론
 ```bash
-git clone https://github.com/MediLux-TalkTo/TalkTo_AI.git
-cd TalkTo_AI
+git clone https://github.com/MediLux-TalkTo/TalkTo_PersonaAI_AI.git
+cd TalkTo_PersonaAI_AI
 ```
 
 ### 2. Python 가상환경 생성

@@ -33,10 +33,8 @@ def generate_response(message: str, history: list = None) -> str:
     # 1. 장기 기억 검색 (top 5)
     long_term = search_memories(message, top_k=5)
 
-    # 2. 단기 기억 검색 (최근 대화에서 저장된 것, top 2)
-    short_term_all = get_active_memories()
-    # 단기 기억 중 관련 있는 것 선택 (최근 것 우선, 최대 2개)
-    short_term = short_term_all[-2:] if short_term_all else []
+    # 2. 단기 기억 전부 (중요도 6 이상만 저장된 것들)
+    short_term = get_active_memories()
 
     # 3. 기억을 텍스트로 변환
     memory_parts = []
