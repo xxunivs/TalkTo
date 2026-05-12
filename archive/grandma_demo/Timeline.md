@@ -203,7 +203,7 @@ PersonaAI/
 
 ---
 
-## Stage 8: 단기 기억 ← 지금 여기
+## Stage 8: 단기 기억 ✅
 
 > 폴더: `memory/`
 
