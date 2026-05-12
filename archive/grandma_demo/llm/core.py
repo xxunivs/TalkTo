@@ -30,8 +30,8 @@ def generate_response(message: str, history: list = None) -> str:
     if history is None:
         history = []
 
-    # 1. 장기 기억 검색 (top 3)
-    long_term = search_memories(message, top_k=3)
+    # 1. 장기 기억 검색 (top 5)
+    long_term = search_memories(message, top_k=5)
 
     # 2. 단기 기억 검색 (최근 대화에서 저장된 것, top 2)
     short_term_all = get_active_memories()
