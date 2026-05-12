@@ -7,6 +7,7 @@ from openai import OpenAI
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from prompt.system_prompt import SYSTEM_PROMPT
 from memory.embeddings import search_memories
+from memory.short_term import get_active_memories, on_memory_recalled
 from memory.extract import extract_and_save
 
 # .env 파일에서 API 키 읽어오기
@@ -29,17 +30,27 @@ def generate_response(message: str, history: list = None) -> str:
     if history is None:
         history = []
 
-    # 1. 관련 기억 검색 (top 5)
-    memories = search_memories(message, top_k=5)
+    # 1. 장기 기억 검색 (top 3)
+    long_term = search_memories(message, top_k=3)
 
-    # 2. 기억을 텍스트로 변환
-    if memories:
-        memory_text = "\n".join(
-            [f"- {m['title']}: {m['content']}" for m in memories]
-        )
-        memory_section = f"\n\n[할머니의 관련 기억]\n{memory_text}"
-    else:
-        memory_section = ""
+    # 2. 단기 기억 검색 (최근 대화에서 저장된 것, top 2)
+    short_term_all = get_active_memories()
+    # 단기 기억 중 관련 있는 것 선택 (최근 것 우선, 최대 2개)
+    short_term = short_term_all[-2:] if short_term_all else []
+
+    # 3. 기억을 텍스트로 변환
+    memory_parts = []
+    if long_term:
+        lt_text = "\n".join([f"- {m['title']}: {m['content']}" for m in long_term])
+        memory_parts.append(f"[장기 기억]\n{lt_text}")
+    if short_term:
+        st_text = "\n".join([f"- {m['content']}" for m in short_term])
+        memory_parts.append(f"[최근 대화에서 알게 된 것]\n{st_text}")
+        # 회상된 단기 기억 강도 갱신
+        for m in short_term:
+            on_memory_recalled(m["id"])
+
+    memory_section = "\n\n" + "\n\n".join(memory_parts) if memory_parts else ""
 
     # 3. 프롬프트 조립
     messages = []
