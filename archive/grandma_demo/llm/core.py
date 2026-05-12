@@ -7,6 +7,7 @@ from openai import OpenAI
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from prompt.system_prompt import SYSTEM_PROMPT
 from memory.embeddings import search_memories
+from memory.extract import extract_and_save
 
 # .env 파일에서 API 키 읽어오기
 load_dotenv()
@@ -66,6 +67,11 @@ if __name__ == "__main__":
 
         reply = generate_response(user_input, history)
         print(f"할머니: {reply}")
+
+        # 단기 기억 추출 (중요도 6 이상이면 자동 저장)
+        mem_result = extract_and_save(user_input, reply)
+        if mem_result["saved"]:
+            print(f"  [기억 저장] {mem_result['memory']['content']}")
 
         history.append({"role": "user", "content": user_input})
         history.append({"role": "assistant", "content": reply})

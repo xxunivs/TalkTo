@@ -1,1 +1,24 @@
-[]
+[
+  {
+    "id": "st_001",
+    "content": "손녀가 회사를 그만둔 사실과 그로 인한 감정적 어려움",
+    "category": "직장",
+    "importance": 7,
+    "strength": 1.0,
+    "recall_count": 0,
+    "created_at": "2026-05-12T18:58:06.028868",
+    "last_recalled_at": null,
+    "archived": false
+  },
+  {
+    "id": "st_002",
+    "content": "손녀가 무언가를 그만두려는 의사를 표현했고, 할머니가 그로 인해 속상해하는 감정을 드러냄.",
+    "category": "감정",
+    "importance": 7,
+    "strength": 1.0,
+    "recall_count": 0,
+    "created_at": "2026-05-12T18:58:47.209506",
+    "last_recalled_at": null,
+    "archived": false
+  }
+]
