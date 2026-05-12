@@ -8,7 +8,6 @@ PersonaAI/
 │   ├── system_prompt.py            현재 사용 중인 프롬프트 (A를 가리킴)
 │   ├── system_prompt_A.py          상세 프롬프트 (기본 GPT용)
 │   ├── system_prompt_B.py          최소 프롬프트 (파인튜닝용)
-│   ├── system_prompt_C.py          상세 프롬프트 (파인튜닝용, A와 동일)
 │   ├── eval_questions.py           평가 질문 20개
 │   ├── eval_run.py                 평가 실행
 │   ├── eval_all.py                 9가지 조합 평가
@@ -75,10 +74,6 @@ PersonaAI/
 **역할**: 최소 프롬프트 (파인튜닝 모델용). 말투 지시 없음.
 - 기본 정보, 가족 관계, 금지 사항만 포함
 - 말투는 파인튜닝이 학습하므로 프롬프트에서 제외
-
-### system_prompt_C.py
-**역할**: 상세 프롬프트 (파인튜닝 모델용). A와 동일.
-- A를 import해서 사용
 
 ### eval_questions.py
 **역할**: 말투 평가용 질문 20개. 실제 할머니 답변 포함.
