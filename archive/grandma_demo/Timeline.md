@@ -160,7 +160,7 @@ PersonaAI/
 
 ---
 
-## Stage 6: 품질 보정 ← 지금 여기
+## Stage 6: 품질 보정 (보류)
 
 > 폴더: `llm/`, `prompt/`
 
@@ -188,7 +188,7 @@ PersonaAI/
 
 ---
 
-## Stage 7: 음성 (STT/TTS)
+## Stage 7: 음성 (STT/TTS) ✅
 
 > 폴더: `voice/`
 
@@ -222,7 +222,7 @@ PersonaAI/
 
 ---
 
-## Stage 8: 단기 기억
+## Stage 8: 단기 기억 ← 지금 여기
 
 > 폴더: `memory/`
 
