@@ -2,46 +2,7 @@
 
 TalkTo 사후 Phase(Persona AI)의 AI 파트 개발 타임라인
 
-## 코드 구조 (기능별)
-
-```
-PersonaAI/
-├── llm/
-│   └── core.py                     generate_response() — GPT 호출 + RAG 연결
-├── prompt/
-│   ├── system_prompt.py            현재 사용 중인 프롬프트 (A를 가리킴)
-│   ├── system_prompt_A.py          상세 프롬프트 (기본 GPT용)
-│   ├── system_prompt_B.py          최소 프롬프트 (파인튜닝용)
-│   ├── system_prompt_C.py          상세 프롬프트 (파인튜닝용, A와 동일)
-│   ├── eval_questions.py           평가 질문 20개
-│   ├── eval_run.py                 평가 실행
-│   ├── eval_all.py                 9가지 조합 평가
-│   └── eval_prototype.py           대표 모델 평가
-├── memory/
-│   ├── embeddings.py               임베딩 생성 + RAG 검색 (top_k=5)
-│   └── short_term.py               단기 기억 스키마 + 저장/조회/강도갱신
-├── voice/
-│   ├── stt.py                      transcribe() — Whisper 음성→텍스트
-│   └── tts.py                      synthesize() — ElevenLabs 텍스트→할머니 목소리
-├── monitoring/                     (미구현)
-├── data/
-│   ├── voice_raw/                  할머니 음성 원본 wav 13개 (GitHub 미포함)
-│   ├── 전사본.txt                  1~13 순서 정렬
-│   ├── 전사본_화자구분.txt          화자 분리 완료
-│   ├── 할머니_분석.md              7개 카테고리 분석
-│   ├── memories.json               장기 기억 chunk 37개
-│   ├── memory_embeddings.json      장기 기억 임베딩 벡터
-│   ├── short_term_memories.json    단기 기억 (대화 중 자동 저장)
-│   ├── finetune_train.jsonl        파인튜닝 학습 데이터 262건
-│   ├── finetune_val.jsonl          파인튜닝 검증 데이터 30건
-│   └── eval_comparison.md          9가지 조합 비교 결과
-├── tools/
-│   ├── build_finetune_dataset.py   전사본 → JSONL 변환
-│   ├── run_finetune.py             파인튜닝 실행/상태 확인
-│   └── reorder_transcript.py       전사본 순서 정렬
-├── Timeline.md
-└── README.md
-```
+코드 구조 상세는 [CODE_STRUCTURE.md](CODE_STRUCTURE.md) 참고.
 
 ---
 

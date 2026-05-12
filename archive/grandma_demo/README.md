@@ -32,19 +32,8 @@ python -m llm.core
 할머니 말투로 응답이 출력되면 환경 세팅 완료!
 
 ## 코드 구조
-```
-TalkTo_AI/
-├── llm/
-│   └── core.py              generate_response() — GPT 호출 핵심 함수
-├── prompt/
-│   └── system_prompt.py     시스템 프롬프트
-├── memory/                  장기/단기 기억, 임베딩, KG, RAG 검색
-├── voice/                   STT, TTS
-├── monitoring/              사용 이벤트, 오류 로그, 피드백
-├── data/                    전사본, 파인튜닝 데이터, 페르소나 JSON
-├── Timeline.md
-└── README.md
-```
+
+상세 내용은 [CODE_STRUCTURE.md](CODE_STRUCTURE.md) 참고.
 
 ## 개발 단계
 
