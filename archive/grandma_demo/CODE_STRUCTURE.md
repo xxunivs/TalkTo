@@ -2,35 +2,32 @@
 
 ```
 PersonaAI/
-├── .env                              API 키 (GitHub 미포함)
-├── .gitignore
-├── .vscode/
-│   └── settings.json
-├── CODE_STRUCTURE.md                 이 파일
-├── README.md                         환경 세팅 + 개발 단계
-├── Timeline.md                       개발 타임라인
-├── server.py                         FastAPI AI 서버 (백엔드 연동 진입점)
-├── data/
+│
+├── data/                             데이터 파일
+│   ├── voice_raw/                    할머니 음성 원본 wav 13개 (GitHub 미포함)
 │   ├── eval_comparison.md            9가지 조합 비교 결과
 │   ├── finetune_train.jsonl          파인튜닝 학습 데이터 262건
 │   ├── finetune_val.jsonl            파인튜닝 검증 데이터 30건
 │   ├── memories.json                 장기 기억 chunk 37개
 │   ├── memory_embeddings.json        장기 기억 임베딩 벡터
 │   ├── short_term_memories.json      단기 기억 (대화 중 자동 저장)
-│   ├── voice_raw/                    할머니 음성 원본 wav 13개 (GitHub 미포함)
 │   ├── 전사본.txt                    1~13 순서 정렬
 │   ├── 전사본_화자구분.txt            화자 분리 완료
 │   └── 할머니_분석.md                7개 카테고리 분석
-├── docs/
+│
+├── docs/                             문서
 │   └── backend_integration.md        AI ↔ 백엔드 연동 가이드
-├── llm/
+│
+├── llm/                              LLM 호출
 │   └── core.py                       generate_response() — GPT 호출 + RAG 연결
-├── memory/
+│
+├── memory/                           기억 시스템
 │   ├── embeddings.py                 임베딩 생성 + RAG 검색 (top_k=5)
 │   ├── extract.py                    중요도 평가 → 단기 기억 자동 저장
 │   ├── importance.py                 중요도 평가 (GPT 기반 5차원)
 │   └── short_term.py                 단기 기억 스키마 + 저장/조회/강도갱신
-├── prompt/
+│
+├── prompt/                           프롬프트 + 평가
 │   ├── eval_all.py                   9가지 조합 평가
 │   ├── eval_prototype.py             대표 모델 평가
 │   ├── eval_questions.py             평가 질문 20개
@@ -38,13 +35,22 @@ PersonaAI/
 │   ├── system_prompt.py              현재 사용 중인 프롬프트 (A를 가리킴)
 │   ├── system_prompt_A.py            상세 프롬프트 (기본 GPT용)
 │   └── system_prompt_B.py            최소 프롬프트 (파인튜닝용)
-├── tools/
+│
+├── tools/                            유틸리티 스크립트
 │   ├── build_finetune_dataset.py     전사본 → JSONL 변환
 │   ├── reorder_transcript.py         전사본 순서 정렬
 │   └── run_finetune.py               파인튜닝 실행/상태 확인
-└── voice/
-    ├── stt.py                        transcribe() — Whisper 음성→텍스트
-    └── tts.py                        synthesize() — ElevenLabs 텍스트→할머니 목소리
+│
+├── voice/                            음성 처리
+│   ├── stt.py                        transcribe() — Whisper 음성→텍스트
+│   └── tts.py                        synthesize() — ElevenLabs 텍스트→할머니 목소리
+│
+├── .env                              API 키 (GitHub 미포함)
+├── .gitignore
+├── CODE_STRUCTURE.md                 이 파일
+├── README.md                         환경 세팅 + 개발 단계
+├── server.py                         FastAPI AI 서버 (백엔드 연동 진입점)
+└── Timeline.md                       개발 타임라인
 ```
 
 ---
