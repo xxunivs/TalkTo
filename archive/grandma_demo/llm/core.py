@@ -15,14 +15,14 @@ load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 
-def generate_response(message: str, history: list = None) -> str:
+def generate_response(message: str, history: list = None, memory_text: str = None) -> str:
     """
     백엔드가 호출하는 핵심 함수.
-    사용자 메시지에 관련된 기억을 검색해서 GPT한테 같이 넘긴다.
 
     매개변수:
         message: 사용자가 지금 보낸 메시지
         history: 이전 대화 내역 리스트 (백엔드가 넘겨줌)
+        memory_text: 기억 텍스트 (server.py에서 조립해서 전달. 없으면 내부 검색)
 
     반환값:
         할머니 답변 텍스트 (str)
@@ -30,27 +30,37 @@ def generate_response(message: str, history: list = None) -> str:
     if history is None:
         history = []
 
-    # 1. 장기 기억 검색 (top 5)
-    long_term = search_memories(message, top_k=5)
+    # 1. 기억 텍스트 준비
+    if memory_text is None:
+        # 내부 JSON에서 검색 (로컬 테스트용)
+        long_term = search_memories(message, top_k=5)
+        short_term = get_active_memories()
 
-    # 2. 단기 기억 전부 (중요도 6 이상만 저장된 것들)
-    short_term = get_active_memories()
+        memory_parts = []
+        if long_term:
+            lt_text = "\n".join([f"- {m['title']}: {m['content']}" for m in long_term])
+            memory_parts.append(f"[장기 기억]\n{lt_text}")
+        if short_term:
+            st_text = "\n".join([f"- {m['content']}" for m in short_term])
+            memory_parts.append(f"[최근 대화에서 알게 된 것]\n{st_text}")
+            for m in short_term:
+                on_memory_recalled(m["id"])
 
-    # 3. 기억을 텍스트로 변환
-    memory_parts = []
-    if long_term:
-        lt_text = "\n".join([f"- {m['title']}: {m['content']}" for m in long_term])
-        memory_parts.append(f"[장기 기억]\n{lt_text}")
-    if short_term:
-        st_text = "\n".join([f"- {m['content']}" for m in short_term])
-        memory_parts.append(f"[최근 대화에서 알게 된 것]\n{st_text}")
-        # 회상된 단기 기억 강도 갱신
-        for m in short_term:
-            on_memory_recalled(m["id"])
+        memory_section = "\n\n" + "\n\n".join(memory_parts) if memory_parts else ""
+    else:
+        # server.py에서 조립한 기억 텍스트 사용
+        # 단기 기억도 추가
+        short_term = get_active_memories()
+        memory_parts = [f"[장기 기억]\n{memory_text}"]
+        if short_term:
+            st_text = "\n".join([f"- {m['content']}" for m in short_term])
+            memory_parts.append(f"[최근 대화에서 알게 된 것]\n{st_text}")
+            for m in short_term:
+                on_memory_recalled(m["id"])
 
-    memory_section = "\n\n" + "\n\n".join(memory_parts) if memory_parts else ""
+        memory_section = "\n\n" + "\n\n".join(memory_parts)
 
-    # 3. 프롬프트 조립
+    # 2. 프롬프트 조립
     messages = []
     messages.append({"role": "system", "content": SYSTEM_PROMPT + memory_section})
     messages.extend(history)

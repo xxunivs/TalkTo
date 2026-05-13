@@ -11,11 +11,12 @@ import tempfile
 from fastapi import FastAPI, UploadFile, File
 from fastapi.responses import Response
 from pydantic import BaseModel
+from typing import Optional
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from llm.core import generate_response
-from memory.embeddings import search_memories
+from memory.embeddings import search_memories, get_embedding
 from memory.extract import extract_and_save
 from voice.stt import transcribe
 from voice.tts import synthesize
@@ -25,14 +26,27 @@ app = FastAPI(title="TalkTo Persona AI", version="0.1.0")
 
 # === 요청/응답 형식 ===
 
+class MemoryItem(BaseModel):
+    """백엔드가 보내주는 기억 한 개"""
+    id: str = ""
+    title: str = ""
+    content: str = ""
+
 class ChatRequest(BaseModel):
     message: str
     history: list = []
+    memories: Optional[list[MemoryItem]] = None  # 백엔드가 직접 검색한 기억 (없으면 내부 JSON 검색)
 
 class ChatResponse(BaseModel):
     content: str
     retrieved_memory_ids: list
     latency_ms: int
+
+class EmbedRequest(BaseModel):
+    text: str
+
+class EmbedResponse(BaseModel):
+    embedding: list
 
 class STTResponse(BaseModel):
     success: bool
@@ -42,11 +56,6 @@ class STTResponse(BaseModel):
 class TTSRequest(BaseModel):
     text: str
 
-class TTSResponse(BaseModel):
-    success: bool
-    audio_url: str = ""
-    error: str = ""
-
 
 # === 엔드포인트 ===
 
@@ -54,16 +63,25 @@ class TTSResponse(BaseModel):
 def chat(req: ChatRequest):
     """
     텍스트 메시지 → 할머니 답변 생성.
-    기억 검색(RAG) + GPT 호출 + 단기 기억 추출까지 처리.
+
+    memories가 있으면 → 백엔드가 검색한 기억 사용
+    memories가 없으면 → 내부 JSON에서 검색 (기존 방식)
     """
     start = time.time()
 
-    # 1. 관련 기억 검색
-    memories = search_memories(req.message, top_k=5)
-    memory_ids = [m["id"] for m in memories]
+    # 1. 기억 검색
+    if req.memories:
+        # 백엔드가 직접 검색해서 보내준 기억 사용
+        memory_ids = [m.id for m in req.memories]
+        memory_text = "\n".join([f"- {m.title}: {m.content}" for m in req.memories])
+    else:
+        # 내부 JSON에서 검색 (로컬 테스트용)
+        found = search_memories(req.message, top_k=5)
+        memory_ids = [m["id"] for m in found]
+        memory_text = "\n".join([f"- {m['title']}: {m['content']}" for m in found])
 
-    # 2. 답변 생성
-    reply = generate_response(req.message, req.history)
+    # 2. 답변 생성 (기억을 프롬프트에 주입)
+    reply = generate_response(req.message, req.history, memory_text=memory_text)
 
     # 3. 단기 기억 추출 (중요도 6 이상이면 자동 저장)
     extract_and_save(req.message, reply)
@@ -77,12 +95,21 @@ def chat(req: ChatRequest):
     )
 
 
+@app.post("/ai/embed", response_model=EmbedResponse)
+def embed(req: EmbedRequest):
+    """
+    텍스트 → 임베딩 벡터 반환.
+    백엔드가 기억 생성/수정 시 호출해서 벡터를 DB에 저장.
+    """
+    embedding = get_embedding(req.text)
+    return EmbedResponse(embedding=embedding)
+
+
 @app.post("/ai/stt", response_model=STTResponse)
 async def stt(audio_file: UploadFile = File(...)):
     """
     음성 파일 → 텍스트 변환 (Whisper API).
     """
-    # 임시 파일로 저장 후 변환
     suffix = os.path.splitext(audio_file.filename or "audio.wav")[1]
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
         content = await audio_file.read()
@@ -130,15 +157,6 @@ async def voice_chat(
 ):
     """
     음성 메시지 → STT → 할머니 답변 생성 → TTS 한 번에 처리.
-    백엔드가 한 번만 호출하면 됨.
-
-    매개변수:
-        audio_file: 사용자 음성 파일
-        history: 이전 대화 내역 JSON 문자열 (multipart라서 문자열로 받음)
-
-    반환값:
-        JSON {stt_text, content, retrieved_memory_ids, latency_ms, tts_success}
-        + TTS 성공 시 audio_bytes 포함
     """
     import json as json_module
     start = time.time()
@@ -162,9 +180,10 @@ async def voice_chat(
 
     # 2. 답변 생성: RAG + GPT
     parsed_history = json_module.loads(history) if history else []
-    memories = search_memories(stt_text, top_k=5)
-    memory_ids = [m["id"] for m in memories]
-    reply = generate_response(stt_text, parsed_history)
+    found = search_memories(stt_text, top_k=5)
+    memory_ids = [m["id"] for m in found]
+    memory_text = "\n".join([f"- {m['title']}: {m['content']}" for m in found])
+    reply = generate_response(stt_text, parsed_history, memory_text=memory_text)
     extract_and_save(stt_text, reply)
 
     # 3. TTS: 텍스트 → 할머니 목소리
