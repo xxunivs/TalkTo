@@ -12,6 +12,14 @@ AI 서버는 Python FastAPI로 구현되어 있으며, 백엔드(NestJS)가 HTTP
 
 ## 2. 엔드포인트
 
+백엔드에서 호출할 엔드포인트는 **두 개**:
+- **텍스트 대화** → `POST /ai/chat`
+- **음성 대화** → `POST /ai/voice-chat` (STT + 답변 + TTS 한 번에 처리)
+
+`/ai/stt`, `/ai/tts`는 개별 호출이 필요한 경우를 위해 남겨둔 것이며, 일반적으로는 위 두 개만 사용하면 됨.
+
+---
+
 ### POST /ai/chat — 텍스트 대화
 
 요청:
