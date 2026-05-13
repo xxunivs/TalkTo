@@ -146,9 +146,32 @@ const { content, retrieved_memory_ids, latency_ms } = await aiResponse.json();
 
 ### 3-2. conversations.service.ts — retrieveMemories()
 
-현재 백엔드가 자체적으로 키워드 검색(`ILike`)을 하고 있음.
-→ AI 서버가 내부적으로 벡터 검색(RAG)을 하므로, 백엔드에서 별도 기억 검색은 불필요.
-→ `/ai/chat` 호출 시 AI 서버가 알아서 기억 검색 + 프롬프트 주입까지 처리함.
+두 가지 방식 중 택 1:
+
+**방식 A (간단)**: 기억 검색을 AI 서버에 맡기기
+- 백엔드의 `retrieveMemories()` 사용하지 않음
+- `/ai/chat` 호출 시 `memories` 파라미터 안 보내면 AI 서버가 내부적으로 벡터 검색
+
+**방식 B (권장, 장기)**: 백엔드 DB에서 검색 후 AI에 전달
+- 백엔드가 pgvector로 벡터 검색 수행
+- 검색된 기억을 `/ai/chat`의 `memories` 파라미터로 전달
+
+```typescript
+// 방식 B 예시
+const memories = await this.pgvectorSearch(dto.content); // 백엔드에서 벡터 검색
+const aiResponse = await fetch("http://ai-server:8000/ai/chat", {
+  method: "POST",
+  body: JSON.stringify({
+    message: dto.content,
+    history: recentMessages,
+    memories: memories.map(m => ({
+      id: m.id,
+      title: m.title,
+      content: m.bodyMarkdown,
+    })),
+  }),
+});
+```
 
 ### 3-3. conversations.service.ts — sendTextMessage()에 history 전달
 
@@ -182,17 +205,48 @@ const history = recentMessages.map(m => ({
 ## 4. 기억(Memory) 데이터 관련
 
 ### 현재 상태
-- 백엔드: Memory 테이블 있음, 비어있음. 청크 분할 + 임베딩 테이블 있으나 embedding은 null.
-- AI: `data/memories.json`에 37개 기억, `data/memory_embeddings.json`에 임베딩 벡터. AI 서버 내부에서 벡터 검색.
+- 백엔드: Memory 테이블 + MemoryEmbedding 테이블 있음. 청크 분할은 구현됨. embedding 컬럼은 null.
+- AI: `data/memories.json`에 44개 기억 + `data/memory_embeddings.json`에 임베딩 벡터. AI 서버 내부에서 벡터 검색 가능.
 
-### 장기 방향
-기억 데이터를 백엔드 DB로 통일하고, AI 서버는 임베딩 생성/벡터 검색만 담당.
-→ AI 서버에 `/ai/embed`, `/ai/search` 엔드포인트 추가 예정.
-→ 백엔드가 기억 생성 시 `/ai/embed` 호출해서 임베딩 벡터를 받아 DB에 저장.
-→ 대화 시 `/ai/search` 호출해서 관련 기억 조회.
+### 연동 방향
+기억 데이터를 백엔드 DB로 통일. AI 서버는 임베딩 생성만 담당.
 
-### 현재 (MVP)
-AI 서버가 내부 JSON으로 기억 관리. 백엔드는 `/ai/chat`만 호출하면 기억 검색까지 AI 서버에서 처리.
+**흐름:**
+1. 관리자가 백엔드 `POST /memories`로 기억 생성
+2. 백엔드가 텍스트를 청크로 분할 (이미 구현됨: `rebuildEmbeddings()`)
+3. 백엔드가 각 청크를 AI 서버 `POST /ai/embed`로 보냄
+4. AI 서버가 임베딩 벡터 반환
+5. 백엔드가 벡터를 `MemoryEmbedding.embedding` 컬럼에 저장
+6. 대화 시 백엔드가 pgvector로 벡터 검색 → 관련 기억을 `/ai/chat`의 `memories`로 전달
+
+### POST /ai/embed — 임베딩 생성
+
+요청:
+```json
+{
+  "text": "불고기 만들 때 간장 한 숟가락..."
+}
+```
+
+응답:
+```json
+{
+  "embedding": [0.023, -0.041, ...]
+}
+```
+- 1536차원 벡터 (text-embedding-3-small 모델)
+- 백엔드가 이 벡터를 `MemoryEmbedding.embedding` (float8[]) 컬럼에 저장
+
+### 백엔드에서 해야 할 것
+1. `rebuildEmbeddings()`에서 청크 생성 후 AI 서버 `/ai/embed` 호출 → 벡터 저장
+2. `retrieveMemories()`를 키워드 검색에서 pgvector 벡터 검색으로 변경
+3. 검색된 기억을 `/ai/chat`의 `memories` 파라미터로 전달
+
+### 초기 데이터 이관
+AI 서버에 `data/memories.json` (44개 기억)이 있음. 백엔드 `POST /memories` API로 넣으면 됨. 이관 스크립트 제공 가능.
+
+### 현재 (DB 연동 전)
+AI 서버가 내부 JSON으로 기억 관리. `/ai/chat` 호출 시 `memories` 파라미터 안 보내면 AI 서버가 내부적으로 검색.
 
 ---
 
