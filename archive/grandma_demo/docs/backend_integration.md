@@ -34,16 +34,28 @@ AI 서버는 이미 다음 API를 제공한다.
 
 ## 같이 결정해야 할 것
 
-### 1. 1차 연동에서 기억 검색을 어디서 할 것인가?
+### 1. 기억 검색과 임베딩 역할을 어떻게 연결할 것인가?
 
-선택지:
+현재 상황:
 
-- AI 서버가 내부 `data/memories.json` / `data/memory_embeddings.json`으로 검색
-- 백엔드가 DB에서 검색한 `memories`를 `/ai/chat`에 전달
+- AI 서버는 `/ai/embed`로 텍스트 임베딩을 생성할 수 있다.
+- AI 서버의 `/ai/chat`은 백엔드가 넘긴 `memories`를 받아 답변을 생성할 수 있다.
+- 백엔드에는 `Memory`, `MemoryEmbedding`, `Message.retrievedMemoryIds`, `MessageMemoryRef` 구조가 있다.
+- 하지만 현재 백엔드는 AI 서버를 호출하지 않고, `MemoryEmbedding.embedding`도 `null`이며, 기억 검색은 `ILike` 키워드 검색이다.
 
-왜 같이 정해야 하나:
+어떻게 붙일지:
 
-이 결정에 따라 백엔드 구현 범위가 크게 달라진다. AI 서버가 검색하면 백엔드는 빨리 붙일 수 있지만, 백엔드의 `MemoryEmbedding`, `MessageMemoryRef` 구조를 바로 활용하기 어렵다. 백엔드가 검색하면 Spec의 “단일 기억 DB 기반 RAG 검색”에 더 맞지만 구현량이 늘어난다.
+1. 기억 생성/수정 시 백엔드가 `/ai/embed`를 호출해 `MemoryEmbedding.embedding`을 저장한다.
+2. 대화 시 백엔드가 사용자 메시지를 `/ai/embed`로 임베딩한다.
+3. 백엔드가 DB에 저장된 기억 임베딩과 비교해 관련 기억을 검색한다.
+4. 백엔드가 검색한 기억을 `/ai/chat`의 `memories`로 전달한다.
+5. AI 서버는 전달받은 기억과 대화 히스토리를 참고해 답변을 생성한다.
+6. 백엔드는 AI 응답의 `content`, `retrieved_memory_ids`, `latency_ms`를 저장한다.
+
+백엔드 담당자와 확인할 것:
+
+- 현재 `float8[]` 컬럼으로 유사도 계산을 할지, pgvector를 도입할지
+- AI 서버 내부 `data/memories.json` 검색은 로컬 테스트 또는 임시 fallback으로만 둘지
 
 ---
 
