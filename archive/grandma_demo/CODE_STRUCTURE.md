@@ -8,9 +8,9 @@ PersonaAI/
 │   ├── eval_comparison.md            9가지 조합 비교 결과
 │   ├── finetune_train.jsonl          파인튜닝 학습 데이터 262건
 │   ├── finetune_val.jsonl            파인튜닝 검증 데이터 30건
-│   ├── memories.json                 장기 기억 chunk 37개
-│   ├── memory_embeddings.json        장기 기억 임베딩 벡터
-│   ├── short_term_memories.json      단기 기억 (대화 중 자동 저장)
+│   ├── memories.json                 장기기억 chunk 44개
+│   ├── memory_embeddings.json        장기기억 임베딩 벡터
+│   ├── short_term_memories.json      단기기억 (대화 중 자동 저장)
 │   ├── 전사본.txt                    1~13 순서 정렬
 │   ├── 전사본_화자구분.txt            화자 분리 완료
 │   └── 할머니_분석.md                7개 카테고리 분석
@@ -23,9 +23,9 @@ PersonaAI/
 │
 ├── memory/                           기억 시스템
 │   ├── embeddings.py                 임베딩 생성 + RAG 검색 (top_k=5)
-│   ├── extract.py                    중요도 평가 → 단기 기억 자동 저장
+│   ├── extract.py                    중요도 평가 → 단기기억 자동 저장
 │   ├── importance.py                 중요도 평가 (GPT 기반 5차원)
-│   └── short_term.py                 단기 기억 스키마 + 저장/조회/강도갱신
+│   └── short_term.py                 단기기억 스키마 + 저장/조회/강도갱신
 │
 ├── prompt/                           프롬프트 + 평가
 │   ├── eval_all.py                   9가지 조합 평가
@@ -80,31 +80,31 @@ PersonaAI/
 - `generate_response(message, history) → str`
   - 사용자 메시지와 대화 히스토리를 받아서 할머니 답변을 반환
   - 내부 동작:
-    1. 장기 기억 검색 (top-5) — `memory/embeddings.py`의 `search_memories()` 호출
-    2. 단기 기억 조회 — `memory/short_term.py`의 `get_active_memories()` 호출
+    1. 장기기억 검색 (top-5) — `memory/embeddings.py`의 `search_memories()` 호출
+    2. 단기기억 조회 — `memory/short_term.py`의 `get_active_memories()` 호출
     3. 시스템 프롬프트 + 기억 + 히스토리 + 사용자 메시지를 조립
     4. GPT API 호출 (현재 gpt-4.1-mini)
     5. 답변 반환
   - 테스트 루프 포함: `python -m llm.core`로 터미널에서 연속 대화 가능
-  - 대화 후 `memory/extract.py`의 `extract_and_save()`로 단기 기억 자동 추출
+  - 대화 후 `memory/extract.py`의 `extract_and_save()`로 단기기억 자동 추출
 
 ---
 
 ## memory/
 
 ### embeddings.py
-**역할**: 장기 기억 임베딩 생성 + RAG 검색.
+**역할**: 장기기억 임베딩 생성 + RAG 검색.
 
 **주요 함수**:
-- `build_embeddings()` — `data/memories.json`의 37개 chunk를 벡터로 변환, `data/memory_embeddings.json`에 저장
+- `build_embeddings()` — `data/memories.json`의 44개 chunk를 벡터로 변환, `data/memory_embeddings.json`에 저장
   - 실행: `python -m memory.embeddings --build`
-- `search_memories(query, top_k=5) → list` — 사용자 질문과 가장 관련 있는 기억 검색
+- `search_memories(query, top_k=5) → list` — 사용자 질문과 가장 관련 있는 장기기억 검색
   - 코사인 유사도 기반
   - 반환: `[{"id", "title", "content", "score"}, ...]`
 - `get_embedding(text) → list` — 텍스트를 벡터로 변환 (text-embedding-3-small)
 
 ### extract.py
-**역할**: 중요도 평가 → 6점 이상이면 단기 기억에 저장.
+**역할**: 중요도 평가 → 6점 이상이면 단기기억에 저장.
 
 **주요 함수**:
 - `extract_and_save(user_message, assistant_message) → dict`
@@ -122,17 +122,17 @@ PersonaAI/
   - 5차원: 감정(30%), 관계(25%), 개인정보(15%), 기억가치(20%), 연속성(10%)
 
 ### short_term.py
-**역할**: 단기 기억 관리 (저장/조회/강도갱신).
+**역할**: 단기기억 관리 (저장/조회/강도갱신).
 
 **주요 함수**:
-- `add_short_term_memory(content, category, importance) → dict` — 새 단기 기억 추가
-- `get_active_memories() → list` — archived되지 않은 활성 기억 반환
-- `on_memory_recalled(memory_id)` — 기억이 검색에 포함됐을 때 strength +1, recall_count +1
+- `add_short_term_memory(content, category, importance) → dict` — 새 단기기억 추가
+- `get_active_memories() → list` — archived되지 않은 활성 단기기억 반환
+- `on_memory_recalled(memory_id)` — 단기기억이 프롬프트에 포함됐을 때 strength +1, recall_count +1
 
 **스키마**:
 ```json
 {
-  "id": "st_001",
+  "id": "ST-0001",
   "content": "향이가 회사를 그만뒀다",
   "category": "직장",
   "importance": 7,
@@ -200,9 +200,9 @@ PersonaAI/
 
 | 파일 | 설명 |
 |---|---|
-| `memories.json` | 장기 기억 chunk 37개 (가족, 요리, 추억, 가치관 등) |
-| `memory_embeddings.json` | 37개 chunk의 임베딩 벡터. `python -m memory.embeddings --build`로 생성 |
-| `short_term_memories.json` | 단기 기억. 대화 중 자동 추가. 초기에는 빈 배열 `[]` |
+| `memories.json` | 장기기억 chunk 44개 (가족, 요리, 추억, 가치관 등) |
+| `memory_embeddings.json` | 44개 chunk의 임베딩 벡터. `python -m memory.embeddings --build`로 생성 |
+| `short_term_memories.json` | 단기기억. 대화 중 자동 추가. 초기에는 빈 배열 `[]` |
 | `전사본.txt` | 할머니 통화 13개 파일 1~13 순서 정렬 |
 | `전사본_화자구분.txt` | 화자 분리 완료. "할머니:" / "손녀:" 표시 |
 | `할머니_분석.md` | 7개 카테고리 분석 (기본정보, 언어, 성격, 관계, 가치관, 기억, 대화패턴) |

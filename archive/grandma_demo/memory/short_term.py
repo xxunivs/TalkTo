@@ -1,5 +1,5 @@
 """
-단기 기억 관리 모듈.
+단기기억 관리 모듈.
 대화 중 새로 알게 된 정보를 저장하고 검색.
 """
 import os
@@ -15,7 +15,7 @@ SHORT_TERM_PATH = os.path.join(
 )
 
 """
-단기 기억 스키마:
+단기기억 스키마:
 {
     "id": "st_001",                    — 고유 ID
     "content": "향이가 회사를 그만뒀다",  — 기억 내용
@@ -31,20 +31,20 @@ SHORT_TERM_PATH = os.path.join(
 
 
 def load_short_term_memories() -> list:
-    """단기 기억 전체 로드"""
+    """단기기억 전체 로드"""
     with open(SHORT_TERM_PATH, "r", encoding="utf-8") as f:
         return json.load(f)
 
 
 def save_short_term_memories(memories: list):
-    """단기 기억 전체 저장"""
+    """단기기억 전체 저장"""
     with open(SHORT_TERM_PATH, "w", encoding="utf-8") as f:
         json.dump(memories, f, ensure_ascii=False, indent=2)
 
 
 def add_short_term_memory(content: str, category: str, importance: int) -> dict:
     """
-    새 단기 기억 추가.
+    새 단기기억 추가.
 
     매개변수:
         content: 기억 내용 (예: "향이가 회사를 그만뒀다")
@@ -52,11 +52,11 @@ def add_short_term_memory(content: str, category: str, importance: int) -> dict:
         importance: 중요도 1~10
 
     반환값:
-        추가된 기억 dict
+        추가된 단기기억 dict
     """
     memories = load_short_term_memories()
 
-    new_id = f"st_{len(memories) + 1:03d}"
+    new_id = f"ST-{len(memories) + 1:04d}"
     new_memory = {
         "id": new_id,
         "content": content,
@@ -75,13 +75,13 @@ def add_short_term_memory(content: str, category: str, importance: int) -> dict:
 
 
 def get_active_memories() -> list:
-    """archived되지 않은 활성 단기 기억만 반환"""
+    """archived되지 않은 활성 단기기억만 반환"""
     memories = load_short_term_memories()
     return [m for m in memories if not m["archived"]]
 
 
 def on_memory_recalled(memory_id: str):
-    """기억이 검색에 포함됐을 때 강도 +1, 회상 횟수 +1"""
+    """단기기억이 프롬프트에 포함됐을 때 강도 +1, 회상 횟수 +1"""
     memories = load_short_term_memories()
     for m in memories:
         if m["id"] == memory_id:
@@ -93,7 +93,7 @@ def on_memory_recalled(memory_id: str):
 
 
 if __name__ == "__main__":
-    # 테스트: 기억 추가
+    # 테스트: 단기기억 추가
     mem = add_short_term_memory(
         content="향이가 오늘 회사에서 스트레스 받았다고 했다",
         category="가족",
@@ -103,6 +103,6 @@ if __name__ == "__main__":
 
     # 전체 조회
     all_mems = get_active_memories()
-    print(f"\n활성 단기 기억 {len(all_mems)}개:")
+    print(f"\n활성 단기기억 {len(all_mems)}개:")
     for m in all_mems:
         print(f"  [{m['id']}] {m['content']}")

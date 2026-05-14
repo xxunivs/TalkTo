@@ -95,16 +95,16 @@ TalkTo 사후 Phase(Persona AI)의 AI 파트 개발 타임라인
 
 ---
 
-## Stage 5: 장기 기억 + RAG ✅
+## Stage 5: 장기기억 + RAG ✅
 
-### 5-1. 기억 chunk 추출
+### 5-1. 장기기억 chunk 추출
 
-- `data/memories.json` — 장기 기억 chunk 37개 (가족, 요리, 추억, 가치관 등)
+- `data/memories.json` — 장기기억 chunk 44개 (가족, 요리, 추억, 가치관 등)
 - 할머니_분석.md 기반, 관계 정보 보강 포함
 
 ### 5-2. 임베딩 생성
 
-- `data/memory_embeddings.json` — 37개 chunk의 임베딩 벡터
+- `data/memory_embeddings.json` — 44개 chunk의 임베딩 벡터
 - `python -m memory.embeddings --build`로 생성/재생성
 
 ### 5-3. RAG 검색 구현
@@ -143,12 +143,12 @@ TalkTo 사후 Phase(Persona AI)의 AI 파트 개발 타임라인
 
 ---
 
-## Stage 7: 단기 기억 ✅
+## Stage 7: 단기기억 ✅
 
-### 7-1. 단기 기억 스키마 정의
+### 7-1. 단기기억 스키마 정의
 
 - `memory/short_term.py` — 스키마, 저장/조회/강도갱신 함수
-- `data/short_term_memories.json` — 단기 기억 저장 파일
+- `data/short_term_memories.json` — 단기기억 저장 파일
 
 ### 7-2. 중요도 평가
 
@@ -158,13 +158,13 @@ TalkTo 사후 Phase(Persona AI)의 AI 파트 개발 타임라인
 ### 7-3. 기억 추출 + 저장
 
 - `memory/extract.py` → `extract_and_save(user_msg, assistant_msg)` 함수
-- importance ≥ 6이면 단기 기억에 자동 저장
+- importance ≥ 6이면 단기기억에 자동 저장
 - `llm/core.py` 대화 루프에 연결 완료
 
-### 7-4. 단기 기억 검색
+### 7-4. 단기기억 검색
 
-- `llm/core.py`에서 장기 top-3 + 단기 최근 2개 합쳐서 프롬프트에 주입
-- 회상된 단기 기억은 `on_memory_recalled()`로 strength +1
+- `llm/core.py`에서 장기기억 top-5 + 활성 단기기억을 합쳐서 프롬프트에 주입
+- 프롬프트에 포함된 단기기억은 `on_memory_recalled()`로 strength +1
 
 ### 이 Stage가 끝나면:
 

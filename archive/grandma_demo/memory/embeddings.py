@@ -1,8 +1,8 @@
 """
-기억 chunk 임베딩 생성 + 검색 모듈.
+장기기억 임베딩 생성 + 검색 모듈.
 
 - memories.json을 읽어서 각 chunk를 벡터로 변환
-- 사용자 질문과 가장 관련 있는 기억을 검색
+- 사용자 질문과 가장 관련 있는 장기기억을 검색
 """
 import os
 import sys
@@ -16,8 +16,14 @@ load_dotenv()
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-MEMORIES_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "memories.json")
-EMBEDDINGS_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "memory_embeddings.json")
+MEMORIES_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "data", "memories.json",
+)
+EMBEDDINGS_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "data", "memory_embeddings.json",
+)
 MODEL = "text-embedding-3-small"
 
 
@@ -37,20 +43,20 @@ def get_embedding(text):
 
 
 def build_embeddings():
-    """모든 기억 chunk의 임베딩을 생성하고 저장"""
+    """모든 장기기억 chunk의 임베딩을 생성하고 저장"""
     memories = load_memories()
-    print(f"기억 {len(memories)}개 임베딩 생성 중...")
+    print(f"장기기억 {len(memories)}개 임베딩 생성 중...")
 
     results = []
-    for i, mem in enumerate(memories):
+    for i, item in enumerate(memories):
         # 제목 + 내용을 합쳐서 임베딩
-        text = f"{mem['title']}: {mem['content']}"
+        text = f"{item['title']}: {item['content']}"
         embedding = get_embedding(text)
         results.append({
-            "id": mem["id"],
+            "id": item["id"],
             "embedding": embedding,
         })
-        print(f"  [{i+1}/{len(memories)}] {mem['id']}")
+        print(f"  [{i+1}/{len(memories)}] {item['id']}")
 
     with open(EMBEDDINGS_PATH, "w", encoding="utf-8") as f:
         json.dump(results, f, ensure_ascii=False)
@@ -67,22 +73,22 @@ def cosine_similarity(a, b):
 
 def search_memories(query, top_k=5):
     """
-    사용자 질문과 가장 관련 있는 기억을 검색.
+    사용자 질문과 가장 관련 있는 장기기억을 검색.
 
     매개변수:
         query: 사용자 질문 (예: "할머니 불고기 어떻게 만들어?")
         top_k: 반환할 기억 개수
 
     반환값:
-        관련 기억 리스트 [{"id", "title", "content", "score"}, ...]
+        관련 장기기억 리스트 [{"id", "title", "content", "score"}, ...]
     """
     # 임베딩 파일 로드
     with open(EMBEDDINGS_PATH, "r", encoding="utf-8") as f:
         embeddings_data = json.load(f)
 
-    # 기억 원본 로드
+    # 장기기억 원본 로드
     memories = load_memories()
-    mem_dict = {m["id"]: m for m in memories}
+    item_dict = {m["id"]: m for m in memories}
 
     # 질문을 벡터로 변환
     query_embedding = get_embedding(query)
@@ -99,7 +105,7 @@ def search_memories(query, top_k=5):
     # top_k개 반환
     results = []
     for mem_id, score in scores[:top_k]:
-        mem = mem_dict[mem_id]
+        mem = item_dict[mem_id]
         results.append({
             "id": mem["id"],
             "title": mem["title"],

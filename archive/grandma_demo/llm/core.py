@@ -22,7 +22,7 @@ def generate_response(message: str, history: list = None, memory_text: str = Non
     매개변수:
         message: 사용자가 지금 보낸 메시지
         history: 이전 대화 내역 리스트 (백엔드가 넘겨줌)
-        memory_text: 기억 텍스트 (server.py에서 조립해서 전달. 없으면 내부 검색)
+        memory_text: 장기기억 텍스트 (server.py에서 조립해서 전달. 없으면 내부 검색)
 
     반환값:
         할머니 답변 텍스트 (str)
@@ -30,7 +30,7 @@ def generate_response(message: str, history: list = None, memory_text: str = Non
     if history is None:
         history = []
 
-    # 1. 기억 텍스트 준비
+    # 1. 장기기억 / 단기기억 텍스트 준비
     if memory_text is None:
         # 내부 JSON에서 검색 (로컬 테스트용)
         long_term = search_memories(message, top_k=5)
@@ -39,22 +39,22 @@ def generate_response(message: str, history: list = None, memory_text: str = Non
         memory_parts = []
         if long_term:
             lt_text = "\n".join([f"- {m['title']}: {m['content']}" for m in long_term])
-            memory_parts.append(f"[장기 기억]\n{lt_text}")
+            memory_parts.append(f"[장기기억]\n{lt_text}")
         if short_term:
             st_text = "\n".join([f"- {m['content']}" for m in short_term])
-            memory_parts.append(f"[최근 대화에서 알게 된 것]\n{st_text}")
+            memory_parts.append(f"[단기기억]\n{st_text}")
             for m in short_term:
                 on_memory_recalled(m["id"])
 
         memory_section = "\n\n" + "\n\n".join(memory_parts) if memory_parts else ""
     else:
-        # server.py에서 조립한 기억 텍스트 사용
-        # 단기 기억도 추가
+        # server.py에서 조립한 장기기억 텍스트 사용
+        # 단기기억도 추가
         short_term = get_active_memories()
-        memory_parts = [f"[장기 기억]\n{memory_text}"]
+        memory_parts = [f"[장기기억]\n{memory_text}"]
         if short_term:
             st_text = "\n".join([f"- {m['content']}" for m in short_term])
-            memory_parts.append(f"[최근 대화에서 알게 된 것]\n{st_text}")
+            memory_parts.append(f"[단기기억]\n{st_text}")
             for m in short_term:
                 on_memory_recalled(m["id"])
 
@@ -87,10 +87,10 @@ if __name__ == "__main__":
         reply = generate_response(user_input, history)
         print(f"할머니: {reply}")
 
-        # 단기 기억 추출 (중요도 6 이상이면 자동 저장)
+        # 단기기억 추출 (중요도 6 이상이면 자동 저장)
         mem_result = extract_and_save(user_input, reply)
         if mem_result["saved"]:
-            print(f"  [기억 저장] {mem_result['memory']['content']}")
+            print(f"  [단기기억 저장] {mem_result['memory']['content']}")
 
         history.append({"role": "user", "content": user_input})
         history.append({"role": "assistant", "content": reply})

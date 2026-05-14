@@ -35,7 +35,7 @@ class MemoryItem(BaseModel):
 class ChatRequest(BaseModel):
     message: str
     history: list = []
-    memories: Optional[list[MemoryItem]] = None  # 백엔드가 직접 검색한 기억 (없으면 내부 JSON 검색)
+    memories: Optional[list[MemoryItem]] = None  # 백엔드가 직접 검색한 기억
 
 class ChatResponse(BaseModel):
     content: str
@@ -70,10 +70,11 @@ def chat(req: ChatRequest):
     start = time.time()
 
     # 1. 기억 검색
-    if req.memories:
+    provided_memories = req.memories
+    if provided_memories:
         # 백엔드가 직접 검색해서 보내준 기억 사용
-        memory_ids = [m.id for m in req.memories]
-        memory_text = "\n".join([f"- {m.title}: {m.content}" for m in req.memories])
+        memory_ids = [m.id for m in provided_memories]
+        memory_text = "\n".join([f"- {m.title}: {m.content}" for m in provided_memories])
     else:
         # 내부 JSON에서 검색 (로컬 테스트용)
         found = search_memories(req.message, top_k=5)
@@ -83,7 +84,7 @@ def chat(req: ChatRequest):
     # 2. 답변 생성 (기억을 프롬프트에 주입)
     reply = generate_response(req.message, req.history, memory_text=memory_text)
 
-    # 3. 단기 기억 추출 (중요도 6 이상이면 자동 저장)
+    # 3. 단기기억 추출 (중요도 6 이상이면 자동 저장)
     extract_and_save(req.message, reply)
 
     latency_ms = int((time.time() - start) * 1000)

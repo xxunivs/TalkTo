@@ -65,7 +65,7 @@ def run_eval(config_num):
             memories = search_memories(item["질문"], top_k=5)
             if memories:
                 memory_text = "\n".join([f"- {m['title']}: {m['content']}" for m in memories])
-                prompt = prompt + f"\n\n[할머니의 관련 기억]\n{memory_text}"
+                prompt = prompt + f"\n\n[할머니의 관련 장기기억]\n{memory_text}"
 
         response = client.chat.completions.create(
             model=cfg["model"],

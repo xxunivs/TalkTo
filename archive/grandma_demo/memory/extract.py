@@ -1,6 +1,6 @@
 """
-단기 기억 추출 모듈.
-매 대화 턴 후에 중요도를 평가하고, 6 이상이면 단기 기억에 저장.
+단기기억 추출 모듈.
+매 대화 턴 후에 중요도를 평가하고, 6 이상이면 단기기억에 저장.
 """
 import os
 import sys
@@ -15,7 +15,7 @@ IMPORTANCE_THRESHOLD = 6  # 이 점수 이상이면 저장
 
 def extract_and_save(user_message: str, assistant_message: str) -> dict:
     """
-    대화 한 턴을 평가하고, 중요하면 단기 기억에 저장.
+    대화 한 턴을 평가하고, 중요하면 단기기억에 저장.
 
     매개변수:
         user_message: 사용자가 한 말
@@ -38,7 +38,7 @@ def extract_and_save(user_message: str, assistant_message: str) -> dict:
             "reason": eval_result.get("reason", ""),
         }
 
-    # 3. 중요하면 단기 기억에 저장
+    # 3. 중요하면 단기기억에 저장
     summary = eval_result.get("summary", "")
     category = eval_result.get("category", "기타")
 
@@ -54,6 +54,7 @@ def extract_and_save(user_message: str, assistant_message: str) -> dict:
     return {
         "saved": True,
         "memory": memory,
+        "note": memory,  # Backward-compatible response key.
     }
 
 
