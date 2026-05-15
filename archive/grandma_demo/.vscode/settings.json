@@ -14,7 +14,7 @@
     "explorer.fileNesting.expand": false,
     "explorer.fileNesting.patterns": {
         "system_prompt.py": "system_prompt_A.py, system_prompt_B.py, system_prompt_C.py",
-        "eval_all.py": "eval_run.py, eval_questions.py",
+        "eval_all.py": "eval_suite.py, eval_dialogue.py, eval_run.py, eval_questions.py",
         "memories.json": "memory_embeddings.json, short_term_memories.json",
         "finetune_train.jsonl": "finetune_val.jsonl",
         "전사본.txt": "전사본_화자구분.txt, 할머니_분석.md"

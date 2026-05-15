@@ -5,7 +5,7 @@
 │
 ├── data/                             데이터 파일
 │   ├── voice_raw/                    할머니 음성 원본 wav 13개 (GitHub 미포함)
-│   ├── eval_comparison.md            초기 조합 비교 결과
+│   ├── eval_results/                 평가 실행 결과 자동 저장 폴더 (GitHub 미포함)
 │   ├── finetune_train.jsonl          파인튜닝 학습 데이터 262건
 │   ├── finetune_val.jsonl            파인튜닝 검증 데이터 30건
 │   ├── memories.json                 장기기억 chunk 44개
@@ -29,8 +29,10 @@
 │
 ├── prompt/                           프롬프트 + 평가
 │   ├── eval_all.py                   프롬프트별 3-way 평가 + RAG 디버그 출력
-│   ├── eval_questions.py             평가 질문 20개
+│   ├── eval_dialogue.py              이어지는 대화형 3-way 평가
+│   ├── eval_questions.py             단발 평가 질문 + 대화 평가 시나리오
 │   ├── eval_run.py                   평가 실행
+│   ├── eval_suite.py                 단발 + 대화형 평가 통합 실행
 │   ├── system_prompt.py              현재 사용 중인 프롬프트 (C를 가리킴)
 │   ├── system_prompt_A.py            상세 프롬프트 (기본 GPT용)
 │   ├── system_prompt_B.py            최소 프롬프트 (파인튜닝용)
@@ -141,6 +143,7 @@
 - `add_short_term_memory(content, category, importance) → dict` — 새 단기기억 추가
 - `get_active_memories() → list` — archived되지 않은 활성 단기기억 반환
 - `on_memory_recalled(memory_id)` — 단기기억이 프롬프트에 포함됐을 때 strength +1, recall_count +1
+- `PERSONA_SHORT_TERM_PATH` — 평가/테스트 시 단기기억 저장 파일을 임시 경로로 바꾸는 환경변수
 
 **스키마**:
 
@@ -189,13 +192,14 @@
 
 ### eval_questions.py
 
-**역할**: 말투 평가용 질문 20개. 실제 할머니 답변 포함.
+**역할**: 평가용 단발 질문과 대화형 시나리오.
 
-- 안부/일상 6개, 칭찬/격려 2개, 건강 2개, 요리법 4개, 가족 관계 3개, 가치관 2개, 추억 1개
+- `EVAL_SET`: 단발 질문 평가. 실제 답변/기대 답변과 평가포인트 포함
+- `DIALOGUE_EVAL_SET`: 3~4턴짜리 이어지는 대화 시나리오
 
 ### eval_run.py
 
-**역할**: 현재 설정(프롬프트 + 모델 + RAG)으로 eval 질문 20개 실행.
+**역할**: 현재 설정(프롬프트 + 모델 + RAG)으로 단발 eval 질문 실행.
 
 - `python -m prompt.eval_run`으로 실행
 
@@ -207,6 +211,25 @@
 - 같은 질문에 대해 기본모델+RAG, 파인튜닝모델+RAG, 초기 프로토타입을 나란히 출력
 - RAG 검색된 memory id/title/score/base_score/boost를 함께 출력
 - 초기 프로토타입 평가는 `PROTO_OPENAI_API_KEY`가 있을 때만 실행 가능
+- 결과는 `data/eval_results/eval_[A|B|C]_YYYYMMDD_HHMMSS.md`로 자동 저장
+
+### eval_dialogue.py
+
+**역할**: 이어지는 대화형 3-way 평가 스크립트.
+
+- `python -m prompt.eval_dialogue [A|B|C]`로 프롬프트 버전 선택
+- 시나리오별로 각 모델의 이전 대화 history를 유지하며 다음 턴을 평가
+- 실제 `extract_and_save()`와 `get_active_memories()`를 사용하되, 모델별 임시 단기기억 파일을 써서 운영 JSON을 오염시키지 않음
+- 맥락 유지, 반복 질문, 잘못된 전제 수정, 후속 질문 처리 능력을 확인
+- 결과는 `data/eval_results/dialogue_[A|B|C]_YYYYMMDD_HHMMSS.md`로 자동 저장
+
+### eval_suite.py
+
+**역할**: 단발 평가와 대화형 평가를 한 번에 실행.
+
+- `python -m prompt.eval_suite [A|B|C]`로 프롬프트 버전 선택
+- 내부에서 `eval_all` 실행 후 `eval_dialogue` 실행
+- 결과 파일은 각각 `data/eval_results/`에 저장
 
 ---
 
@@ -247,7 +270,7 @@
 | `할머니_분석.md`           | 7개 카테고리 분석 (기본정보, 언어, 성격, 관계, 가치관, 기억, 대화패턴) |
 | `finetune_train.jsonl`     | 파인튜닝 학습 데이터 262건                                             |
 | `finetune_val.jsonl`       | 파인튜닝 검증 데이터 30건                                              |
-| `eval_comparison.md`       | 조합별 20개 질문 비교 결과                                             |
+| `eval_results/`            | `eval_all`, `eval_dialogue` 실행 결과 자동 저장 폴더                  |
 | `voice_raw/`               | 할머니 음성 원본 wav 13개 (GitHub 미포함)                              |
 
 ---

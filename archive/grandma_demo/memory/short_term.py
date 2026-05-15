@@ -9,10 +9,15 @@ from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-SHORT_TERM_PATH = os.path.join(
+DEFAULT_SHORT_TERM_PATH = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
     "data", "short_term_memories.json"
 )
+
+
+def get_short_term_path() -> str:
+    """단기기억 저장 경로. 평가/테스트에서는 환경변수로 임시 파일을 지정할 수 있다."""
+    return os.getenv("PERSONA_SHORT_TERM_PATH", DEFAULT_SHORT_TERM_PATH)
 
 """
 단기기억 스키마:
@@ -32,13 +37,13 @@ SHORT_TERM_PATH = os.path.join(
 
 def load_short_term_memories() -> list:
     """단기기억 전체 로드"""
-    with open(SHORT_TERM_PATH, "r", encoding="utf-8") as f:
+    with open(get_short_term_path(), "r", encoding="utf-8") as f:
         return json.load(f)
 
 
 def save_short_term_memories(memories: list):
     """단기기억 전체 저장"""
-    with open(SHORT_TERM_PATH, "w", encoding="utf-8") as f:
+    with open(get_short_term_path(), "w", encoding="utf-8") as f:
         json.dump(memories, f, ensure_ascii=False, indent=2)
 
 

@@ -5,3 +5,4 @@ __pycache__/
 data/voice_raw/
 data/tts_test.mp3
 data/*.mp3
+data/eval_results/*.md

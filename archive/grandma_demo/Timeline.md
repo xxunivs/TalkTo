@@ -60,7 +60,7 @@ TalkTo 사후 Phase(Persona AI)의 AI 파트 개발 타임라인
 
 ### 3-2. 말투 평가 세트 구축
 
-- `prompt/eval_questions.py` — 평가 질문 20개 (실제 할머니 답변 포함)
+- `prompt/eval_questions.py` — 단발 평가 질문 + 대화형 평가 시나리오
 - `prompt/eval_run.py` — 평가 자동 실행 스크립트
 
 ### 이 Stage가 끝나면:
@@ -85,7 +85,9 @@ TalkTo 사후 Phase(Persona AI)의 AI 파트 개발 타임라인
 ### 4-3. 모델 비교 테스트
 
 - `prompt/eval_all.py` — 선택 프롬프트별 기본모델+RAG / 파인튜닝모델+RAG / 초기 프로토타입 3-way 비교
-- `data/eval_comparison.md` — 초기 조합 비교 결과
+- `prompt/eval_dialogue.py` — 이어지는 대화형 3-way 비교
+- `prompt/eval_suite.py` — 단발 평가와 대화형 평가 통합 실행
+- `data/eval_results/` — 평가 실행 결과 자동 저장 폴더
 - 현재는 프롬프트 C를 기준으로 기본모델과 파인튜닝모델을 계속 비교
 
 ### 이 Stage가 끝나면:
@@ -177,8 +179,10 @@ TalkTo 사후 Phase(Persona AI)의 AI 파트 개발 타임라인
 
 ### 8-1. eval 결과 기반 문제점 파악
 
-- `python -m prompt.eval_all C`로 20개 질문 답변과 RAG 검색 결과 확인
-- `data/eval_comparison.md` 초기 조합 비교 참고
+- `python -m prompt.eval_all C`로 단발 질문 답변과 RAG 검색 결과 확인
+- `python -m prompt.eval_dialogue C`로 실제 단기기억 저장/조회 흐름을 포함한 이어지는 대화 맥락 유지 확인
+- `python -m prompt.eval_suite C`로 두 평가를 한 번에 실행 가능
+- 실행 결과는 `data/eval_results/`에 자동 저장
 - 현재 후보 프롬프트: 중간 프롬프트 C
 
 ### 8-2. 말투 자연스러움 개선
@@ -208,7 +212,7 @@ TalkTo 사후 Phase(Persona AI)의 AI 파트 개발 타임라인
 
 ### 8-6. eval 재실행 + 비교
 
-- 프롬프트/RAG 수정 후 `python -m prompt.eval_all C`로 재평가
+- 프롬프트/RAG 수정 후 `python -m prompt.eval_suite C`로 재평가
 - 이전 결과와 비교해서 개선 여부 확인
 - 만족스러울 때까지 8-2 ~ 8-6 반복
 

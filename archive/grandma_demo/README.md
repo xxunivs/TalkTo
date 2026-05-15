@@ -36,9 +36,12 @@ API 문서: `http://localhost:8000/docs`
 ### 5. 평가 실행
 ```bash
 source venv/bin/activate
-python -m prompt.eval_all C
+python -m prompt.eval_suite C
 ```
+`eval_suite`는 단발 질문 평가와 이어지는 대화 평가를 순서대로 실행합니다.
 `C`는 현재 후보 프롬프트입니다. 기본모델+RAG, 파인튜닝모델+RAG, 초기 프로토타입을 같은 질문에서 비교합니다.
+`eval_dialogue`는 실제 단기기억 저장/조회 메커니즘을 사용하되, 평가용 임시 파일을 써서 운영 단기기억 JSON은 바꾸지 않습니다.
+실행 결과는 `data/eval_results/`에 자동 저장됩니다.
 
 ## 코드 구조
 

@@ -11,6 +11,7 @@
 """
 import os
 import sys
+from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -37,6 +38,12 @@ PROMPTS = {
     "C": {"name": "중간C", "prompt": PROMPT_C},
 }
 
+RESULT_DIR = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "data",
+    "eval_results",
+)
+
 PROTO_PROMPT = """당신은 83세의 따뜻하고 다정한 할머니 '신금자'입니다. 자식들과 손자손녀들을 무척 사랑하며, 항상 그들의 건강과 안녕을 걱정합니다. 대화할 때는 할머니의 말투로 이야기합니다. 6달 전에 세상을 떠났으며 평소 독실한 신자이셨고 베푸는 삶을 사셨으며 현재 천국에 계십니다. 할머니는 대화를 무척 좋아하시고, 손자손녀의 이야기에 진심으로 관심을 갖고 계십니다.
 
 행동 가이드라인:
@@ -55,21 +62,42 @@ def build_rag_prompt(system_prompt, memories):
     return system_prompt + f"\n\n[할머니의 관련 장기기억]\n{memory_text}"
 
 
-def generate(client, model, system_prompt, question):
+def generate(client, model, system_prompt, question, history=None):
+    if history is None:
+        history = []
+
     response = client.chat.completions.create(
         model=model,
         messages=[
             {"role": "system", "content": system_prompt},
+            *history,
             {"role": "user", "content": question},
         ],
     )
     return response.choices[0].message.content
 
 
-def print_rag(memories):
-    print("RAG:")
+class EvalLogger:
+    def __init__(self):
+        self.lines = []
+
+    def write(self, text=""):
+        print(text)
+        self.lines.append(text)
+
+    def save(self, prompt_key):
+        os.makedirs(RESULT_DIR, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        path = os.path.join(RESULT_DIR, f"eval_{prompt_key}_{timestamp}.md")
+        with open(path, "w", encoding="utf-8") as f:
+            f.write("\n".join(self.lines) + "\n")
+        return path
+
+
+def print_rag(memories, logger):
+    logger.write("RAG:")
     if not memories:
-        print("  없음")
+        logger.write("  없음")
         return
 
     for idx, memory in enumerate(memories, 1):
@@ -82,7 +110,7 @@ def print_rag(memories):
         score_text = f"{score}"
         if base_score is not None and boost is not None:
             score_text = f"{score} = {base_score}+{boost}"
-        print(f"  {idx}. [{score_text}] {memory['id']} | {memory['title']} | {content}")
+        logger.write(f"  {idx}. [{score_text}] {memory['id']} | {memory['title']} | {content}")
 
 
 def run_eval(prompt_key):
@@ -92,15 +120,18 @@ def run_eval(prompt_key):
     prompt_info = PROMPTS[prompt_key]
     main_client = OpenAI(api_key=MY_KEY)
     proto_client = OpenAI(api_key=PROTO_KEY) if PROTO_KEY else None
+    logger = EvalLogger()
 
-    print("=" * 60)
-    print(f"프롬프트: {prompt_key} ({prompt_info['name']})")
-    print(f"1. 기본모델 + {prompt_info['name']} + RAG")
-    print(f"2. 파인튜닝모델 + {prompt_info['name']} + RAG")
-    print("3. 초기 프로토타입")
+    logger.write(f"# Eval Result - Prompt {prompt_key} ({prompt_info['name']})")
+    logger.write("")
+    logger.write(f"- 실행시각: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    logger.write(f"- 기본모델: {BASE_MODEL} + {prompt_info['name']} + RAG")
+    logger.write(f"- 파인튜닝모델: {FINETUNED_MODEL} + {prompt_info['name']} + RAG")
+    logger.write(f"- 초기 프로토타입: {PROTO_MODEL}")
     if not proto_client:
-        print("프로토타입: PROTO_OPENAI_API_KEY 없음 - 결과 생략")
-    print("=" * 60)
+        logger.write("- 프로토타입 결과: PROTO_OPENAI_API_KEY 없음 - 생략")
+    logger.write("")
+    logger.write("=" * 60)
 
     for i, item in enumerate(EVAL_SET, 1):
         memories = search_memories(item["질문"], top_k=5)
@@ -113,18 +144,21 @@ def run_eval(prompt_key):
         else:
             proto_reply = "PROTO_OPENAI_API_KEY 없음"
 
-        print(f"\n--- 질문 {i} ---")
-        print(f"질문:       {item['질문']}")
-        print(f"실제:       {item['실제']}")
-        print_rag(memories)
-        print(f"기본모델:   {base_reply}")
-        print(f"파인튜닝:   {finetuned_reply}")
-        print(f"프로토타입: {proto_reply}")
-        print(f"평가포인트: {item['포인트']}")
+        logger.write("")
+        logger.write(f"## 질문 {i}")
+        logger.write(f"질문:       {item['질문']}")
+        logger.write(f"실제:       {item['실제']}")
+        print_rag(memories, logger)
+        logger.write(f"기본모델:   {base_reply}")
+        logger.write(f"파인튜닝:   {finetuned_reply}")
+        logger.write(f"프로토타입: {proto_reply}")
+        logger.write(f"평가포인트: {item['포인트']}")
 
-    print("\n" + "=" * 60)
-    print("완료!")
-    print("=" * 60)
+    logger.write("")
+    logger.write("=" * 60)
+    logger.write("완료!")
+    saved_path = logger.save(prompt_key)
+    logger.write(f"저장: {saved_path}")
 
 
 if __name__ == "__main__":
