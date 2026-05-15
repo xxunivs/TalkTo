@@ -27,6 +27,90 @@ EMBEDDINGS_PATH = os.path.join(
 MODEL = "text-embedding-3-small"
 
 
+KEYWORD_BOOST_RULES = [
+    {
+        "keywords": ["향이", "외손녀", "공공기관", "영어"],
+        "memory_ids": ["family_hyangi"],
+        "boost": 0.22,
+    },
+    {
+        "keywords": ["엄마", "아빠", "부모"],
+        "memory_ids": ["family_hyangi_parents"],
+        "boost": 0.16,
+    },
+    {
+        "keywords": ["이종서 아들", "준혁", "이준혁", "의예과"],
+        "memory_ids": ["family_junhyuk", "family_son"],
+        "boost": 0.22,
+    },
+    {
+        "keywords": ["할아버지", "이재산", "남편"],
+        "memory_ids": ["family_husband"],
+        "boost": 0.20,
+    },
+    {
+        "keywords": ["아파", "아프", "허리", "엉덩이", "진통제", "수술"],
+        "memory_ids": ["health_back"],
+        "boost": 0.24,
+    },
+    {
+        "keywords": ["당뇨", "혈당", "서울대병원", "내과"],
+        "memory_ids": ["health_diabetes", "place_hospital"],
+        "boost": 0.20,
+    },
+    {
+        "keywords": ["병원", "정형외과", "검사", "진료"],
+        "memory_ids": ["place_hospital", "health_diabetes", "health_back"],
+        "boost": 0.18,
+    },
+    {
+        "keywords": ["밖에서", "사먹", "사 먹", "파는 음식", "외식", "집밥", "설탕"],
+        "memory_ids": ["values_food"],
+        "boost": 0.24,
+    },
+    {
+        "keywords": ["도시락"],
+        "memory_ids": ["episode_dosirak", "family_hyangi"],
+        "boost": 0.18,
+    },
+    {
+        "keywords": ["상 받", "수상", "상품", "회사에서 상"],
+        "memory_ids": ["episode_award", "family_hyangi"],
+        "boost": 0.18,
+    },
+    {
+        "keywords": ["콩나물국", "콩나물"],
+        "memory_ids": ["recipe_kongnamul"],
+        "boost": 0.22,
+    },
+    {
+        "keywords": ["불고기"],
+        "memory_ids": ["recipe_bulgogi"],
+        "boost": 0.22,
+    },
+    {
+        "keywords": ["된장찌개", "된장"],
+        "memory_ids": ["recipe_doenjangjjigae"],
+        "boost": 0.22,
+    },
+    {
+        "keywords": ["매실청", "매실"],
+        "memory_ids": ["recipe_maesil"],
+        "boost": 0.22,
+    },
+    {
+        "keywords": ["신림동", "시장"],
+        "memory_ids": ["episode_sinrimdong"],
+        "boost": 0.22,
+    },
+    {
+        "keywords": ["건강", "운동", "면역력", "건강하려면"],
+        "memory_ids": ["values_health"],
+        "boost": 0.20,
+    },
+]
+
+
 def load_memories():
     """memories.json 읽기"""
     with open(MEMORIES_PATH, "r", encoding="utf-8") as f:
@@ -71,6 +155,22 @@ def cosine_similarity(a, b):
     return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
 
 
+def keyword_boost(query, memory_id):
+    """
+    짧은 구어체 질문에서 임베딩 검색이 빗나가는 경우를 보정한다.
+
+    예: "향이는 뭐하는 애야?"는 임베딩만 쓰면 향이 부모 기억이 더 높게
+    나올 수 있으므로, 명시 키워드가 있으면 해당 기억에 작은 가산점을 준다.
+    """
+    matched_boost = 0.0
+    for rule in KEYWORD_BOOST_RULES:
+        if memory_id not in rule["memory_ids"]:
+            continue
+        if any(keyword in query for keyword in rule["keywords"]):
+            matched_boost += rule["boost"]
+    return matched_boost
+
+
 def search_memories(query, top_k=5):
     """
     사용자 질문과 가장 관련 있는 장기기억을 검색.
@@ -93,24 +193,28 @@ def search_memories(query, top_k=5):
     # 질문을 벡터로 변환
     query_embedding = get_embedding(query)
 
-    # 각 기억과 유사도 계산
+    # 각 기억과 유사도 계산 + 키워드 보정
     scores = []
     for item in embeddings_data:
-        score = cosine_similarity(query_embedding, item["embedding"])
-        scores.append((item["id"], score))
+        base_score = cosine_similarity(query_embedding, item["embedding"])
+        boost = keyword_boost(query, item["id"])
+        final_score = base_score + boost
+        scores.append((item["id"], final_score, base_score, boost))
 
     # 유사도 높은 순 정렬
     scores.sort(key=lambda x: x[1], reverse=True)
 
     # top_k개 반환
     results = []
-    for mem_id, score in scores[:top_k]:
+    for mem_id, score, base_score, boost in scores[:top_k]:
         mem = item_dict[mem_id]
         results.append({
             "id": mem["id"],
             "title": mem["title"],
             "content": mem["content"],
             "score": round(score, 4),
+            "base_score": round(base_score, 4),
+            "boost": round(boost, 4),
         })
 
     return results

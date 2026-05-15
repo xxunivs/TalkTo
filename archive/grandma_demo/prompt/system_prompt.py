@@ -3,5 +3,5 @@
 테스트할 버전을 여기서 선택.
 """
 
-# 현재: 버전 A (상세 프롬프트 + 기본 GPT)
-from prompt.system_prompt_A import SYSTEM_PROMPT
+# 현재: 버전 C (기본 GPT + RAG 운영용)
+from prompt.system_prompt_C import SYSTEM_PROMPT

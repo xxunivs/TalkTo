@@ -56,7 +56,7 @@ TalkTo 사후 Phase(Persona AI)의 AI 파트 개발 타임라인
 
 - `prompt/system_prompt_A.py` — 상세 프롬프트 (말투+성격+규칙, 기본 GPT용)
 - `prompt/system_prompt_B.py` — 최소 프롬프트 (사실 정보+금지 사항만, 파인튜닝용)
-- `prompt/system_prompt_C.py` — 상세 프롬프트 (파인튜닝 모델용, A와 동일)
+- `prompt/system_prompt_C.py` — RAG 운영용 중간 프롬프트
 
 ### 3-2. 말투 평가 세트 구축
 
@@ -82,12 +82,11 @@ TalkTo 사후 Phase(Persona AI)의 AI 파트 개발 타임라인
 - `tools/run_finetune.py` — OpenAI Fine-tuning API 실행/상태 확인
 - 모델: `ft:gpt-4.1-mini-2025-04-14:talkto::DeJqGFij`
 
-### 4-3. 9가지 조합 비교 테스트
+### 4-3. 모델 비교 테스트
 
-- `prompt/eval_all.py` — 기본/파인튜닝 × 상세/최소 × RAG유무 = 8가지 + 대표 모델
-- `prompt/eval_prototype.py` — 대표 파인튜닝 모델 평가
-- `data/eval_comparison.md` — 9가지 조합 비교 결과
-- 결론: 기본 GPT + 상세 프롬프트 A + RAG (조합 3)이 현재 최선
+- `prompt/eval_all.py` — 선택 프롬프트별 기본모델+RAG / 파인튜닝모델+RAG / 초기 프로토타입 3-way 비교
+- `data/eval_comparison.md` — 초기 조합 비교 결과
+- 현재는 프롬프트 C를 기준으로 기본모델과 파인튜닝모델을 계속 비교
 
 ### 이 Stage가 끝나면:
 
@@ -178,9 +177,9 @@ TalkTo 사후 Phase(Persona AI)의 AI 파트 개발 타임라인
 
 ### 8-1. eval 결과 기반 문제점 파악
 
-- `python -m prompt.eval_run`으로 20개 질문 답변 확인
-- `data/eval_comparison.md` 9가지 조합 비교 참고
-- 현재 최선 조합: 기본 GPT (gpt-4.1-mini) + 상세 프롬프트 A + RAG
+- `python -m prompt.eval_all C`로 20개 질문 답변과 RAG 검색 결과 확인
+- `data/eval_comparison.md` 초기 조합 비교 참고
+- 현재 후보 프롬프트: 중간 프롬프트 C
 
 ### 8-2. 말투 자연스러움 개선
 
@@ -209,9 +208,14 @@ TalkTo 사후 Phase(Persona AI)의 AI 파트 개발 타임라인
 
 ### 8-6. eval 재실행 + 비교
 
-- 프롬프트 수정 후 `python -m prompt.eval_run`으로 재평가
+- 프롬프트/RAG 수정 후 `python -m prompt.eval_all C`로 재평가
 - 이전 결과와 비교해서 개선 여부 확인
 - 만족스러울 때까지 8-2 ~ 8-6 반복
+
+### 8-7. RAG 검색 보정
+
+- `memory/embeddings.py`에 키워드 boost 기반 하이브리드 검색 추가
+- 짧은 구어 질문에서 `health_back`, `family_hyangi`, `values_food` 등이 밀리는 문제 보정
 
 ### 이 Stage가 끝나면:
 

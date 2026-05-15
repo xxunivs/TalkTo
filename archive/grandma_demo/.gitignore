@@ -4,3 +4,4 @@ __pycache__/
 .DS_Store
 data/voice_raw/
 data/tts_test.mp3
+data/*.mp3
