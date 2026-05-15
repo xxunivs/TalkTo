@@ -182,6 +182,7 @@ TalkTo 사후 Phase(Persona AI)의 AI 파트 개발 타임라인
 - `python -m prompt.eval_all C`로 단발 질문 답변과 RAG 검색 결과 확인
 - `python -m prompt.eval_dialogue C`로 실제 단기기억 저장/조회 흐름을 포함한 이어지는 대화 맥락 유지 확인
 - `python -m prompt.eval_suite C`로 두 평가를 한 번에 실행 가능
+- 기본 결과는 답변 중심으로 출력하고, RAG/평가포인트/단기기억 판정은 옵션으로 확인
 - 실행 결과는 `data/eval_results/`에 자동 저장
 - 현재 후보 프롬프트: 중간 프롬프트 C
 

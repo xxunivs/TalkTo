@@ -12,10 +12,11 @@
 import os
 import sys
 from datetime import datetime
+from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from dotenv import load_dotenv
+from dotenv import dotenv_values, load_dotenv
 from openai import OpenAI
 from prompt.system_prompt_A import SYSTEM_PROMPT as PROMPT_A
 from prompt.system_prompt_B import SYSTEM_PROMPT as PROMPT_B
@@ -25,12 +26,19 @@ from memory.embeddings import search_memories
 
 load_dotenv()
 
+PROTO_ENV = Path(__file__).resolve().parents[2] / "TalkTo_prototype" / ".env"
+PROTO_ENV_VALUES = dotenv_values(PROTO_ENV) if PROTO_ENV.exists() else {}
+
 MY_KEY = os.getenv("OPENAI_API_KEY")
-PROTO_KEY = os.getenv("PROTO_OPENAI_API_KEY")
+PROTO_KEY = os.getenv("PROTO_OPENAI_API_KEY") or PROTO_ENV_VALUES.get("OPENAI_API_KEY")
 
 BASE_MODEL = "gpt-4.1-mini"
 FINETUNED_MODEL = "ft:gpt-4.1-mini-2025-04-14:talkto::DeJqGFij"
-PROTO_MODEL = "ft:gpt-4.1-mini-2025-04-14:picky::C0g3PIpn"
+PROTO_MODEL = (
+    os.getenv("PROTO_OPENAI_MODEL")
+    or PROTO_ENV_VALUES.get("OPENAI_MODEL")
+    or "ft:gpt-4.1-mini-2025-04-14:picky::C0g3PIpn"
+)
 
 PROMPTS = {
     "A": {"name": "상세A", "prompt": PROMPT_A},
@@ -113,7 +121,7 @@ def print_rag(memories, logger):
         logger.write(f"  {idx}. [{score_text}] {memory['id']} | {memory['title']} | {content}")
 
 
-def run_eval(prompt_key):
+def run_eval(prompt_key, show_rag=False, show_points=False):
     if not MY_KEY:
         raise RuntimeError("OPENAI_API_KEY를 .env에 설정하세요.")
 
@@ -128,6 +136,8 @@ def run_eval(prompt_key):
     logger.write(f"- 기본모델: {BASE_MODEL} + {prompt_info['name']} + RAG")
     logger.write(f"- 파인튜닝모델: {FINETUNED_MODEL} + {prompt_info['name']} + RAG")
     logger.write(f"- 초기 프로토타입: {PROTO_MODEL}")
+    logger.write(f"- RAG 상세 출력: {'켜짐' if show_rag else '꺼짐'}")
+    logger.write(f"- 평가포인트 출력: {'켜짐' if show_points else '꺼짐'}")
     if not proto_client:
         logger.write("- 프로토타입 결과: PROTO_OPENAI_API_KEY 없음 - 생략")
     logger.write("")
@@ -148,11 +158,13 @@ def run_eval(prompt_key):
         logger.write(f"## 질문 {i}")
         logger.write(f"질문:       {item['질문']}")
         logger.write(f"실제:       {item['실제']}")
-        print_rag(memories, logger)
+        if show_rag:
+            print_rag(memories, logger)
         logger.write(f"기본모델:   {base_reply}")
         logger.write(f"파인튜닝:   {finetuned_reply}")
         logger.write(f"프로토타입: {proto_reply}")
-        logger.write(f"평가포인트: {item['포인트']}")
+        if show_points:
+            logger.write(f"평가포인트: {item['포인트']}")
 
     logger.write("")
     logger.write("=" * 60)
@@ -162,16 +174,20 @@ def run_eval(prompt_key):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("사용법: python -m prompt.eval_all [A|B|C]")
+    args = [arg for arg in sys.argv[1:] if not arg.startswith("--")]
+    show_rag = "--show-rag" in sys.argv
+    show_points = "--show-points" in sys.argv
+
+    if len(args) < 1:
+        print("사용법: python -m prompt.eval_all [A|B|C] [--show-rag] [--show-points]")
         print()
         for key, value in PROMPTS.items():
             print(f"  {key}: {value['name']} 프롬프트로 3-way 비교")
         sys.exit(0)
 
-    selected_prompt = sys.argv[1].upper()
+    selected_prompt = args[0].upper()
     if selected_prompt not in PROMPTS:
         print("A, B, C 중 선택하세요.")
         sys.exit(1)
 
-    run_eval(selected_prompt)
+    run_eval(selected_prompt, show_rag=show_rag, show_points=show_points)

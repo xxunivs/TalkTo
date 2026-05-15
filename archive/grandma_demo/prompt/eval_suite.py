@@ -13,7 +13,7 @@ from prompt.eval_all import PROMPTS, run_eval
 from prompt.eval_dialogue import run_dialogue_eval
 
 
-def run_suite(prompt_key):
+def run_suite(prompt_key, show_rag=False, show_points=False, show_memory=False):
     print("=" * 60)
     print(f"Eval suite 시작: 프롬프트 {prompt_key} ({PROMPTS[prompt_key]['name']})")
     print("1. 단발 질문 평가")
@@ -21,7 +21,7 @@ def run_suite(prompt_key):
     print("=" * 60)
     print()
 
-    run_eval(prompt_key)
+    run_eval(prompt_key, show_rag=show_rag, show_points=show_points)
 
     print()
     print("=" * 60)
@@ -29,7 +29,12 @@ def run_suite(prompt_key):
     print("=" * 60)
     print()
 
-    run_dialogue_eval(prompt_key)
+    run_dialogue_eval(
+        prompt_key,
+        show_rag=show_rag,
+        show_points=show_points,
+        show_memory=show_memory,
+    )
 
     print()
     print("=" * 60)
@@ -39,16 +44,26 @@ def run_suite(prompt_key):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("사용법: python -m prompt.eval_suite [A|B|C]")
+    args = [arg for arg in sys.argv[1:] if not arg.startswith("--")]
+    show_rag = "--show-rag" in sys.argv
+    show_points = "--show-points" in sys.argv
+    show_memory = "--show-memory" in sys.argv
+
+    if len(args) < 1:
+        print("사용법: python -m prompt.eval_suite [A|B|C] [--show-rag] [--show-points] [--show-memory]")
         print()
         for key, value in PROMPTS.items():
             print(f"  {key}: {value['name']} 프롬프트로 단발+대화형 평가")
         sys.exit(0)
 
-    selected_prompt = sys.argv[1].upper()
+    selected_prompt = args[0].upper()
     if selected_prompt not in PROMPTS:
         print("A, B, C 중 선택하세요.")
         sys.exit(1)
 
-    run_suite(selected_prompt)
+    run_suite(
+        selected_prompt,
+        show_rag=show_rag,
+        show_points=show_points,
+        show_memory=show_memory,
+    )

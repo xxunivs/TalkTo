@@ -209,8 +209,10 @@
 
 - `python -m prompt.eval_all [A|B|C]`로 프롬프트 버전 선택
 - 같은 질문에 대해 기본모델+RAG, 파인튜닝모델+RAG, 초기 프로토타입을 나란히 출력
-- RAG 검색된 memory id/title/score/base_score/boost를 함께 출력
-- 초기 프로토타입 평가는 `PROTO_OPENAI_API_KEY`가 있을 때만 실행 가능
+- 기본 출력에서는 RAG 상세와 평가포인트를 숨김
+- `--show-rag`, `--show-points` 옵션으로 RAG 검색 결과와 평가포인트 출력 가능
+- `PROTO_OPENAI_API_KEY`가 없으면 sibling 폴더 `TalkTo_prototype/.env`의 `OPENAI_API_KEY`와 `OPENAI_MODEL`을 사용
+- 초기 프로토타입 평가는 `PROTO_OPENAI_API_KEY` 또는 `TalkTo_prototype/.env`가 있을 때 실행 가능
 - 결과는 `data/eval_results/eval_[A|B|C]_YYYYMMDD_HHMMSS.md`로 자동 저장
 
 ### eval_dialogue.py
@@ -220,6 +222,8 @@
 - `python -m prompt.eval_dialogue [A|B|C]`로 프롬프트 버전 선택
 - 시나리오별로 각 모델의 이전 대화 history를 유지하며 다음 턴을 평가
 - 실제 `extract_and_save()`와 `get_active_memories()`를 사용하되, 모델별 임시 단기기억 파일을 써서 운영 JSON을 오염시키지 않음
+- 기본 출력에서는 RAG 상세, 평가포인트, 단기기억 저장판정을 숨김
+- `--show-rag`, `--show-points`, `--show-memory` 옵션으로 디버그 정보 출력 가능
 - 맥락 유지, 반복 질문, 잘못된 전제 수정, 후속 질문 처리 능력을 확인
 - 결과는 `data/eval_results/dialogue_[A|B|C]_YYYYMMDD_HHMMSS.md`로 자동 저장
 
@@ -229,6 +233,7 @@
 
 - `python -m prompt.eval_suite [A|B|C]`로 프롬프트 버전 선택
 - 내부에서 `eval_all` 실행 후 `eval_dialogue` 실행
+- `--show-rag`, `--show-points`, `--show-memory` 옵션을 하위 평가에 전달
 - 결과 파일은 각각 `data/eval_results/`에 저장
 
 ---

@@ -101,7 +101,7 @@ def save_dialogue_result(logger, prompt_key):
     return path
 
 
-def run_dialogue_eval(prompt_key):
+def run_dialogue_eval(prompt_key, show_rag=False, show_points=False, show_memory=False):
     if not MY_KEY:
         raise RuntimeError("OPENAI_API_KEY를 .env에 설정하세요.")
 
@@ -116,6 +116,9 @@ def run_dialogue_eval(prompt_key):
     logger.write(f"- 기본모델: {BASE_MODEL} + {prompt_info['name']} + RAG")
     logger.write(f"- 파인튜닝모델: {FINETUNED_MODEL} + {prompt_info['name']} + RAG")
     logger.write(f"- 초기 프로토타입: {PROTO_MODEL}")
+    logger.write(f"- RAG 상세 출력: {'켜짐' if show_rag else '꺼짐'}")
+    logger.write(f"- 평가포인트 출력: {'켜짐' if show_points else '꺼짐'}")
+    logger.write(f"- 단기기억 디버그 출력: {'켜짐' if show_memory else '꺼짐'}")
     if not proto_client:
         logger.write("- 프로토타입 결과: PROTO_OPENAI_API_KEY 없음 - 생략")
     logger.write("")
@@ -131,7 +134,8 @@ def run_dialogue_eval(prompt_key):
 
         logger.write("")
         logger.write(f"## 시나리오 {scenario_idx}: {scenario['name']}")
-        logger.write(f"평가포인트: {scenario['point']}")
+        if show_points:
+            logger.write(f"평가포인트: {scenario['point']}")
 
         for turn_idx, user_message in enumerate(scenario["turns"], 1):
             memories = search_memories(user_message, top_k=5)
@@ -183,18 +187,21 @@ def run_dialogue_eval(prompt_key):
             logger.write("")
             logger.write(f"### 턴 {turn_idx}")
             logger.write(f"사용자:     {user_message}")
-            print_rag(memories, logger)
-            logger.write(f"단기기억(기본): {format_short_term(base_short_term)}")
-            logger.write(f"단기기억(파인튜닝): {format_short_term(finetuned_short_term)}")
-            if proto_client:
-                logger.write(f"단기기억(프로토타입): {format_short_term(proto_short_term)}")
+            if show_rag:
+                print_rag(memories, logger)
+            if show_memory:
+                logger.write(f"단기기억(기본): {format_short_term(base_short_term)}")
+                logger.write(f"단기기억(파인튜닝): {format_short_term(finetuned_short_term)}")
+                if proto_client:
+                    logger.write(f"단기기억(프로토타입): {format_short_term(proto_short_term)}")
             logger.write(f"기본모델:   {base_reply}")
             logger.write(f"파인튜닝:   {finetuned_reply}")
             logger.write(f"프로토타입: {proto_reply}")
-            logger.write(f"저장판정(기본): {base_extract}")
-            logger.write(f"저장판정(파인튜닝): {finetuned_extract}")
-            if proto_client:
-                logger.write(f"저장판정(프로토타입): {proto_extract}")
+            if show_memory:
+                logger.write(f"저장판정(기본): {base_extract}")
+                logger.write(f"저장판정(파인튜닝): {finetuned_extract}")
+                if proto_client:
+                    logger.write(f"저장판정(프로토타입): {proto_extract}")
 
     logger.write("")
     logger.write("=" * 60)
@@ -204,16 +211,26 @@ def run_dialogue_eval(prompt_key):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("사용법: python -m prompt.eval_dialogue [A|B|C]")
+    args = [arg for arg in sys.argv[1:] if not arg.startswith("--")]
+    show_rag = "--show-rag" in sys.argv
+    show_points = "--show-points" in sys.argv
+    show_memory = "--show-memory" in sys.argv
+
+    if len(args) < 1:
+        print("사용법: python -m prompt.eval_dialogue [A|B|C] [--show-rag] [--show-points] [--show-memory]")
         print()
         for key, value in PROMPTS.items():
             print(f"  {key}: {value['name']} 프롬프트로 대화형 3-way 비교")
         sys.exit(0)
 
-    selected_prompt = sys.argv[1].upper()
+    selected_prompt = args[0].upper()
     if selected_prompt not in PROMPTS:
         print("A, B, C 중 선택하세요.")
         sys.exit(1)
 
-    run_dialogue_eval(selected_prompt)
+    run_dialogue_eval(
+        selected_prompt,
+        show_rag=show_rag,
+        show_points=show_points,
+        show_memory=show_memory,
+    )
