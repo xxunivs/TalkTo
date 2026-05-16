@@ -10,7 +10,7 @@
 │   ├── finetune_val.jsonl            파인튜닝 검증 데이터 30건
 │   ├── memories.json                 장기기억 chunk 44개
 │   ├── memory_embeddings.json        장기기억 임베딩 벡터
-│   ├── short_term_memories.json      단기기억 (대화 중 자동 저장)
+│   ├── short_term_memories.json      로컬 단기기억 (운영 기본값은 비활성)
 │   ├── 전사본.txt                      1~13 순서 정렬
 │   ├── 전사본_화자구분.txt               화자 분리 완료
 │   └── 할머니_분석.md                   7개 카테고리 분석
@@ -49,8 +49,10 @@
 │
 ├── .env                              API 키 (GitHub 미포함)
 ├── .gitignore
+├── .python-version                   Render/Python 런타임 버전 고정
 ├── CODE_STRUCTURE.md                 이 파일
 ├── README.md                         환경 세팅 + 개발 단계
+├── render.yaml                       Render Web Service 배포 설정
 ├── server.py                         FastAPI AI 서버 (백엔드 연동 진입점)
 ├── Timeline.md                       개발 타임라인
 └── requirements.txt                  Python 의존성
@@ -88,12 +90,13 @@
   - 사용자 메시지와 대화 히스토리를 받아서 할머니 답변을 반환
   - 내부 동작:
     1. 장기기억 검색 (top-5) — `memory/embeddings.py`의 `search_memories()` 호출
-    2. 단기기억 조회 — `memory/short_term.py`의 `get_active_memories()` 호출
+    2. 로컬 단기기억이 켜져 있으면 `memory/short_term.py`의 `get_active_memories()` 호출
     3. 시스템 프롬프트 + 기억 + 히스토리 + 사용자 메시지를 조립
-    4. GPT API 호출 (현재 gpt-4.1-mini)
+    4. GPT API 호출 (`OPENAI_CHAT_MODEL`, 기본값 gpt-4.1-mini)
     5. 답변 반환
   - 테스트 루프 포함: `python -m llm.core`로 터미널에서 연속 대화 가능
-  - 대화 후 `memory/extract.py`의 `extract_and_save()`로 단기기억 자동 추출
+  - 로컬 테스트 루프에서는 `memory/extract.py`의 `extract_and_save()`로 단기기억 자동 추출
+  - 운영 배포에서는 `PERSONA_ENABLE_LOCAL_SHORT_TERM=false`를 사용하고, 기억 저장 기준은 백엔드 DB로 둠
 
 ---
 
@@ -269,7 +272,7 @@
 | ---------------------------- | ------------------------------------------------------------------------ |
 | `memories.json`            | 장기기억 chunk 44개 (가족, 요리, 추억, 가치관 등)                      |
 | `memory_embeddings.json`   | 44개 chunk의 임베딩 벡터.`python -m memory.embeddings --build`로 생성  |
-| `short_term_memories.json` | 단기기억. 대화 중 자동 추가. 초기에는 빈 배열`[]`                      |
+| `short_term_memories.json` | 로컬 단기기억. 운영 배포에서는 기본 비활성, 로컬 테스트/eval에서 사용 |
 | `전사본.txt`               | 할머니 통화 13개 파일 1~13 순서 정렬                                   |
 | `전사본_화자구분.txt`      | 화자 분리 완료. "할머니:" / "손녀:" 표시                               |
 | `할머니_분석.md`           | 7개 카테고리 분석 (기본정보, 언어, 성격, 관계, 가치관, 기억, 대화패턴) |
@@ -304,7 +307,9 @@ AI ↔ 백엔드 연동 가이드. 엔드포인트 형식, 백엔드 수정 필�
 
 | 파일                    | 설명                                                                                      |
 | ------------------------- | ------------------------------------------------------------------------------------------- |
-| `.env`                  | API 키: OPENAI_API_KEY, HF_TOKEN, ELEVENLABS_API_KEY, ELEVENLABS_VOICE_ID (GitHub 미포함) |
+| `.env`                  | API 키/모델/운영 옵션: OPENAI_API_KEY, OPENAI_CHAT_MODEL, PERSONA_ENABLE_LOCAL_SHORT_TERM, ELEVENLABS_API_KEY, ELEVENLABS_VOICE_ID (GitHub 미포함) |
 | `requirements.txt`      | Python 의존성 목록                                                                        |
+| `.python-version`       | Render에서 사용할 Python 버전                                                            |
+| `render.yaml`           | Render Web Service 배포 설정                                                             |
 | `.gitignore`            | 제외: .env, venv/,__pycache__/, .DS_Store, data/voice_raw/, data/*.mp3                    |
 | `.vscode/settings.json` | VS Code 터미널 설정                                                                       |

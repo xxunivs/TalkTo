@@ -15,7 +15,7 @@ from typing import Optional
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from llm.core import generate_response
+from llm.core import generate_response, local_short_term_enabled
 from memory.embeddings import search_memories, get_embedding
 from memory.extract import extract_and_save
 from voice.stt import transcribe
@@ -84,8 +84,9 @@ def chat(req: ChatRequest):
     # 2. 답변 생성 (기억을 프롬프트에 주입)
     reply = generate_response(req.message, req.history, memory_text=memory_text)
 
-    # 3. 단기기억 추출 (중요도 6 이상이면 자동 저장)
-    extract_and_save(req.message, reply)
+    # 3. 로컬 개발에서만 단기기억 추출 (운영은 백엔드 DB가 기억 저장소의 기준)
+    if local_short_term_enabled():
+        extract_and_save(req.message, reply)
 
     latency_ms = int((time.time() - start) * 1000)
 
@@ -185,7 +186,8 @@ async def voice_chat(
     memory_ids = [m["id"] for m in found]
     memory_text = "\n".join([f"- {m['title']}: {m['content']}" for m in found])
     reply = generate_response(stt_text, parsed_history, memory_text=memory_text)
-    extract_and_save(stt_text, reply)
+    if local_short_term_enabled():
+        extract_and_save(stt_text, reply)
 
     # 3. TTS: 텍스트 → 할머니 목소리
     output_path = f"/tmp/tts_{int(time.time())}.mp3"

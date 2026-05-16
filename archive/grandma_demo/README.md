@@ -21,6 +21,8 @@ pip install -r requirements.txt
 프로젝트 루트에 `.env` 파일을 만들고 API 키를 넣어주세요.
 ```
 OPENAI_API_KEY=여기에_API_키_입력
+OPENAI_CHAT_MODEL=gpt-4.1-mini
+PERSONA_ENABLE_LOCAL_SHORT_TERM=true
 ELEVENLABS_API_KEY=여기에_ELEVENLABS_키_입력
 ELEVENLABS_VOICE_ID=여기에_voice_id_입력
 ```
@@ -47,6 +49,35 @@ python -m prompt.eval_suite C
 ## 코드 구조
 
 상세 내용은 [CODE_STRUCTURE.md](CODE_STRUCTURE.md) 참고.
+
+## Render 배포
+
+Render Web Service로 배포합니다.
+
+- Runtime: `Python 3`
+- Build Command: `pip install -r requirements.txt`
+- Start Command: `uvicorn server:app --host 0.0.0.0 --port $PORT`
+- Health Check Path: `/health`
+
+환경변수:
+
+```env
+OPENAI_API_KEY=...
+OPENAI_CHAT_MODEL=ft:gpt-4.1-mini-2025-04-14:talkto::DeJqGFij
+PERSONA_ENABLE_LOCAL_SHORT_TERM=false
+ELEVENLABS_API_KEY=...
+ELEVENLABS_VOICE_ID=...
+```
+
+`OPENAI_CHAT_MODEL`만 바꾸면 기본 모델/파인튜닝 모델을 코드 수정 없이 교체할 수 있습니다.
+운영 배포에서는 기억 저장소의 기준을 백엔드 DB로 두기 위해 `PERSONA_ENABLE_LOCAL_SHORT_TERM=false`를 사용합니다.
+
+배포 후 나온 URL을 백엔드 환경변수에 넣습니다.
+
+```env
+AI_SERVER_URL=https://배포된-render-url
+AI_SERVER_TIMEOUT_MS=30000
+```
 
 ## 개발 단계
 

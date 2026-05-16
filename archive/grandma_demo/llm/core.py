@@ -14,6 +14,23 @@ from memory.extract import extract_and_save
 load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
+DEFAULT_CHAT_MODEL = "gpt-4.1-mini"
+
+
+def get_chat_model() -> str:
+    """운영 배포에서는 환경변수로 기본/파인튜닝 모델을 교체한다."""
+    return os.getenv("OPENAI_CHAT_MODEL", DEFAULT_CHAT_MODEL)
+
+
+def local_short_term_enabled() -> bool:
+    """
+    AI 서버 로컬 파일에 단기기억을 저장/조회할지 여부.
+
+    운영에서는 백엔드가 기억 저장소의 기준이므로 기본값을 끈다.
+    """
+    value = os.getenv("PERSONA_ENABLE_LOCAL_SHORT_TERM", "false").lower()
+    return value in {"1", "true", "yes", "on"}
+
 
 def generate_response(message: str, history: list = None, memory_text: str = None) -> str:
     """
@@ -34,12 +51,16 @@ def generate_response(message: str, history: list = None, memory_text: str = Non
     if memory_text is None:
         # 내부 JSON에서 검색 (로컬 테스트용)
         long_term = search_memories(message, top_k=5)
-        short_term = get_active_memories()
 
         memory_parts = []
         if long_term:
             lt_text = "\n".join([f"- {m['title']}: {m['content']}" for m in long_term])
             memory_parts.append(f"[장기기억]\n{lt_text}")
+
+        if local_short_term_enabled():
+            short_term = get_active_memories()
+        else:
+            short_term = []
         if short_term:
             st_text = "\n".join([f"- {m['content']}" for m in short_term])
             memory_parts.append(f"[단기기억]\n{st_text}")
@@ -49,16 +70,21 @@ def generate_response(message: str, history: list = None, memory_text: str = Non
         memory_section = "\n\n" + "\n\n".join(memory_parts) if memory_parts else ""
     else:
         # server.py에서 조립한 장기기억 텍스트 사용
-        # 단기기억도 추가
-        short_term = get_active_memories()
-        memory_parts = [f"[장기기억]\n{memory_text}"]
+        memory_parts = []
+        if memory_text.strip():
+            memory_parts.append(f"[장기기억]\n{memory_text}")
+
+        if local_short_term_enabled():
+            short_term = get_active_memories()
+        else:
+            short_term = []
         if short_term:
             st_text = "\n".join([f"- {m['content']}" for m in short_term])
             memory_parts.append(f"[단기기억]\n{st_text}")
             for m in short_term:
                 on_memory_recalled(m["id"])
 
-        memory_section = "\n\n" + "\n\n".join(memory_parts)
+        memory_section = "\n\n" + "\n\n".join(memory_parts) if memory_parts else ""
 
     # 2. 프롬프트 조립
     messages = []
@@ -68,7 +94,7 @@ def generate_response(message: str, history: list = None, memory_text: str = Non
 
     # 4. GPT 호출
     response = client.chat.completions.create(
-        model="gpt-4.1-mini",  # RAG 테스트용: 파인튜닝 없이 기본 모델
+        model=get_chat_model(),
         messages=messages,
     )
 
@@ -77,6 +103,7 @@ def generate_response(message: str, history: list = None, memory_text: str = Non
 
 # 터미널에서 직접 실행할 때만 동작하는 테스트용 대화 루프
 if __name__ == "__main__":
+    os.environ.setdefault("PERSONA_ENABLE_LOCAL_SHORT_TERM", "true")
     history = []
     print("할머니와 대화를 시작합니다. (종료: q)")
     while True:
@@ -88,9 +115,10 @@ if __name__ == "__main__":
         print(f"할머니: {reply}")
 
         # 단기기억 추출 (중요도 6 이상이면 자동 저장)
-        mem_result = extract_and_save(user_input, reply)
-        if mem_result["saved"]:
-            print(f"  [단기기억 저장] {mem_result['memory']['content']}")
+        if local_short_term_enabled():
+            mem_result = extract_and_save(user_input, reply)
+            if mem_result["saved"]:
+                print(f"  [단기기억 저장] {mem_result['memory']['content']}")
 
         history.append({"role": "user", "content": user_input})
         history.append({"role": "assistant", "content": reply})
