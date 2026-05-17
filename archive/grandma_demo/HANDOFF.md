@@ -46,11 +46,8 @@
 - `/Users/univ/Desktop/TalkTo/PersonaAI/data/할머니_분석.md`
   - 전사본 대비 빠진 내용 7개 보강.
 
-- `/Users/univ/Desktop/TalkTo/PersonaAI/docs/backend_integration.md`
-  - 백엔드 연동 엔드포인트 정리.
-  - `/ai/chat`, `/ai/voice-chat` 중심으로 사용하도록 안내.
-  - `/ai/embed`, `memories` 파라미터, 기존 44개 장기기억 이관 순서 추가.
-  - 연동 순서를 `기존 44개 DB 이관 -> 벡터 검색 연결 -> 이후 새 장기기억 추가`로 수정.
+- `/Users/univ/Desktop/TalkTo/PersonaAI/docs/ai_backend_integration_ver1.md`
+  - 백엔드 연동 최초 체크리스트.
 
 - `/Users/univ/Desktop/TalkTo/PersonaAI/HANDOFF.md`
   - 이 파일. 다음 작업 인계를 위해 생성.

@@ -8,8 +8,8 @@ import os
 import sys
 import time
 import tempfile
-from fastapi import FastAPI, UploadFile, File
-from fastapi.responses import Response
+from fastapi import FastAPI, Request, UploadFile, File
+from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 from typing import Optional
 
@@ -23,6 +23,26 @@ from voice.stt import transcribe
 from voice.tts import synthesize
 
 app = FastAPI(title="TalkTo Persona AI", version="0.1.0")
+
+
+@app.middleware("http")
+async def require_ai_server_token(request: Request, call_next):
+    """
+    AI 서버 public URL 보호용 shared secret 검사.
+
+    AI_SERVER_TOKEN이 설정된 환경에서만 /ai/* 요청에
+    X-AI-Server-Token 헤더를 요구한다. /health는 공개로 둔다.
+    """
+    expected_token = os.getenv("AI_SERVER_TOKEN")
+    if expected_token and request.url.path.startswith("/ai/"):
+        actual_token = request.headers.get("x-ai-server-token")
+        if actual_token != expected_token:
+            return JSONResponse(
+                status_code=401,
+                content={"detail": "Invalid AI server token."},
+            )
+
+    return await call_next(request)
 
 
 # === 요청/응답 형식 ===

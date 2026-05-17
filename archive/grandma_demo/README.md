@@ -23,6 +23,7 @@ pip install -r requirements.txt
 OPENAI_API_KEY=여기에_API_키_입력
 OPENAI_CHAT_MODEL=gpt-4.1-mini
 PERSONA_ENABLE_LOCAL_SHORT_TERM=true
+AI_SERVER_TOKEN=로컬에서_필요할_때만_입력
 ELEVENLABS_API_KEY=여기에_ELEVENLABS_키_입력
 ELEVENLABS_VOICE_ID=여기에_voice_id_입력
 ```
@@ -65,18 +66,21 @@ Render Web Service로 배포합니다.
 OPENAI_API_KEY=...
 OPENAI_CHAT_MODEL=ft:gpt-4.1-mini-2025-04-14:talkto::DeJqGFij
 PERSONA_ENABLE_LOCAL_SHORT_TERM=false
+AI_SERVER_TOKEN=백엔드와_공유할_긴_랜덤_토큰
 ELEVENLABS_API_KEY=...
 ELEVENLABS_VOICE_ID=...
 ```
 
 `OPENAI_CHAT_MODEL`만 바꾸면 기본 모델/파인튜닝 모델을 코드 수정 없이 교체할 수 있습니다.
 운영 배포에서는 기억 저장소의 기준을 백엔드 DB로 두기 위해 `PERSONA_ENABLE_LOCAL_SHORT_TERM=false`를 사용합니다.
+`AI_SERVER_TOKEN`을 설정하면 `/ai/*` 호출에는 `X-AI-Server-Token` 헤더가 필요합니다. `/health`는 토큰 없이 확인할 수 있습니다.
 
 배포 후 나온 URL을 백엔드 환경변수에 넣습니다.
 
 ```env
 AI_SERVER_URL=https://배포된-render-url
-AI_SERVER_TIMEOUT_MS=30000
+AI_SERVER_TIMEOUT_MS=45000
+AI_SERVER_TOKEN=Render와_같은_값
 ```
 
 ## 개발 단계

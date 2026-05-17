@@ -10,13 +10,16 @@
 │   ├── finetune_val.jsonl            파인튜닝 검증 데이터 30건
 │   ├── memories.json                 장기기억 chunk 44개
 │   ├── memory_embeddings.json        장기기억 임베딩 벡터
+│   ├── backend_memory_import.json    백엔드 Memory import용 44개 기억
 │   ├── short_term_memories.json      로컬 단기기억 (운영 기본값은 비활성)
 │   ├── 전사본.txt                      1~13 순서 정렬
 │   ├── 전사본_화자구분.txt               화자 분리 완료
 │   └── 할머니_분석.md                   7개 카테고리 분석
 │
 ├── docs/                             문서
-│   └── backend_integration.md        AI ↔ 백엔드 연동 가이드
+│   ├── ai_backend_integration_ver1.md AI ↔ 백엔드 연동 최초 체크리스트
+│   ├── ai_backend_integration_ver2.md 백엔드 개발자 회신
+│   └── ai_backend_integration_ver3.md Render 배포 후 최신 연동 정리
 │
 ├── llm/                              LLM 호출
 │   └── core.py                       generate_response() — GPT 호출 + RAG 연결
@@ -272,6 +275,7 @@
 | ---------------------------- | ------------------------------------------------------------------------ |
 | `memories.json`            | 장기기억 chunk 44개 (가족, 요리, 추억, 가치관 등)                      |
 | `memory_embeddings.json`   | 44개 chunk의 임베딩 벡터.`python -m memory.embeddings --build`로 생성  |
+| `backend_memory_import.json` | 백엔드 `Memory` import용 44개 기억. `LONG_TERM`, `category:*`, `legacy_id:*` 기준 |
 | `short_term_memories.json` | 로컬 단기기억. 운영 배포에서는 기본 비활성, 로컬 테스트/eval에서 사용 |
 | `전사본.txt`               | 할머니 통화 13개 파일 1~13 순서 정렬                                   |
 | `전사본_화자구분.txt`      | 화자 분리 완료. "할머니:" / "손녀:" 표시                               |
@@ -285,9 +289,17 @@
 
 ## docs/
 
-### backend_integration.md
+### ai_backend_integration_ver1.md
 
-AI ↔ 백엔드 연동 가이드. 엔드포인트 형식, 백엔드 수정 필요 사항, 기억 데이터 방향.
+AI ↔ 백엔드 연동 최초 체크리스트.
+
+### ai_backend_integration_ver2.md
+
+백엔드 개발자 회신.
+
+### ai_backend_integration_ver3.md
+
+Render 배포 후 최신 연동 상태, 백엔드 설정값, 남은 논의 사항.
 
 ---
 
@@ -297,6 +309,7 @@ AI ↔ 백엔드 연동 가이드. 엔드포인트 형식, 백엔드 수정 필�
 | 파일                        | 설명                          | 실행                                                |
 | ----------------------------- | ------------------------------- | ----------------------------------------------------- |
 | `build_finetune_dataset.py` | 전사본 → 파인튜닝 JSONL 변환 | `python tools/build_finetune_dataset.py`            |
+| `export_backend_memories.py` | `memories.json` → 백엔드 import JSON 변환 | `python tools/export_backend_memories.py` |
 | `reorder_transcript.py`     | 전사본 1~13 순서 정렬         | `python tools/reorder_transcript.py`                |
 | `run_finetune.py`           | 파인튜닝 실행/상태 확인       | `python tools/run_finetune.py` / `--check [job_id]` |
 
@@ -307,7 +320,7 @@ AI ↔ 백엔드 연동 가이드. 엔드포인트 형식, 백엔드 수정 필�
 
 | 파일                    | 설명                                                                                      |
 | ------------------------- | ------------------------------------------------------------------------------------------- |
-| `.env`                  | API 키/모델/운영 옵션: OPENAI_API_KEY, OPENAI_CHAT_MODEL, PERSONA_ENABLE_LOCAL_SHORT_TERM, ELEVENLABS_API_KEY, ELEVENLABS_VOICE_ID (GitHub 미포함) |
+| `.env`                  | API 키/모델/운영 옵션: OPENAI_API_KEY, OPENAI_CHAT_MODEL, PERSONA_ENABLE_LOCAL_SHORT_TERM, AI_SERVER_TOKEN, ELEVENLABS_API_KEY, ELEVENLABS_VOICE_ID (GitHub 미포함) |
 | `requirements.txt`      | Python 의존성 목록                                                                        |
 | `.python-version`       | Render에서 사용할 Python 버전                                                            |
 | `render.yaml`           | Render Web Service 배포 설정                                                             |

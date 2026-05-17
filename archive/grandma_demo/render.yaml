@@ -15,6 +15,8 @@ services:
         value: ft:gpt-4.1-mini-2025-04-14:talkto::DeJqGFij
       - key: PERSONA_ENABLE_LOCAL_SHORT_TERM
         value: "false"
+      - key: AI_SERVER_TOKEN
+        sync: false
       - key: ELEVENLABS_API_KEY
         sync: false
       - key: ELEVENLABS_VOICE_ID
