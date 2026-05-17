@@ -16,7 +16,8 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 EVAL_PROMPT = """
 다음은 할머니와 손녀의 대화 한 턴이다.
-이 대화에서 나중에 기억해둘 만한 새로운 정보가 있는지 평가해줘.
+최근 대화 맥락을 참고해서, 현재 턴에서 나중에 기억해둘 만한 새로운 정보가 있는지 평가해줘.
+최근 대화는 맥락 파악용이고, 저장 판단과 요약은 현재 턴에서 새로 확정되거나 구체화된 정보 중심으로 해줘.
 
 [평가 기준]
 - 감정적 중요도 (30%): 감정적으로 의미 있는 사건인가?
@@ -38,13 +39,37 @@ EVAL_PROMPT = """
 """.strip()
 
 
-def evaluate_importance(user_message: str, assistant_message: str) -> dict:
+def format_history_for_importance(history: list | None) -> str:
+    """최근 대화 히스토리를 중요도 평가 프롬프트용 텍스트로 변환한다."""
+    if not history:
+        return "(없음)"
+
+    lines = []
+    for item in history[-10:]:
+        if not isinstance(item, dict):
+            continue
+        role = item.get("role", "")
+        content = item.get("content", "")
+        if not content:
+            continue
+        speaker = "손녀" if role == "user" else "할머니" if role == "assistant" else role
+        lines.append(f"{speaker}: {content}")
+
+    return "\n".join(lines) if lines else "(없음)"
+
+
+def evaluate_importance(
+    user_message: str,
+    assistant_message: str,
+    history: list | None = None,
+) -> dict:
     """
     대화 한 턴의 중요도를 평가.
 
     매개변수:
         user_message: 사용자가 한 말
         assistant_message: 할머니가 답한 말
+        history: 현재 턴 이전의 최근 대화 내역
 
     반환값:
         {"importance": 7, "category": "직장", "summary": "향이가 회사를 그만뒀다", "reason": "..."}
@@ -52,7 +77,10 @@ def evaluate_importance(user_message: str, assistant_message: str) -> dict:
         {"importance": 0, "category": "", "summary": "", "reason": "평가 실패"}
     """
     try:
-        conversation = f"손녀: {user_message}\n할머니: {assistant_message}"
+        conversation = (
+            f"[최근 대화]\n{format_history_for_importance(history)}\n\n"
+            f"[현재 턴]\n손녀: {user_message}\n할머니: {assistant_message}"
+        )
 
         response = client.chat.completions.create(
             model="gpt-4.1-mini",

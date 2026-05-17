@@ -13,20 +13,25 @@ from memory.short_term import add_short_term_memory
 IMPORTANCE_THRESHOLD = 6  # 이 점수 이상이면 저장
 
 
-def extract_and_save(user_message: str, assistant_message: str) -> dict:
+def extract_and_save(
+    user_message: str,
+    assistant_message: str,
+    history: list | None = None,
+) -> dict:
     """
     대화 한 턴을 평가하고, 중요하면 단기기억에 저장.
 
     매개변수:
         user_message: 사용자가 한 말
         assistant_message: 할머니가 답한 말
+        history: 현재 턴 이전의 최근 대화 내역
 
     반환값:
         {"saved": True, "memory": {...}} — 저장됨
         {"saved": False, "importance": 3, "reason": "..."} — 저장 안 됨
     """
     # 1. 중요도 평가
-    eval_result = evaluate_importance(user_message, assistant_message)
+    eval_result = evaluate_importance(user_message, assistant_message, history=history)
 
     importance = eval_result.get("importance", 0)
 

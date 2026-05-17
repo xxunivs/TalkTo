@@ -169,15 +169,65 @@ AI 응답의 `retrieved_memory_ids`도 같은 UUID 기준으로 반환된다.
 
 ### AI에서 해결한 것
 
+- AI 서버는 단계별 음성 처리 엔드포인트를 제공한다.
+  - `POST /ai/stt`: 음성 파일을 텍스트로 변환
+  - `POST /ai/chat`: 텍스트와 백엔드가 검색한 기억을 기반으로 답변 생성
+  - `POST /ai/tts`: 답변 텍스트를 mp3 음성으로 변환
+- `/ai/voice-chat` 단일 호출 엔드포인트도 존재하지만, 현재 백엔드 DB/RAG 연동 구조에서는 분리 호출을 기준으로 쓰는 것이 적합하다.
+
 ### 백엔드가 참조해야 할 것
+
+음성 대화도 텍스트 대화와 같은 저장/검색 흐름을 쓰려면 `STT -> chat -> TTS` 분리 호출을 권장한다.
+
+권장 흐름:
+
+1. 백엔드가 사용자 음성 파일을 받는다.
+2. 백엔드가 `/ai/stt`를 호출해서 음성을 텍스트로 변환한다.
+3. 백엔드가 STT 결과 텍스트를 user message로 저장한다.
+4. 백엔드가 STT 결과 텍스트로 기억을 검색한다.
+5. 백엔드가 `/ai/chat`을 호출한다.
+   - `message`: STT 결과 텍스트
+   - `history`: 최근 대화
+   - `memories`: 백엔드가 검색한 기억
+6. 백엔드가 assistant 답변과 `retrieved_memory_ids`를 저장한다.
+7. 백엔드가 `/ai/tts`를 호출해서 assistant 답변을 mp3로 변환한다.
+8. 백엔드가 mp3 파일을 저장하고 프론트에서 재생할 URL을 만든다.
+9. 백엔드가 `/ai/memory/extract`를 호출해서 새 단기기억 후보를 판단한다.
+
+`/ai/voice-chat` 단일 호출은 로컬 프로토타입이나 간단한 데모에는 쓸 수 있지만, 백엔드가 기억 검색, 메시지 저장, `MessageMemoryRef`, 음성 파일 저장을 관리해야 하는 운영 연동에서는 분리 호출이 더 맞다.
 
 ---
 
-## 7. TTS base64를 mp3 파일로 저장할 스토리지/S3 및 signed URL 정책 필요
+## 7. TTS mp3 파일을 저장할 스토리지/S3 및 signed URL 정책 필요
 
 ### AI에서 해결한 것
 
+- AI 서버는 `POST /ai/tts` 엔드포인트를 제공한다.
+- `/ai/tts`는 답변 텍스트를 받아 `audio/mpeg` mp3 bytes를 반환한다.
+- AI 서버가 담당하는 범위는 mp3 생성까지이다.
+
+요청:
+
+```json
+{
+  "text": "어. 그래 잘 자라. 사랑한다."
+}
+```
+
+응답:
+
+```http
+Content-Type: audio/mpeg
+Content-Disposition: attachment; filename=tts_output.mp3
+```
+
 ### 백엔드가 참조해야 할 것
+
+백엔드는 `/ai/tts` 응답으로 받은 mp3 bytes를 저장하고, 프론트가 재생할 수 있는 URL을 만들어야 한다.
+mp3 저장소, URL 발급 방식, 보관 기간, DB 저장 필드는 백엔드/프론트/인프라 쪽 협의 사안이다.
+
+AI 쪽 추가 작업은 현재 없다.
+단, 백엔드가 base64 응답 등 다른 TTS 응답 형식을 원하면 AI 서버 응답 형식만 조정하면 된다.
 
 ---
 
@@ -187,10 +237,15 @@ AI 응답의 `retrieved_memory_ids`도 같은 UUID 기준으로 반환된다.
 
 - `/ai/embed`가 Render 배포 서버에서 정상 동작하는 것을 확인했다.
 - 현재 임베딩 모델은 AI 서버 코드 기준 `text-embedding-3-small`이다.
+- 실제 응답 벡터 길이는 1536이다.
+- AI가 해결한 범위는 임베딩 생성 API 제공까지이며, 백엔드의 벡터 저장/검색 방식까지 결정한 것은 아니다.
 
 ### 백엔드가 참조해야 할 것
 
-백엔드는 기존 구현대로 memory 생성/수정/reembed 및 query embedding 시 `/ai/embed`를 호출하면 된다.
+현재 백엔드 구현은 `float8[]` 저장 후 TypeScript cosine similarity로 검색하는 방식이다.
+이 방식으로 계속 갈지, DB 레벨 검색을 위해 pgvector로 전환할지는 별도 결정이 필요하다.
+
+두 방식 중 어느 쪽을 선택하더라도, memory 생성/수정/reembed 및 query embedding 시 임베딩 생성은 `/ai/embed`를 호출하면 된다.
 
 요청:
 
@@ -208,8 +263,6 @@ AI 응답의 `retrieved_memory_ids`도 같은 UUID 기준으로 반환된다.
 }
 ```
 
-실제 응답 벡터 길이는 1536이다.
-
 ---
 
 ## 9. 단기기억을 BE `Memory`로 저장할지, 저장한다면 `memoryType` 표준값 결정 필요
@@ -218,6 +271,8 @@ AI 응답의 `retrieved_memory_ids`도 같은 UUID 기준으로 반환된다.
 
 - Render 운영 환경에서 AI 서버 로컬 `data/short_term_memories.json` 저장을 비활성화했다.
 - 단기기억 후보 판단용 API를 추가했다.
+- 단기기억 후보 판단 시 현재 턴뿐 아니라 백엔드가 전달한 최근 대화 `history`도 함께 참고하도록 수정했다.
+- 자동 추출된 대화 기반 기억은 응답에서 `memory_type: "SHORT_TERM"`으로 내려준다.
 
 ```http
 POST /ai/memory/extract
@@ -231,6 +286,16 @@ POST /ai/memory/extract
 
 ```json
 {
+  "history": [
+    {
+      "role": "user",
+      "content": "요즘 집 알아보고 있어"
+    },
+    {
+      "role": "assistant",
+      "content": "어디 쪽으로 알아보는데?"
+    }
+  ],
   "user_message": "나 다음 달에 이사해",
   "assistant_message": "어디로 가는데?"
 }
@@ -242,16 +307,41 @@ POST /ai/memory/extract
 {
   "saved": true,
   "importance": 7,
+  "memory_type": "SHORT_TERM",
   "category": "가족",
   "summary": "손녀가 다음 달에 이사 간다는 사실",
   "reason": "가족 간의 중요한 생활 변화 정보로 다음 대화에서 언급될 가능성이 높음"
 }
 ```
 
+`history`는 선택값이지만, 맥락 의존 문장까지 제대로 판단하려면 백엔드가 `/ai/chat`에 넘기는 최근 대화 히스토리와 같은 형식으로 전달하는 것이 좋다.
+
+`memoryType` 표준값은 아래 기준으로 맞춘다.
+
+- 기존 44개 고정 기억, 관리자/대표가 직접 작성하거나 검수한 기억: `LONG_TERM`
+- 대화 중 `/ai/memory/extract`가 자동 추출한 새 기억 후보: `SHORT_TERM`
+
+백엔드가 `saved: true` 응답을 받아 `Memory`를 생성할 때는 아래처럼 매핑하면 된다.
+
+```json
+{
+  "title": "손녀가 다음 달에 이사 간다는 사실",
+  "memoryType": "SHORT_TERM",
+  "relatedPeople": [],
+  "relatedPeriod": null,
+  "bodyMarkdown": "손녀가 다음 달에 이사 간다는 사실",
+  "tags": [
+    "category:가족",
+    "source:ai_memory_extract"
+  ],
+  "confidenceScore": 0.7
+}
+```
+
 백엔드에서 사용할 수 있는 흐름:
 
 1. `/ai/chat`으로 assistant 답변 생성
-2. 사용자 메시지와 assistant 답변을 `/ai/memory/extract`에 전달
+2. 최근 대화 `history`, 사용자 메시지, assistant 답변을 `/ai/memory/extract`에 전달
 3. `saved: true`이면 백엔드가 `Memory` row로 저장
 4. 저장 후 기존 `rebuildEmbeddings()` 흐름으로 `/ai/embed` 호출 및 embedding 저장
 

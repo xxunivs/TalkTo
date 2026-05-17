@@ -10,7 +10,7 @@ import time
 import tempfile
 from fastapi import FastAPI, Request, UploadFile, File
 from fastapi.responses import JSONResponse, Response
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -55,7 +55,7 @@ class MemoryItem(BaseModel):
 
 class ChatRequest(BaseModel):
     message: str
-    history: list = []
+    history: list = Field(default_factory=list)
     memories: Optional[list[MemoryItem]] = None  # 백엔드가 직접 검색한 기억
 
 class ChatResponse(BaseModel):
@@ -70,12 +70,14 @@ class EmbedResponse(BaseModel):
     embedding: list
 
 class MemoryExtractRequest(BaseModel):
+    history: list = Field(default_factory=list)
     user_message: str
     assistant_message: str
 
 class MemoryExtractResponse(BaseModel):
     saved: bool
     importance: int
+    memory_type: str = "SHORT_TERM"
     category: str = ""
     summary: str = ""
     reason: str = ""
@@ -143,17 +145,22 @@ def embed(req: EmbedRequest):
 @app.post("/ai/memory/extract", response_model=MemoryExtractResponse)
 def extract_memory(req: MemoryExtractRequest):
     """
-    대화 한 턴 → 백엔드 DB에 저장할 단기기억 후보 판단.
+    최근 대화 맥락 + 현재 대화 한 턴 → 백엔드 DB에 저장할 단기기억 후보 판단.
 
     이 엔드포인트는 로컬 파일에 저장하지 않고 후보만 반환한다.
     실제 저장 여부와 저장 위치는 백엔드가 결정한다.
     """
-    result = evaluate_importance(req.user_message, req.assistant_message)
+    result = evaluate_importance(
+        req.user_message,
+        req.assistant_message,
+        history=req.history,
+    )
     importance = int(result.get("importance", 0) or 0)
 
     return MemoryExtractResponse(
         saved=importance >= 6,
         importance=importance,
+        memory_type="SHORT_TERM",
         category=result.get("category", "") or "",
         summary=result.get("summary", "") or "",
         reason=result.get("reason", "") or "",
