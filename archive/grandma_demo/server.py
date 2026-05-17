@@ -18,6 +18,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from llm.core import generate_response, local_short_term_enabled
 from memory.embeddings import search_memories, get_embedding
 from memory.extract import extract_and_save
+from memory.importance import evaluate_importance
 from voice.stt import transcribe
 from voice.tts import synthesize
 
@@ -48,6 +49,17 @@ class EmbedRequest(BaseModel):
 class EmbedResponse(BaseModel):
     embedding: list
 
+class MemoryExtractRequest(BaseModel):
+    user_message: str
+    assistant_message: str
+
+class MemoryExtractResponse(BaseModel):
+    saved: bool
+    importance: int
+    category: str = ""
+    summary: str = ""
+    reason: str = ""
+
 class STTResponse(BaseModel):
     success: bool
     text: str = ""
@@ -71,8 +83,9 @@ def chat(req: ChatRequest):
 
     # 1. 기억 검색
     provided_memories = req.memories
-    if provided_memories:
-        # 백엔드가 직접 검색해서 보내준 기억 사용
+    if provided_memories is not None:
+        # 백엔드가 직접 검색해서 보내준 기억 사용.
+        # 빈 배열은 "검색 결과 없음"으로 보고 내부 JSON fallback을 하지 않는다.
         memory_ids = [m.id for m in provided_memories]
         memory_text = "\n".join([f"- {m.title}: {m.content}" for m in provided_memories])
     else:
@@ -105,6 +118,26 @@ def embed(req: EmbedRequest):
     """
     embedding = get_embedding(req.text)
     return EmbedResponse(embedding=embedding)
+
+
+@app.post("/ai/memory/extract", response_model=MemoryExtractResponse)
+def extract_memory(req: MemoryExtractRequest):
+    """
+    대화 한 턴 → 백엔드 DB에 저장할 단기기억 후보 판단.
+
+    이 엔드포인트는 로컬 파일에 저장하지 않고 후보만 반환한다.
+    실제 저장 여부와 저장 위치는 백엔드가 결정한다.
+    """
+    result = evaluate_importance(req.user_message, req.assistant_message)
+    importance = int(result.get("importance", 0) or 0)
+
+    return MemoryExtractResponse(
+        saved=importance >= 6,
+        importance=importance,
+        category=result.get("category", "") or "",
+        summary=result.get("summary", "") or "",
+        reason=result.get("reason", "") or "",
+    )
 
 
 @app.post("/ai/stt", response_model=STTResponse)
