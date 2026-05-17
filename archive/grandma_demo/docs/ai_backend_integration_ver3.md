@@ -51,7 +51,16 @@ AI_SERVER_TIMEOUT_MS=45000
 
 ### 백엔드가 참조해야 할 것
 
-백엔드와 Render AI 서버에 같은 토큰 값을 설정해야 한다.
+현재 Render AI 서버에는 아직 `AI_SERVER_TOKEN`을 설정하지 않은 상태로 두는 것이 좋다.
+백엔드가 먼저 토큰 없이 서버 호출 테스트를 끝내고, 이후 AI 서버 호출 시 공통 헤더를 붙이도록 수정한 뒤 토큰을 확정해서 양쪽 환경변수에 같은 값을 넣으면 된다.
+
+적용 순서:
+
+1. 백엔드가 현재 `AI_SERVER_URL`로 `/ai/embed`, `/ai/chat`, `/ai/memory/extract` 호출 테스트
+2. 백엔드가 `/ai/*` 호출 시 `X-AI-Server-Token` 헤더를 붙이도록 수정
+3. AI와 백엔드가 공유할 긴 랜덤 토큰 값 확정
+4. 백엔드 환경변수와 Render AI 서버 환경변수에 같은 토큰 등록
+5. 토큰 포함 호출 테스트
 
 ```env
 AI_SERVER_TOKEN=백엔드와_AI서버가_공유할_긴_랜덤_토큰
@@ -71,6 +80,8 @@ headers: {
   'x-ai-server-token': process.env.AI_SERVER_TOKEN,
 }
 ```
+
+주의: Render에 `AI_SERVER_TOKEN`을 먼저 설정하면, 백엔드가 헤더를 보내기 전까지 `/ai/*` 요청은 `401`로 막힌다.
 
 ---
 
