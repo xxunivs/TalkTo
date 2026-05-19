@@ -195,84 +195,26 @@ def tts(req: TTSRequest):
     텍스트 → 할머니 목소리 변환 (ElevenLabs API).
     음성 파일(mp3)을 직접 반환. 백엔드가 받아서 저장/signed URL 생성.
     """
-    output_path = f"/tmp/tts_{int(time.time())}.mp3"
-    result = synthesize(req.text, output_path)
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp:
+        output_path = tmp.name
 
-    if not result["success"]:
-        return {"success": False, "error": result.get("error", "")}
+    try:
+        result = synthesize(req.text, output_path)
 
-    with open(output_path, "rb") as f:
-        audio_bytes = f.read()
-    os.unlink(output_path)
+        if not result["success"]:
+            return {"success": False, "error": result.get("error", "")}
+
+        with open(output_path, "rb") as f:
+            audio_bytes = f.read()
+    finally:
+        if os.path.exists(output_path):
+            os.unlink(output_path)
 
     return Response(
         content=audio_bytes,
         media_type="audio/mpeg",
         headers={"Content-Disposition": "attachment; filename=tts_output.mp3"},
     )
-
-
-@app.post("/ai/voice-chat")
-async def voice_chat(
-    audio_file: UploadFile = File(...),
-    history: str = "[]",
-):
-    """
-    음성 메시지 → STT → 할머니 답변 생성 → TTS 한 번에 처리.
-    """
-    import json as json_module
-    start = time.time()
-
-    # 1. STT: 음성 → 텍스트
-    suffix = os.path.splitext(audio_file.filename or "audio.wav")[1]
-    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-        content = await audio_file.read()
-        tmp.write(content)
-        tmp_path = tmp.name
-
-    try:
-        stt_result = transcribe(tmp_path)
-    finally:
-        os.unlink(tmp_path)
-
-    if not stt_result["success"]:
-        return {"success": False, "error": stt_result.get("error", ""), "step": "stt"}
-
-    stt_text = stt_result["text"]
-
-    # 2. 답변 생성: RAG + GPT
-    parsed_history = json_module.loads(history) if history else []
-    found = search_memories(stt_text, top_k=5)
-    memory_ids = [m["id"] for m in found]
-    memory_text = "\n".join([f"- {m['title']}: {m['content']}" for m in found])
-    reply = generate_response(stt_text, parsed_history, memory_text=memory_text)
-    if local_short_term_enabled():
-        extract_and_save(stt_text, reply)
-
-    # 3. TTS: 텍스트 → 할머니 목소리
-    output_path = f"/tmp/tts_{int(time.time())}.mp3"
-    tts_result = synthesize(reply, output_path)
-
-    latency_ms = int((time.time() - start) * 1000)
-
-    if tts_result["success"]:
-        with open(output_path, "rb") as f:
-            import base64
-            audio_base64 = base64.b64encode(f.read()).decode()
-        os.unlink(output_path)
-    else:
-        audio_base64 = None
-
-    return {
-        "success": True,
-        "stt_text": stt_text,
-        "content": reply,
-        "retrieved_memory_ids": memory_ids,
-        "latency_ms": latency_ms,
-        "tts_success": tts_result["success"],
-        "tts_audio_base64": audio_base64,
-        "tts_error": tts_result.get("error", "") if not tts_result["success"] else "",
-    }
 
 
 @app.get("/health")
