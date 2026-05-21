@@ -1,7 +1,5 @@
 # AI 서버 연동 BE 개발 업데이트
 
-> 상태: 백엔드 1차 회신 기록. 현재 배포/남은 운영 항목은 `ai_backend_integration_ver4.md`를 기준으로 본다.
-
 ## 추가 개발한 것
 
 1. AI 서버 HTTP client 추가
