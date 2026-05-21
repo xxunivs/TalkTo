@@ -19,7 +19,8 @@
 ├── docs/                             문서
 │   ├── ai_backend_integration_ver1.md AI ↔ 백엔드 연동 최초 체크리스트
 │   ├── ai_backend_integration_ver2.md 백엔드 개발자 회신
-│   └── ai_backend_integration_ver3.md Render 배포 후 최신 연동 정리
+│   ├── ai_backend_integration_ver3.md Render 배포 직후 연동 기록
+│   └── ai_backend_integration_ver4.md 현재 배포/운영 연동 상태
 │
 ├── llm/                              LLM 호출
 │   └── core.py                       generate_response() — GPT 호출 + RAG 연결
@@ -43,7 +44,9 @@
 │
 ├── tools/                            유틸리티 스크립트
 │   ├── build_finetune_dataset.py     전사본 → JSONL 변환
+│   ├── export_backend_memories.py    백엔드 Memory import payload 생성
 │   ├── reorder_transcript.py         전사본 순서 정렬
+│   ├── test_export_backend_memories.py backend memory export 테스트
 │   └── run_finetune.py               파인튜닝 실행/상태 확인
 │
 ├── voice/                            음성 처리
@@ -275,7 +278,7 @@
 | ---------------------------- | ------------------------------------------------------------------------ |
 | `memories.json`            | 장기기억 chunk 44개 (가족, 요리, 추억, 가치관 등)                      |
 | `memory_embeddings.json`   | 44개 chunk의 임베딩 벡터.`python -m memory.embeddings --build`로 생성  |
-| `backend_memory_import.json` | 백엔드 `Memory` import용 44개 기억. `LONG_TERM`, `category:*`, `legacy_id:*` 기준 |
+| `backend_memory_import.json` | 백엔드 `Memory` import용 44개 기억. `LONG_TERM`, `category:*`, `legacy_id:*`, 명시 인물 `relatedPeople` 기준 |
 | `short_term_memories.json` | 로컬 단기기억. 운영 배포에서는 기본 비활성, 로컬 테스트/eval에서 사용 |
 | `전사본.txt`               | 할머니 통화 13개 파일 1~13 순서 정렬                                   |
 | `전사본_화자구분.txt`      | 화자 분리 완료. "할머니:" / "손녀:" 표시                               |
@@ -299,7 +302,11 @@ AI ↔ 백엔드 연동 최초 체크리스트.
 
 ### ai_backend_integration_ver3.md
 
-Render 배포 후 최신 연동 상태, 백엔드 설정값, 남은 논의 사항.
+Render 배포 직후 연동 상태 기록.
+
+### ai_backend_integration_ver4.md
+
+현재 배포/운영 연동 상태와 남은 운영 항목.
 
 ---
 
@@ -312,6 +319,7 @@ Render 배포 후 최신 연동 상태, 백엔드 설정값, 남은 논의 사�
 | `export_backend_memories.py` | `memories.json` → 백엔드 import JSON 변환 | `python tools/export_backend_memories.py` |
 | `reorder_transcript.py`     | 전사본 1~13 순서 정렬         | `python tools/reorder_transcript.py`                |
 | `run_finetune.py`           | 파인튜닝 실행/상태 확인       | `python tools/run_finetune.py` / `--check [job_id]` |
+| `test_export_backend_memories.py` | backend memory export 테스트 | `python3 -m unittest tools/test_export_backend_memories.py` |
 
 ---
 
