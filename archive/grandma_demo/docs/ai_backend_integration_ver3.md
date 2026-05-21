@@ -1,7 +1,5 @@
 # AI <-> 백엔드 연동 업데이트 ver3
 
-> 상태: Render 배포 직후 연동 기록. 현재 배포/남은 운영 항목은 `ai_backend_integration_ver4.md`를 기준으로 본다.
-
 ## 1. AI 서버를 어디에 올릴지, BE에서 접근 가능한 `AI_SERVER_URL` 확정 필요
 
 ### AI에서 해결한 것

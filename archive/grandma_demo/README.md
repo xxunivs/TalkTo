@@ -55,11 +55,6 @@ python -m prompt.eval_suite C
 
 Render Web Service로 배포합니다.
 
-현재 배포 URL:
-
-- AI server: `https://talkto-persona-ai.onrender.com`
-- Health: `https://talkto-persona-ai.onrender.com/health`
-
 - Runtime: `Python 3`
 - Build Command: `pip install -r requirements.txt`
 - Start Command: `uvicorn server:app --host 0.0.0.0 --port $PORT`
@@ -87,22 +82,6 @@ AI_SERVER_URL=https://배포된-render-url
 AI_SERVER_TIMEOUT_MS=45000
 AI_SERVER_TOKEN=Render와_같은_값
 ```
-
-현재 백엔드는 Render, DB는 Neon PostgreSQL, 음성 mp3는 Cloudflare R2를 사용한다.
-백엔드가 기억 검색/저장과 TTS 파일 저장을 담당하고, 이 AI 서버는 임베딩,
-답변 생성, STT, TTS, 단기기억 후보 추출 API를 제공한다.
-
-## 백엔드 연동 기준
-
-- 최신 상태 문서: [docs/ai_backend_integration_ver4.md](docs/ai_backend_integration_ver4.md)
-- 장기기억 import source: `data/backend_memory_import.json`
-- export script: `tools/export_backend_memories.py`
-- export test: `python3 -m unittest tools/test_export_backend_memories.py`
-
-`backend_memory_import.json`은 기존 44개 장기기억을 백엔드 `Memory`
-payload로 변환한 파일이다. source memory title/content에 명시된 인물만
-보수적으로 추출해 `relatedPeople`에 넣고, category와 legacy ID는 tags에
-보존한다.
 
 ## 개발 단계
 
