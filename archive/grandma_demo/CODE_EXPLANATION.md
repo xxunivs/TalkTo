@@ -250,6 +250,8 @@ AI repo의 기존 장기기억을 백엔드가 import할 수 있는 형태로 �
 `data/memories.json`을 읽어서 `data/backend_memory_import.json`을 만든다.
 
 백엔드 DB로 기존 44개 장기기억을 옮길 때 중요한 파일이다.
+source memory title/content에 명시된 인물만 `relatedPeople`로 보수적으로
+추출하고, category와 legacy ID는 tags에 보존한다.
 
 ---
 
@@ -275,7 +277,8 @@ AI repo의 기존 장기기억을 백엔드가 import할 수 있는 형태로 �
 
 백엔드 `Memory` DB에 넣기 좋게 변환된 장기기억 파일이다.
 
-백엔드의 import 스크립트가 이 파일을 읽어서 44개 장기기억을 DB에 넣을 수 있다.
+백엔드의 import 스크립트가 이 파일을 읽어서 44개 장기기억을 DB에 넣는다.
+현재 Neon DB에는 해당 legacy memory import가 반영되어 있다.
 
 ### `data/short_term_memories.json`
 
@@ -329,15 +332,12 @@ AI repo의 기존 장기기억을 백엔드가 import할 수 있는 형태로 �
 
 ### `docs/ai_backend_integration_ver3.md`
 
-Render 배포, 토큰, 기억 import, 음성 분리 호출, 단기기억 저장 흐름 등을 더 구체화한 문서다.
-
-백엔드가 실제로 어떤 API를 호출해야 하는지 가장 많이 정리되어 있다.
+Render 배포 직후 토큰, 기억 import, 음성 분리 호출, 단기기억 저장 흐름을
+정리한 기록이다.
 
 ### `docs/ai_backend_integration_ver4.md`
 
-AI 서버 토큰 설정만 짧게 정리한 문서다.
-
-백엔드와 Render AI 서버에 같은 `AI_SERVER_TOKEN`을 넣어야 한다는 내용을 담고 있다.
+현재 배포/운영 연동 상태와 남은 운영 항목을 정리한 문서다.
 
 ---
 
@@ -413,4 +413,3 @@ AI 서버 토큰 설정만 짧게 정리한 문서다.
 - `memory/short_term.py`
 
 운영에서는 기억 저장과 검색의 기준이 백엔드 DB로 넘어가고 있으므로, 위 로컬 테스트 파일들은 바로 삭제하기보다 평가/디버깅 용도로 남길지 먼저 결정하는 것이 좋다.
-
