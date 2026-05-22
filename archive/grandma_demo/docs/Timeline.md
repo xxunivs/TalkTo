@@ -10,14 +10,14 @@ TalkTo 사후 Phase(Persona AI)의 AI 파트 개발 타임라인
 
 ### 1-1. GPT 호출 함수 작성
 
-- `llm/core.py` → `generate_response(message, history)` 함수
+- `core/response/generator.py` → `generate_response(message, history)` 함수
 - 기본 GPT 모델 (gpt-4.1-mini) 호출
 - 입력: 사용자 메시지, 대화 히스토리 → 출력: 할머니 답변 텍스트
 - 대화형 테스트 루프 포함 (터미널에서 연속 대화 가능)
 
 ### 1-2. 간단한 시스템 프롬프트 작성
 
-- `prompt/system_prompt.py` → 현재 사용 중인 프롬프트 선택 (A를 가리킴)
+- `prompts/system_prompt.py` → 현재 사용 중인 프롬프트 선택 (A를 가리킴)
 
 ### 1-3. 백엔드 연동 인터페이스 협의
 
@@ -36,8 +36,8 @@ TalkTo 사후 Phase(Persona AI)의 AI 파트 개발 타임라인
 ### 2-1. 화자 분리
 
 - 음성 원본 파일 수령 완료 (wav 13개, `data/voice_raw/`)
-- `tools/reorder_transcript.py`로 전사본 1~13 순서 정렬 → `data/전사본.txt`
-- Claude에 넣어서 맥락 기반 화자 분리 → `data/전사본_화자구분.txt`
+- 전사본 1~13 순서 정렬
+- Claude에 넣어서 맥락 기반 화자 분리 → 최종 `data/전사본.txt`
 
 ### 2-2. 전사본 분석
 
@@ -54,14 +54,14 @@ TalkTo 사후 Phase(Persona AI)의 AI 파트 개발 타임라인
 
 ### 3-1. 시스템 프롬프트 A/B/C 작성
 
-- `prompt/system_prompt_A.py` — 상세 프롬프트 (말투+성격+규칙, 기본 GPT용)
-- `prompt/system_prompt_B.py` — 최소 프롬프트 (사실 정보+금지 사항만, 파인튜닝용)
-- `prompt/system_prompt_C.py` — RAG 운영용 중간 프롬프트
+- `prompts/system_prompt_A.py` — 상세 프롬프트 (말투+성격+규칙, 기본 GPT용)
+- `prompts/system_prompt_B.py` — 최소 프롬프트 (사실 정보+금지 사항만, 파인튜닝용)
+- `prompts/system_prompt_C.py` — RAG 운영용 중간 프롬프트
 
 ### 3-2. 말투 평가 세트 구축
 
-- `prompt/eval_questions.py` — 단발 평가 질문 + 대화형 평가 시나리오
-- `prompt/eval_run.py` — 평가 자동 실행 스크립트
+- `evals/eval_questions.py` — 단발 평가 질문 + 대화형 평가 시나리오
+- `evals/eval_run.py` — 평가 자동 실행 스크립트
 
 ### 이 Stage가 끝나면:
 
@@ -84,10 +84,10 @@ TalkTo 사후 Phase(Persona AI)의 AI 파트 개발 타임라인
 
 ### 4-3. 모델 비교 테스트
 
-- `prompt/eval_all.py` — 선택 프롬프트별 기본모델+RAG / 파인튜닝모델+RAG / 초기 프로토타입 3-way 비교
-- `prompt/eval_dialogue.py` — 이어지는 대화형 3-way 비교
-- `prompt/eval_suite.py` — 단발 평가와 대화형 평가 통합 실행
-- `data/eval_results/` — 평가 실행 결과 자동 저장 폴더
+- `evals/eval_all.py` — 선택 프롬프트별 기본모델+RAG / 파인튜닝모델+RAG / 초기 프로토타입 3-way 비교
+- `evals/eval_dialogue.py` — 이어지는 대화형 3-way 비교
+- `evals/eval_suite.py` — 단발 평가와 대화형 평가 통합 실행
+- `evals/results/` — 평가 실행 결과 자동 저장 폴더
 - 현재는 프롬프트 C를 기준으로 기본모델과 파인튜닝모델을 계속 비교
 
 ### 이 Stage가 끝나면:
@@ -110,8 +110,8 @@ TalkTo 사후 Phase(Persona AI)의 AI 파트 개발 타임라인
 
 ### 5-3. RAG 검색 구현
 
-- `memory/embeddings.py` → `search_memories(query, top_k=5)` 함수
-- `llm/core.py`에 RAG 연결 — 검색된 기억을 프롬프트에 주입
+- `core/memory/embeddings.py` → `search_memories(query, top_k=5)` 함수
+- `core/response/generator.py`에 RAG 연결 — 검색된 기억을 프롬프트에 주입
 
 ### 이 Stage가 끝나면:
 
@@ -123,13 +123,13 @@ TalkTo 사후 Phase(Persona AI)의 AI 파트 개발 타임라인
 
 ### 6-1. STT 구현
 
-- `voice/stt.py` → `transcribe(audio_path)` 함수
+- `core/voice/stt.py` → `transcribe(audio_path)` 함수
 - Whisper API로 음성 → 텍스트 변환
 - 에러 처리 포함 (success/error 반환)
 
 ### 6-2. TTS 구현
 
-- `voice/tts.py` → `synthesize(text, output_path)` 함수
+- `core/voice/tts.py` → `synthesize(text, output_path)` 함수
 - ElevenLabs PVC로 텍스트 → 할머니 목소리 변환
 - voice_id: `lTmcD2Kp43w1lHsMQmq7` (대표가 클로닝 완료)
 - 에러 처리 포함 (success/error 반환)
@@ -148,23 +148,23 @@ TalkTo 사후 Phase(Persona AI)의 AI 파트 개발 타임라인
 
 ### 7-1. 단기기억 스키마 정의
 
-- `memory/short_term.py` — 스키마, 저장/조회/강도갱신 함수
+- `core/memory/short_term.py` — 스키마, 저장/조회/강도갱신 함수
 - `data/short_term_memories.json` — 단기기억 저장 파일
 
 ### 7-2. 중요도 평가
 
-- `memory/importance.py` → `evaluate_importance(user_msg, assistant_msg)` 함수
+- `core/memory/importance.py` → `evaluate_importance(user_msg, assistant_msg)` 함수
 - GPT 기반 5차원 중요도 평가 (감정, 관계, 개인정보, 기억가치, 연속성)
 
 ### 7-3. 기억 추출 + 저장
 
-- `memory/extract.py` → `extract_and_save(user_msg, assistant_msg)` 함수
+- `core/memory/extract.py` → `extract_and_save(user_msg, assistant_msg)` 함수
 - importance ≥ 6이면 단기기억에 자동 저장
-- `llm/core.py` 대화 루프에 연결 완료
+- `core/response/generator.py` 대화 루프에 연결 완료
 
 ### 7-4. 단기기억 검색
 
-- `llm/core.py`에서 장기기억 top-5 + 활성 단기기억을 합쳐서 프롬프트에 주입
+- `core/response/generator.py`에서 장기기억 top-5 + 활성 단기기억을 합쳐서 프롬프트에 주입
 - 프롬프트에 포함된 단기기억은 `on_memory_recalled()`로 strength +1
 
 ### 이 Stage가 끝나면:
@@ -175,15 +175,15 @@ TalkTo 사후 Phase(Persona AI)의 AI 파트 개발 타임라인
 
 ## Stage 8: 프롬프트 조정 ← 다음
 
-> 파일: `prompt/system_prompt_A.py`
+> 파일: `prompts/system_prompt_A.py`
 
 ### 8-1. eval 결과 기반 문제점 파악
 
-- `python -m prompt.eval_all C`로 단발 질문 답변과 RAG 검색 결과 확인
-- `python -m prompt.eval_dialogue C`로 실제 단기기억 저장/조회 흐름을 포함한 이어지는 대화 맥락 유지 확인
-- `python -m prompt.eval_suite C`로 두 평가를 한 번에 실행 가능
+- `python -m evals.eval_all C`로 단발 질문 답변과 RAG 검색 결과 확인
+- `python -m evals.eval_dialogue C`로 실제 단기기억 저장/조회 흐름을 포함한 이어지는 대화 맥락 유지 확인
+- `python -m evals.eval_suite C`로 두 평가를 한 번에 실행 가능
 - 기본 결과는 답변 중심으로 출력하고, RAG/평가포인트/단기기억 판정은 옵션으로 확인
-- 실행 결과는 `data/eval_results/`에 자동 저장
+- 실행 결과는 `evals/results/`에 자동 저장
 - 현재 후보 프롬프트: 중간 프롬프트 C
 
 ### 8-2. 말투 자연스러움 개선
@@ -213,13 +213,13 @@ TalkTo 사후 Phase(Persona AI)의 AI 파트 개발 타임라인
 
 ### 8-6. eval 재실행 + 비교
 
-- 프롬프트/RAG 수정 후 `python -m prompt.eval_suite C`로 재평가
+- 프롬프트/RAG 수정 후 `python -m evals.eval_suite C`로 재평가
 - 이전 결과와 비교해서 개선 여부 확인
 - 만족스러울 때까지 8-2 ~ 8-6 반복
 
 ### 8-7. RAG 검색 보정
 
-- `memory/embeddings.py`에 키워드 boost 기반 하이브리드 검색 추가
+- `core/memory/embeddings.py`에 키워드 boost 기반 하이브리드 검색 추가
 - 짧은 구어 질문에서 `health_back`, `family_hyangi`, `values_food` 등이 밀리는 문제 보정
 
 ### 이 Stage가 끝나면:

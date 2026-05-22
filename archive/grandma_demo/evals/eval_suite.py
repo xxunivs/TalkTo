@@ -2,15 +2,15 @@
 단발 평가와 대화형 평가를 한 번에 실행하는 스크립트.
 
 사용법:
-  python -m prompt.eval_suite C
+  python -m evals.eval_suite C
 """
 import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from prompt.eval_all import PROMPTS, run_eval
-from prompt.eval_dialogue import run_dialogue_eval
+from evals.eval_all import PROMPTS, run_eval
+from evals.eval_dialogue import run_dialogue_eval
 
 
 def run_suite(prompt_key, show_rag=False, show_points=False, show_memory=False):
@@ -39,7 +39,7 @@ def run_suite(prompt_key, show_rag=False, show_points=False, show_memory=False):
     print()
     print("=" * 60)
     print("Eval suite 완료.")
-    print("결과 파일은 data/eval_results/에 각각 저장됐습니다.")
+    print("결과 파일은 evals/results/에 각각 저장됐습니다.")
     print("=" * 60)
 
 
@@ -50,7 +50,7 @@ if __name__ == "__main__":
     show_memory = "--show-memory" in sys.argv
 
     if len(args) < 1:
-        print("사용법: python -m prompt.eval_suite [A|B|C] [--show-rag] [--show-points] [--show-memory]")
+        print("사용법: python -m evals.eval_suite [A|B|C] [--show-rag] [--show-points] [--show-memory]")
         print()
         for key, value in PROMPTS.items():
             print(f"  {key}: {value['name']} 프롬프트로 단발+대화형 평가")

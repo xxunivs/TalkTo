@@ -4,11 +4,13 @@
 """
 import os
 import sys
+from pathlib import Path
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
 
-from memory.importance import evaluate_importance
-from memory.short_term import add_short_term_memory
+from core.memory.importance import evaluate_importance
+from core.memory.short_term import add_short_term_memory
 
 IMPORTANCE_THRESHOLD = 6  # 이 점수 이상이면 저장
 

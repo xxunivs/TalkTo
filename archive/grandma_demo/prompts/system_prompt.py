@@ -4,4 +4,4 @@
 """
 
 # 현재: 버전 C (기본 GPT + RAG 운영용)
-from prompt.system_prompt_C import SYSTEM_PROMPT
+from prompts.system_prompt_C import SYSTEM_PROMPT

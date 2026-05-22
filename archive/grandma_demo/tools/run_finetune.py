@@ -45,7 +45,7 @@ def check_status(job_id):
     print(f"\n상태: {job.status}")
     if job.status == "succeeded":
         print(f"완료! 모델 ID: {job.fine_tuned_model}")
-        print(f"\n이 모델 ID를 llm/core.py에 넣으면 됩니다:")
+        print(f"\n이 모델 ID를 core/response/generator.py에 넣으면 됩니다:")
         print(f'  model="{job.fine_tuned_model}"')
     elif job.status == "failed":
         print(f"실패: {job.error}")

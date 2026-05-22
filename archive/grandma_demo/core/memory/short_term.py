@@ -6,13 +6,12 @@ import os
 import sys
 import json
 from datetime import datetime
+from pathlib import Path
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
 
-DEFAULT_SHORT_TERM_PATH = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    "data", "short_term_memories.json"
-)
+DEFAULT_SHORT_TERM_PATH = str(ROOT / "data" / "short_term_memories.json")
 
 
 def get_short_term_path() -> str:

@@ -15,12 +15,12 @@ from typing import Optional
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from llm.core import generate_response, local_short_term_enabled
-from memory.embeddings import search_memories, get_embedding
-from memory.extract import extract_and_save
-from memory.importance import evaluate_importance
-from voice.stt import transcribe
-from voice.tts import synthesize
+from core.response.generator import generate_response, local_short_term_enabled
+from core.memory.embeddings import search_memories, get_embedding
+from core.memory.extract import extract_and_save
+from core.memory.importance import evaluate_importance
+from core.voice.stt import transcribe
+from core.voice.tts import synthesize
 
 app = FastAPI(title="TalkTo Persona AI", version="0.1.0")
 

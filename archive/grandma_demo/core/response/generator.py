@@ -1,14 +1,16 @@
 import os
 import sys
+from pathlib import Path
 from dotenv import load_dotenv
 from openai import OpenAI
 
 # 프로젝트 루트 경로 추가
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from prompt.system_prompt import SYSTEM_PROMPT
-from memory.embeddings import search_memories
-from memory.short_term import get_active_memories, on_memory_recalled
-from memory.extract import extract_and_save
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
+from prompts.system_prompt import SYSTEM_PROMPT
+from core.memory.embeddings import search_memories
+from core.memory.short_term import get_active_memories, on_memory_recalled
+from core.memory.extract import extract_and_save
 
 # .env 파일에서 API 키 읽어오기
 load_dotenv()

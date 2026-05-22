@@ -7,23 +7,19 @@
 import os
 import sys
 import json
+from pathlib import Path
 import numpy as np
 from dotenv import load_dotenv
 from openai import OpenAI
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
 load_dotenv()
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-MEMORIES_PATH = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    "data", "memories.json",
-)
-EMBEDDINGS_PATH = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    "data", "memory_embeddings.json",
-)
+MEMORIES_PATH = ROOT / "data" / "memories.json"
+EMBEDDINGS_PATH = ROOT / "data" / "memory_embeddings.json"
 MODEL = "text-embedding-3-small"
 
 

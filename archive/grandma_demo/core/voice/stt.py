@@ -4,10 +4,12 @@ OpenAI Whisper API 사용.
 """
 import os
 import sys
+from pathlib import Path
 from dotenv import load_dotenv
 from openai import OpenAI
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
 load_dotenv()
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))

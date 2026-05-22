@@ -16,7 +16,24 @@
 
 나중에 백엔드 DB 기반 장기기억 검색과 단기기억 저장/검색이 완전히 안정되면 제거를 검토한다.
 
-### 2. `AI_SERVER_TOKEN` 운영 적용
+### 2. 백엔드 배포 서버와 실제 연동 테스트
+
+프롬프트와 답변 품질 개선은 당분간 AI repo의 JSON 기반 eval로 계속 진행한다.
+
+현재 eval은 `data/memories.json`과 `data/memory_embeddings.json`을 사용하므로, 백엔드 DB에 import된 기존 장기기억과 같은 원천 데이터 기준으로 답변 품질을 비교할 수 있다.
+
+다만 실제 서비스 흐름은 백엔드 DB 검색, conversation history, assistant 메시지 저장, `/ai/memory/extract` 이후 단기기억 DB 저장까지 포함하므로 별도 연동 테스트가 필요하다.
+
+백엔드 연동 테스트를 하려면 테스트용 로그인 계정/비밀번호를 받아서 다음 흐름을 확인한다.
+
+1. `/api/v1/auth/login`으로 access token 발급
+2. conversation 생성
+3. 텍스트 메시지 전송
+4. 백엔드가 DB에서 검색한 `memories`를 `/ai/chat`에 넘기는지 확인
+5. assistant 답변이 DB에 저장되는지 확인
+6. `/ai/memory/extract` 결과가 `SHORT_TERM` memory로 DB에 저장되는지 확인
+
+### 3. `AI_SERVER_TOKEN` 운영 적용
 
 AI 서버는 `AI_SERVER_TOKEN`이 설정되면 `/ai/*` 요청에 `X-AI-Server-Token` 헤더를 요구한다.
 

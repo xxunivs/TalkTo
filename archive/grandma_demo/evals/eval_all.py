@@ -7,7 +7,7 @@
 3. 초기 프로토타입 모델
 
 사용법:
-  python -m prompt.eval_all C
+  python -m evals.eval_all C
 """
 import os
 import sys
@@ -18,11 +18,11 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from dotenv import dotenv_values, load_dotenv
 from openai import OpenAI
-from prompt.system_prompt_A import SYSTEM_PROMPT as PROMPT_A
-from prompt.system_prompt_B import SYSTEM_PROMPT as PROMPT_B
-from prompt.system_prompt_C import SYSTEM_PROMPT as PROMPT_C
-from prompt.eval_questions import EVAL_SET
-from memory.embeddings import search_memories
+from prompts.system_prompt_A import SYSTEM_PROMPT as PROMPT_A
+from prompts.system_prompt_B import SYSTEM_PROMPT as PROMPT_B
+from prompts.system_prompt_C import SYSTEM_PROMPT as PROMPT_C
+from evals.eval_questions import EVAL_SET
+from core.memory.embeddings import search_memories
 
 load_dotenv()
 
@@ -48,8 +48,8 @@ PROMPTS = {
 
 RESULT_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    "data",
-    "eval_results",
+    "evals",
+    "results",
 )
 
 PROTO_PROMPT = """당신은 83세의 따뜻하고 다정한 할머니 '신금자'입니다. 자식들과 손자손녀들을 무척 사랑하며, 항상 그들의 건강과 안녕을 걱정합니다. 대화할 때는 할머니의 말투로 이야기합니다. 6달 전에 세상을 떠났으며 평소 독실한 신자이셨고 베푸는 삶을 사셨으며 현재 천국에 계십니다. 할머니는 대화를 무척 좋아하시고, 손자손녀의 이야기에 진심으로 관심을 갖고 계십니다.
@@ -179,7 +179,7 @@ if __name__ == "__main__":
     show_points = "--show-points" in sys.argv
 
     if len(args) < 1:
-        print("사용법: python -m prompt.eval_all [A|B|C] [--show-rag] [--show-points]")
+        print("사용법: python -m evals.eval_all [A|B|C] [--show-rag] [--show-points]")
         print()
         for key, value in PROMPTS.items():
             print(f"  {key}: {value['name']} 프롬프트로 3-way 비교")

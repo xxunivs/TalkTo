@@ -7,8 +7,8 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from llm.core import generate_response
-from prompt.eval_questions import EVAL_SET
+from core.response.generator import generate_response
+from evals.eval_questions import EVAL_SET
 
 
 def run_eval():

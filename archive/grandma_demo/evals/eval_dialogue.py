@@ -5,7 +5,7 @@
 기본모델+RAG, 파인튜닝모델+RAG, 초기 프로토타입을 비교한다.
 
 사용법:
-  python -m prompt.eval_dialogue C
+  python -m evals.eval_dialogue C
 """
 import os
 import sys
@@ -16,7 +16,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from dotenv import load_dotenv
 from openai import OpenAI
-from prompt.eval_all import (
+from evals.eval_all import (
     BASE_MODEL,
     FINETUNED_MODEL,
     PROTO_MODEL,
@@ -28,10 +28,10 @@ from prompt.eval_all import (
     print_rag,
     EvalLogger,
 )
-from prompt.eval_questions import DIALOGUE_EVAL_SET
-from memory.embeddings import search_memories
-from memory.extract import extract_and_save
-from memory.short_term import get_active_memories
+from evals.eval_questions import DIALOGUE_EVAL_SET
+from core.memory.embeddings import search_memories
+from core.memory.extract import extract_and_save
+from core.memory.short_term import get_active_memories
 
 load_dotenv()
 
@@ -217,7 +217,7 @@ if __name__ == "__main__":
     show_memory = "--show-memory" in sys.argv
 
     if len(args) < 1:
-        print("사용법: python -m prompt.eval_dialogue [A|B|C] [--show-rag] [--show-points] [--show-memory]")
+        print("사용법: python -m evals.eval_dialogue [A|B|C] [--show-rag] [--show-points] [--show-memory]")
         print()
         for key, value in PROMPTS.items():
             print(f"  {key}: {value['name']} 프롬프트로 대화형 3-way 비교")
