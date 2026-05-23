@@ -11,7 +11,7 @@ from openai import OpenAI
 from prompts.system_prompt_A import SYSTEM_PROMPT as PROMPT_A
 from prompts.system_prompt_B import SYSTEM_PROMPT as PROMPT_B
 from prompts.system_prompt_C import SYSTEM_PROMPT as PROMPT_C
-from evals.eval_questions import DIALOGUE_EVAL_SET, EVAL_SET
+from evaluation.eval_questions import DIALOGUE_EVAL_SET, EVAL_SET
 from core.memory.embeddings import search_memories
 from core.memory.extract import extract_and_save
 from core.memory.short_term import get_active_memories
@@ -33,14 +33,14 @@ PROTO_MODEL = (
 )
 
 PROMPTS = {
-    "A": {"name": "상세A", "prompt": PROMPT_A},
-    "B": {"name": "최소B", "prompt": PROMPT_B},
-    "C": {"name": "중간C", "prompt": PROMPT_C},
+    "A": {"name": "프롬프트 A", "prompt": PROMPT_A},
+    "B": {"name": "프롬프트 B", "prompt": PROMPT_B},
+    "C": {"name": "프롬프트 C", "prompt": PROMPT_C},
 }
 
 RESULT_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    "evals",
+    "evaluation",
     "results",
 )
 
@@ -347,14 +347,14 @@ def run_suite(prompt_key, show_rag=False, show_points=False, show_memory=False):
     print()
     print("=" * 60)
     print("Eval suite 완료.")
-    print("결과 파일은 evals/results/에 각각 저장됐습니다.")
+    print("결과 파일은 evaluation/results/에 각각 저장됐습니다.")
     print("=" * 60)
 
 def print_usage():
-    print("사용법: python -m evals.evaluation [A|B|C] [--single|--dialogue] [--show-rag] [--show-points] [--show-memory]")
+    print("사용법: python -m evaluation.eval_run [A|B|C] [--single|--dialogue] [--show-rag] [--show-points] [--show-memory]")
     print()
     for key, value in PROMPTS.items():
-        print(f"  {key}: {value['name']} 프롬프트로 평가")
+        print(f"  {key}: {value['name']}로 평가")
 
 if __name__ == "__main__":
     args = [arg for arg in sys.argv[1:] if not arg.startswith("--")]

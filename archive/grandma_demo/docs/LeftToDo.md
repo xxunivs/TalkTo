@@ -40,7 +40,7 @@
 우선 백엔드 실연동과 별개로 AI repo의 JSON 기반 eval을 사용해서 단발 질문과 이어지는 대화 결과를 비교한다.
 
 ```bash
-python -m evals.evaluation C
+python -m evaluation.eval_run C
 ```
 
 확인할 내용은 다음과 같다.

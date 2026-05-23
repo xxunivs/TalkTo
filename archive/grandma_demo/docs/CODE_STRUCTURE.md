@@ -17,7 +17,7 @@ PersonaAI/
     voice/
 
   prompts/
-  evals/
+  evaluation/
     results/
 
   finetune/
@@ -27,7 +27,7 @@ PersonaAI/
   docs/
 ```
 
-루트에는 서버 실행과 배포에 바로 필요한 파일만 남겼다. 실제 PersonaAI의 본체 로직은 `core/`에 있고, 프롬프트 실험은 `prompts/`, 평가 실행은 `evals/`, 파인튜닝 재현 자료는 `finetune/`, 백엔드 memory import 자료는 `backend_memory/`에 둔다.
+루트에는 서버 실행과 배포에 바로 필요한 파일만 남겼다. 실제 PersonaAI의 본체 로직은 `core/`에 있고, 프롬프트 실험은 `prompts/`, 평가 실행은 `evaluation/`, 파인튜닝 재현 자료는 `finetune/`, 백엔드 memory import 자료는 `backend_memory/`에 둔다.
 
 ## 루트 파일
 
@@ -124,33 +124,27 @@ ElevenLabs API로 텍스트를 할머니 목소리 mp3로 변환한다.
 
 ### `prompts/system_prompt_A.py`
 
-상세한 규칙을 많이 넣은 초기 프롬프트다.
-
-기본 모델을 강하게 제어하는 데는 좋지만, 파인튜닝 모델과 함께 쓰면 과하게 설명적인 답변이 나올 수 있다.
+프롬프트 후보 A다.
 
 ### `prompts/system_prompt_B.py`
 
-파인튜닝 학습에 사용했던 최소 프롬프트다.
-
-말투와 세부 행동을 모델 내부 학습에 더 맡기는 형태라, 단독 운영 프롬프트로는 제어력이 약할 수 있다.
+프롬프트 후보 B다.
 
 ### `prompts/system_prompt_C.py`
 
-현재 운영 후보 프롬프트다.
+프롬프트 후보 C다.
 
-파인튜닝 모델과 RAG 기억을 함께 쓸 때 답변이 너무 장황해지지 않도록 중간 정도의 규칙만 둔 버전이다.
-
-## `evals/`
+## `evaluation/`
 
 프롬프트와 모델 답변 품질을 비교하는 평가 코드다.
 
-### `evals/eval_questions.py`
+### `evaluation/eval_questions.py`
 
 평가 질문과 기대 답변 포인트가 들어 있다.
 
 단발 질문 평가와 이어지는 대화 평가 시나리오를 모두 이 파일에서 관리한다.
 
-### `evals/evaluation.py`
+### `evaluation/eval_run.py`
 
 프롬프트 평가의 메인 실행 파일이다.
 
@@ -158,17 +152,7 @@ ElevenLabs API로 텍스트를 할머니 목소리 mp3로 변환한다.
 
 같은 질문 또는 같은 대화 흐름에 대해 기본 모델, 파인튜닝 모델, 초기 프로토타입 모델 답변을 나란히 비교한다. 필요하면 `--show-rag`, `--show-points`, `--show-memory` 옵션으로 검색된 기억, 평가 포인트, 단기기억 판정도 같이 볼 수 있다.
 
-### `evals/eval_suite.py`
-
-기존 실행 명령을 유지하기 위한 호환용 wrapper다.
-
-새로 실행할 때는 `evals/evaluation.py`를 쓰는 것이 기준이다.
-
-```bash
-python -m evals.evaluation C
-```
-
-### `evals/results/`
+### `evaluation/results/`
 
 평가 실행 결과가 자동 저장되는 폴더다.
 
@@ -291,19 +275,19 @@ uvicorn server:app --port 8000
 평가 전체 실행:
 
 ```bash
-python -m evals.evaluation C
+python -m evaluation.eval_run C
 ```
 
 단발 질문만 평가:
 
 ```bash
-python -m evals.evaluation C --single
+python -m evaluation.eval_run C --single
 ```
 
 이어지는 대화만 평가:
 
 ```bash
-python -m evals.evaluation C --dialogue
+python -m evaluation.eval_run C --dialogue
 ```
 
 백엔드 import용 장기기억 생성:

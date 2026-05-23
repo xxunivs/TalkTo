@@ -6,4 +6,4 @@ data/voice_raw/
 data/tts_test.mp3
 data/*.mp3
 data/eval_results/*.md
-evals/results/*.md
+evaluation/results/*.md

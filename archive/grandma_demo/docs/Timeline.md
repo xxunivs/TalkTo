@@ -52,16 +52,16 @@ TalkTo 사후 Phase(Persona AI)의 AI 파트 개발 타임라인
 
 ## Stage 3: 프롬프팅 강화 ✅
 
-### 3-1. 시스템 프롬프트 A/B/C 작성
+### 3-1. 시스템 프롬프트 후보 A/B/C 작성
 
-- `prompts/system_prompt_A.py` — 상세 프롬프트 (말투+성격+규칙, 기본 GPT용)
-- `prompts/system_prompt_B.py` — 최소 프롬프트 (사실 정보+금지 사항만, 파인튜닝용)
-- `prompts/system_prompt_C.py` — RAG 운영용 중간 프롬프트
+- `prompts/system_prompt_A.py` — 프롬프트 후보 A
+- `prompts/system_prompt_B.py` — 프롬프트 후보 B
+- `prompts/system_prompt_C.py` — 프롬프트 후보 C
 
 ### 3-2. 말투 평가 세트 구축
 
-- `evals/eval_questions.py` — 단발 평가 질문 + 대화형 평가 시나리오
-- `evals/evaluation.py` — 단발 평가 + 대화형 평가 통합 실행 스크립트
+- `evaluation/eval_questions.py` — 단발 평가 질문 + 대화형 평가 시나리오
+- `evaluation/eval_run.py` — 단발 평가 + 대화형 평가 통합 실행 스크립트
 
 ### 이 Stage가 끝나면:
 
@@ -84,9 +84,8 @@ TalkTo 사후 Phase(Persona AI)의 AI 파트 개발 타임라인
 
 ### 4-3. 모델 비교 테스트
 
-- `evals/evaluation.py` — 선택 프롬프트별 기본모델+RAG / 파인튜닝모델+RAG / 초기 프로토타입 3-way 비교
-- `evals/eval_suite.py` — 기존 실행 명령을 유지하기 위한 호환용 wrapper
-- `evals/results/` — 평가 실행 결과 자동 저장 폴더
+- `evaluation/eval_run.py` — 선택 프롬프트별 기본모델+RAG / 파인튜닝모델+RAG / 초기 프로토타입 3-way 비교
+- `evaluation/results/` — 평가 실행 결과 자동 저장 폴더
 - 현재는 프롬프트 C를 기준으로 기본모델과 파인튜닝모델을 계속 비교
 
 ### 이 Stage가 끝나면:
@@ -178,12 +177,12 @@ TalkTo 사후 Phase(Persona AI)의 AI 파트 개발 타임라인
 
 ### 8-1. eval 결과 기반 문제점 파악
 
-- `python -m evals.evaluation C --single`로 단발 질문 답변과 RAG 검색 결과 확인
-- `python -m evals.evaluation C --dialogue`로 실제 단기기억 저장/조회 흐름을 포함한 이어지는 대화 맥락 유지 확인
-- `python -m evals.evaluation C`로 두 평가를 한 번에 실행 가능
+- `python -m evaluation.eval_run C --single`로 단발 질문 답변과 RAG 검색 결과 확인
+- `python -m evaluation.eval_run C --dialogue`로 실제 단기기억 저장/조회 흐름을 포함한 이어지는 대화 맥락 유지 확인
+- `python -m evaluation.eval_run C`로 두 평가를 한 번에 실행 가능
 - 기본 결과는 답변 중심으로 출력하고, RAG/평가포인트/단기기억 판정은 옵션으로 확인
-- 실행 결과는 `evals/results/`에 자동 저장
-- 현재 후보 프롬프트: 중간 프롬프트 C
+- 실행 결과는 `evaluation/results/`에 자동 저장
+- 현재 후보 프롬프트: C
 
 ### 8-2. 말투 자연스러움 개선
 
@@ -212,7 +211,7 @@ TalkTo 사후 Phase(Persona AI)의 AI 파트 개발 타임라인
 
 ### 8-6. eval 재실행 + 비교
 
-- 프롬프트/RAG 수정 후 `python -m evals.evaluation C`로 재평가
+- 프롬프트/RAG 수정 후 `python -m evaluation.eval_run C`로 재평가
 - 이전 결과와 비교해서 개선 여부 확인
 - 만족스러울 때까지 8-2 ~ 8-6 반복
 
