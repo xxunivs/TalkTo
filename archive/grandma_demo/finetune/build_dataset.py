@@ -1,5 +1,5 @@
 """
-전사본.txt에서 파인튜닝 데이터셋(JSONL)을 생성하는 스크립트.
+transcript.txt에서 파인튜닝 데이터셋(JSONL)을 생성하는 스크립트.
 
 화자 구분된 전사본에서:
 - 손녀 발화 → user
@@ -14,9 +14,9 @@ import re
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from prompts.system_prompt_B import SYSTEM_PROMPT
 
-INPUT_PATH = "data/전사본.txt"
-OUTPUT_TRAIN = "data/finetune_train.jsonl"
-OUTPUT_VAL = "data/finetune_val.jsonl"
+INPUT_PATH = "data/transcript.txt"
+OUTPUT_TRAIN = "finetune/train.jsonl"
+OUTPUT_VAL = "finetune/val.jsonl"
 
 WINDOW_SIZE = 6   # 한 예시에 포함할 대화 턴 수
 SHIFT = 2         # 슬라이딩 윈도우 이동 간격

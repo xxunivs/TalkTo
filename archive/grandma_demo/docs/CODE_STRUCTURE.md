@@ -20,13 +20,14 @@ PersonaAI/
   evals/
     results/
 
-  tools/
+  finetune/
+  backend_memory/
   tests/
   data/
   docs/
 ```
 
-루트에는 서버 실행과 배포에 바로 필요한 파일만 남겼다. 실제 PersonaAI의 본체 로직은 `core/`에 있고, 프롬프트 실험은 `prompts/`, 평가 실행은 `evals/`, 데이터 변환 도구는 `tools/`에 둔다.
+루트에는 서버 실행과 배포에 바로 필요한 파일만 남겼다. 실제 PersonaAI의 본체 로직은 `core/`에 있고, 프롬프트 실험은 `prompts/`, 평가 실행은 `evals/`, 파인튜닝 재현 자료는 `finetune/`, 백엔드 memory import 자료는 `backend_memory/`에 둔다.
 
 ## 루트 파일
 
@@ -177,35 +178,53 @@ python -m evals.eval_suite C
 
 결과 파일을 남겨두면 프롬프트나 모델을 바꿨을 때 이전 결과와 비교하기 쉽다.
 
-## `tools/`
+## `finetune/`
 
-일회성 데이터 준비나 운영 보조 스크립트가 들어 있다.
+파인튜닝 재현에 필요한 스크립트와 데이터가 들어 있다.
 
-### `tools/build_finetune_dataset.py`
+현재 운영 답변은 `OPENAI_CHAT_MODEL` 환경변수에 설정된 모델을 사용한다. 파인튜닝을 다시 실험하거나 재현해야 할 때만 이 폴더를 보면 된다.
+
+### `finetune/build_dataset.py`
 
 화자 구분된 전사본에서 파인튜닝용 JSONL 파일을 만든다.
 
-입력은 `data/전사본.txt`, 출력은 `data/finetune_train.jsonl`과 `data/finetune_val.jsonl`이다.
+입력은 `data/transcript.txt`, 출력은 `finetune/train.jsonl`과 `finetune/val.jsonl`이다.
 
-### `tools/run_finetune.py`
+### `finetune/run_finetune.py`
 
 OpenAI 파인튜닝 작업을 실행하는 스크립트다.
 
 학습 데이터 업로드, validation 데이터 업로드, fine-tuning job 생성까지 담당한다.
 
-### `tools/export_backend_memories.py`
+### `finetune/train.jsonl`, `finetune/val.jsonl`
+
+파인튜닝 학습과 검증에 사용한 JSONL 파일이다.
+
+## `backend_memory/`
+
+백엔드 DB에 기존 장기기억을 넣기 위한 import 파일과 생성 스크립트가 들어 있다.
+
+서비스 런타임에서 계속 읽는 폴더는 아니고, 백엔드 DB를 새로 만들거나 기존 장기기억을 다시 import해야 할 때 사용한다.
+
+### `backend_memory/build_memory_import.py`
 
 AI 레포의 장기기억 JSON을 백엔드 import 형식으로 변환한다.
 
-입력은 `data/memories.json`, 출력은 `data/backend_memory_import.json`이다. 백엔드는 이 파일을 가져가 DB에 장기기억을 넣는다.
+입력은 `data/memories.json`, 출력은 `backend_memory/memory_import.json`이다.
+
+### `backend_memory/memory_import.json`
+
+백엔드가 기존 장기기억을 DB로 가져갈 때 쓰는 import 데이터다.
+
+이미 운영 DB에 import가 끝난 경우 매 요청마다 쓰이는 파일은 아니지만, 새 DB 세팅이나 재import가 필요할 때 기준 파일로 사용한다.
 
 ## `tests/`
 
 테스트 코드가 들어 있다.
 
-### `tests/test_export_backend_memories.py`
+### `backend_memory/test_build_memory_import.py`
 
-`tools/export_backend_memories.py`가 백엔드 import 형식에 맞게 변환하는지 확인한다.
+`backend_memory/build_memory_import.py`가 백엔드 import 형식에 맞게 변환하는지 확인한다.
 
 특히 가족 이름, 별칭, `relatedPeople` 추출이 의도대로 되는지 검사한다.
 
@@ -231,21 +250,11 @@ AI 단독 테스트용 장기기억 원본이다.
 
 운영 Render에서는 `PERSONA_ENABLE_LOCAL_SHORT_TERM=false`라서 이 파일을 기준으로 삼지 않는다.
 
-### `data/backend_memory_import.json`
+### `data/transcript.txt`, `data/persona_analysis.md`
 
-백엔드가 기존 장기기억을 DB로 가져갈 때 쓰는 import 파일이다.
+`data/transcript.txt`는 화자 구분이 끝난 최종 전사본이다. 파인튜닝 데이터 생성은 이 파일을 기준으로 한다.
 
-`tools/export_backend_memories.py`로 생성한다.
-
-### `data/finetune_train.jsonl`, `data/finetune_val.jsonl`
-
-파인튜닝 학습과 검증에 사용한 JSONL 파일이다.
-
-### `data/전사본.txt`, `data/할머니_분석.md`
-
-`data/전사본.txt`는 화자 구분이 끝난 최종 전사본이다. 파인튜닝 데이터 생성은 이 파일을 기준으로 한다.
-
-`data/할머니_분석.md`는 전사본을 바탕으로 말투, 성격, 관계 정보를 정리한 분석 자료다.
+`data/persona_analysis.md`는 전사본을 바탕으로 말투, 성격, 관계 정보를 정리한 분석 자료다.
 
 ### `data/voice_raw/`
 
@@ -269,7 +278,7 @@ STT 테스트나 음성 관련 실험에서 참조한다.
 
 아직 나중에 정리해야 할 임시 운영 사항을 적어둔 파일이다.
 
-### `docs/ai_backend_integration_ver*.md`
+### `docs/ai_backend_integration/ai_backend_integration_ver*.md`
 
 백엔드와 AI 서버 연동을 논의하면서 남긴 버전별 문서다.
 
@@ -304,5 +313,5 @@ python -m evals.eval_dialogue C
 백엔드 import용 장기기억 생성:
 
 ```bash
-python tools/export_backend_memories.py
+python backend_memory/build_memory_import.py
 ```

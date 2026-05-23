@@ -4,9 +4,9 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "tools"))
+sys.path.insert(0, str(ROOT / "backend_memory"))
 
-from export_backend_memories import extract_related_people, to_backend_memory
+from build_memory_import import extract_related_people, to_backend_memory
 
 
 class ExportBackendMemoriesTest(unittest.TestCase):

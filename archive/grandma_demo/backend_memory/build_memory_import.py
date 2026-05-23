@@ -2,7 +2,7 @@
 Export PersonaAI memory chunks to the backend Memory create DTO shape.
 
 Output:
-  data/backend_memory_import.json
+  backend_memory/memory_import.json
 """
 import json
 from pathlib import Path
@@ -10,7 +10,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE_PATH = ROOT / "data" / "memories.json"
-OUTPUT_PATH = ROOT / "data" / "backend_memory_import.json"
+OUTPUT_PATH = ROOT / "backend_memory" / "memory_import.json"
 
 RELATED_PERSON_ALIASES = (
     ("신금자", ("신금자", "할머니")),

@@ -15,8 +15,8 @@ load_dotenv()
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-TRAIN_PATH = "data/finetune_train.jsonl"
-VAL_PATH = "data/finetune_val.jsonl"
+TRAIN_PATH = "finetune/train.jsonl"
+VAL_PATH = "finetune/val.jsonl"
 MODEL = "gpt-4.1-mini-2025-04-14"
 
 
@@ -51,7 +51,7 @@ def check_status(job_id):
         print(f"실패: {job.error}")
     else:
         print("아직 학습 중... 몇 분 후 다시 확인하세요:")
-        print(f"  python tools/run_finetune.py --check {job_id}")
+        print(f"  python finetune/run_finetune.py --check {job_id}")
     return job
 
 
@@ -66,4 +66,4 @@ if __name__ == "__main__":
         val_id = upload_file(VAL_PATH)
         job_id = start_finetune(train_id, val_id)
         print(f"\n학습이 시작됐습니다. 완료까지 수십 분 ~ 몇 시간 걸릴 수 있어요.")
-        print(f"상태 확인: python tools/run_finetune.py --check {job_id}")
+        print(f"상태 확인: python finetune/run_finetune.py --check {job_id}")

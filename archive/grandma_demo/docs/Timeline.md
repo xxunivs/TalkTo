@@ -37,11 +37,11 @@ TalkTo 사후 Phase(Persona AI)의 AI 파트 개발 타임라인
 
 - 음성 원본 파일 수령 완료 (wav 13개, `data/voice_raw/`)
 - 전사본 1~13 순서 정렬
-- Claude에 넣어서 맥락 기반 화자 분리 → 최종 `data/전사본.txt`
+- Claude에 넣어서 맥락 기반 화자 분리 → 최종 `data/transcript.txt`
 
 ### 2-2. 전사본 분석
 
-- 화자 분리된 전사본 기반으로 7개 카테고리 분석 → `data/할머니_분석.md`
+- 화자 분리된 전사본 기반으로 7개 카테고리 분석 → `data/persona_analysis.md`
 - 기본정보, 언어적 특징, 성격/심리, 관계, 가치관, 기억/경험, 대화패턴
 
 ### 이 Stage가 끝나면:
@@ -73,13 +73,13 @@ TalkTo 사후 Phase(Persona AI)의 AI 파트 개발 타임라인
 
 ### 4-1. 파인튜닝 데이터셋 구축
 
-- `tools/build_finetune_dataset.py` — 전사본 → JSONL 변환 (슬라이딩 윈도우)
-- `data/finetune_train.jsonl` — 학습 데이터 262건
-- `data/finetune_val.jsonl` — 검증 데이터 30건
+- `finetune/build_dataset.py` — 전사본 → JSONL 변환 (슬라이딩 윈도우)
+- `finetune/train.jsonl` — 학습 데이터 262건
+- `finetune/val.jsonl` — 검증 데이터 30건
 
 ### 4-2. 파인튜닝 실행
 
-- `tools/run_finetune.py` — OpenAI Fine-tuning API 실행/상태 확인
+- `finetune/run_finetune.py` — OpenAI Fine-tuning API 실행/상태 확인
 - 모델: `ft:gpt-4.1-mini-2025-04-14:talkto::DeJqGFij`
 
 ### 4-3. 모델 비교 테스트
@@ -101,7 +101,7 @@ TalkTo 사후 Phase(Persona AI)의 AI 파트 개발 타임라인
 ### 5-1. 장기기억 chunk 추출
 
 - `data/memories.json` — 장기기억 chunk 44개 (가족, 요리, 추억, 가치관 등)
-- 할머니_분석.md 기반, 관계 정보 보강 포함
+- persona_analysis.md 기반, 관계 정보 보강 포함
 
 ### 5-2. 임베딩 생성
 
@@ -190,7 +190,7 @@ TalkTo 사후 Phase(Persona AI)의 AI 파트 개발 타임라인
 
 - GPT가 만들어내는 잘못된 사투리 금지 목록 확대 (~한디, ~다꼬, ~구먼, ~당께, ~했슈 등)
 - 실제 할머니 사투리만 허용 (께름하다, 질력나다, 그러니끼 등)
-- `data/할머니_분석.md` 언어적 특징 섹션 참고
+- `data/persona_analysis.md` 언어적 특징 섹션 참고
 
 ### 8-3. 답변 길이/톤 조정
 
