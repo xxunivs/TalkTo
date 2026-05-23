@@ -1,8 +1,3 @@
-"""
-중요도 평가 모듈.
-매 대화 턴 후에 "이 대화가 기억할 만큼 중요한가?" 판단.
-GPT한테 물어봐서 중요도(1~10)와 카테고리를 받아옴.
-"""
 import os
 import sys
 import json
@@ -40,9 +35,7 @@ EVAL_PROMPT = """
 "응", "그래", "알았어" 같은 단순 맞장구는 중요도 1.
 """.strip()
 
-
 def format_history_for_importance(history: list | None) -> str:
-    """최근 대화 히스토리를 중요도 평가 프롬프트용 텍스트로 변환한다."""
     if not history:
         return "(없음)"
 
@@ -59,25 +52,11 @@ def format_history_for_importance(history: list | None) -> str:
 
     return "\n".join(lines) if lines else "(없음)"
 
-
 def evaluate_importance(
     user_message: str,
     assistant_message: str,
     history: list | None = None,
 ) -> dict:
-    """
-    대화 한 턴의 중요도를 평가.
-
-    매개변수:
-        user_message: 사용자가 한 말
-        assistant_message: 할머니가 답한 말
-        history: 현재 턴 이전의 최근 대화 내역
-
-    반환값:
-        {"importance": 7, "category": "직장", "summary": "향이가 회사를 그만뒀다", "reason": "..."}
-        또는 실패 시
-        {"importance": 0, "category": "", "summary": "", "reason": "평가 실패"}
-    """
     try:
         conversation = (
             f"[최근 대화]\n{format_history_for_importance(history)}\n\n"
@@ -104,9 +83,8 @@ def evaluate_importance(
             "reason": f"평가 실패: {str(e)}",
         }
 
-
 if __name__ == "__main__":
-    # 테스트: 다양한 대화로 중요도 평가
+
     test_cases = [
         ("나 회사 그만뒀어", "어? 왜? 무슨 일 있었어?"),
         ("응", "그래."),

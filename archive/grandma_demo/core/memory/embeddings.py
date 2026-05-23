@@ -1,9 +1,3 @@
-"""
-장기기억 임베딩 생성 + 검색 모듈.
-
-- memories.json을 읽어서 각 chunk를 벡터로 변환
-- 사용자 질문과 가장 관련 있는 장기기억을 검색
-"""
 import os
 import sys
 import json
@@ -21,7 +15,6 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 MEMORIES_PATH = ROOT / "data" / "memories.json"
 EMBEDDINGS_PATH = ROOT / "data" / "memory_embeddings.json"
 MODEL = "text-embedding-3-small"
-
 
 KEYWORD_BOOST_RULES = [
     {
@@ -106,30 +99,24 @@ KEYWORD_BOOST_RULES = [
     },
 ]
 
-
 def load_memories():
-    """memories.json 읽기"""
     with open(MEMORIES_PATH, "r", encoding="utf-8") as f:
         return json.load(f)
 
-
 def get_embedding(text):
-    """텍스트를 벡터로 변환"""
     response = client.embeddings.create(
         model=MODEL,
         input=text,
     )
     return response.data[0].embedding
 
-
 def build_embeddings():
-    """모든 장기기억 chunk의 임베딩을 생성하고 저장"""
     memories = load_memories()
     print(f"장기기억 {len(memories)}개 임베딩 생성 중...")
 
     results = []
     for i, item in enumerate(memories):
-        # 제목 + 내용을 합쳐서 임베딩
+
         text = f"{item['title']}: {item['content']}"
         embedding = get_embedding(text)
         results.append({
@@ -143,21 +130,12 @@ def build_embeddings():
 
     print(f"완료! {EMBEDDINGS_PATH}에 저장됨")
 
-
 def cosine_similarity(a, b):
-    """두 벡터의 코사인 유사도 계산"""
     a = np.array(a)
     b = np.array(b)
     return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
 
-
 def keyword_boost(query, memory_id):
-    """
-    짧은 구어체 질문에서 임베딩 검색이 빗나가는 경우를 보정한다.
-
-    예: "향이는 뭐하는 애야?"는 임베딩만 쓰면 향이 부모 기억이 더 높게
-    나올 수 있으므로, 명시 키워드가 있으면 해당 기억에 작은 가산점을 준다.
-    """
     matched_boost = 0.0
     for rule in KEYWORD_BOOST_RULES:
         if memory_id not in rule["memory_ids"]:
@@ -166,30 +144,16 @@ def keyword_boost(query, memory_id):
             matched_boost += rule["boost"]
     return matched_boost
 
-
 def search_memories(query, top_k=5):
-    """
-    사용자 질문과 가장 관련 있는 장기기억을 검색.
 
-    매개변수:
-        query: 사용자 질문 (예: "할머니 불고기 어떻게 만들어?")
-        top_k: 반환할 기억 개수
-
-    반환값:
-        관련 장기기억 리스트 [{"id", "title", "content", "score"}, ...]
-    """
-    # 임베딩 파일 로드
     with open(EMBEDDINGS_PATH, "r", encoding="utf-8") as f:
         embeddings_data = json.load(f)
 
-    # 장기기억 원본 로드
     memories = load_memories()
     item_dict = {m["id"]: m for m in memories}
 
-    # 질문을 벡터로 변환
     query_embedding = get_embedding(query)
 
-    # 각 기억과 유사도 계산 + 키워드 보정
     scores = []
     for item in embeddings_data:
         base_score = cosine_similarity(query_embedding, item["embedding"])
@@ -197,10 +161,8 @@ def search_memories(query, top_k=5):
         final_score = base_score + boost
         scores.append((item["id"], final_score, base_score, boost))
 
-    # 유사도 높은 순 정렬
     scores.sort(key=lambda x: x[1], reverse=True)
 
-    # top_k개 반환
     results = []
     for mem_id, score, base_score, boost in scores[:top_k]:
         mem = item_dict[mem_id]
@@ -215,12 +177,11 @@ def search_memories(query, top_k=5):
 
     return results
 
-
 if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "--build":
         build_embeddings()
     else:
-        # 검색 테스트
+
         test_queries = [
             "할머니 불고기 어떻게 만들어?",
             "이종서 아들은 뭐해?",

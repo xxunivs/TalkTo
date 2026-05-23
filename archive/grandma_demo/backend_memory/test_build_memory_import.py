@@ -2,12 +2,10 @@ import sys
 import unittest
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend_memory"))
 
 from build_memory_import import extract_related_people, to_backend_memory
-
 
 class ExportBackendMemoriesTest(unittest.TestCase):
     def test_extracts_normalized_people_from_explicit_names_and_family_aliases(self) -> None:
@@ -47,7 +45,6 @@ class ExportBackendMemoriesTest(unittest.TestCase):
         )
 
         self.assertEqual(payload["relatedPeople"], ["신금자", "향이", "규하"])
-
 
 if __name__ == "__main__":
     unittest.main()

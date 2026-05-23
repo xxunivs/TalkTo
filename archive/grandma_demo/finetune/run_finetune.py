@@ -1,9 +1,3 @@
-"""
-OpenAI 파인튜닝 실행 스크립트.
-1. train/val 파일 업로드
-2. 파인튜닝 작업 생성
-3. 상태 확인
-"""
 import os
 import sys
 import time
@@ -19,14 +13,12 @@ TRAIN_PATH = "finetune/train.jsonl"
 VAL_PATH = "finetune/val.jsonl"
 MODEL = "gpt-4.1-mini-2025-04-14"
 
-
 def upload_file(path, purpose="fine-tune"):
     print(f"업로드 중: {path}")
     with open(path, "rb") as f:
         result = client.files.create(file=f, purpose=purpose)
     print(f"  → file_id: {result.id}")
     return result.id
-
 
 def start_finetune(train_file_id, val_file_id):
     print(f"\n파인튜닝 시작: {MODEL}")
@@ -38,7 +30,6 @@ def start_finetune(train_file_id, val_file_id):
     print(f"  → job_id: {job.id}")
     print(f"  → status: {job.status}")
     return job.id
-
 
 def check_status(job_id):
     job = client.fine_tuning.jobs.retrieve(job_id)
@@ -54,14 +45,13 @@ def check_status(job_id):
         print(f"  python finetune/run_finetune.py --check {job_id}")
     return job
 
-
 if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "--check":
-        # 상태 확인 모드
+
         job_id = sys.argv[2]
         check_status(job_id)
     else:
-        # 파인튜닝 시작
+
         train_id = upload_file(TRAIN_PATH)
         val_id = upload_file(VAL_PATH)
         job_id = start_finetune(train_id, val_id)

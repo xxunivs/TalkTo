@@ -150,26 +150,22 @@ ElevenLabs API로 텍스트를 할머니 목소리 mp3로 변환한다.
 
 단발 질문 평가와 이어지는 대화 평가 시나리오를 모두 이 파일에서 관리한다.
 
-### `evals/eval_all.py`
+### `evals/evaluation.py`
 
-단발 질문을 평가한다.
+프롬프트 평가의 메인 실행 파일이다.
 
-같은 질문에 대해 기본 모델, 파인튜닝 모델, 초기 프로토타입 모델 답변을 나란히 비교한다. 필요하면 `--show-rag`, `--show-points` 옵션으로 검색된 기억과 평가 포인트도 같이 볼 수 있다.
+단발 질문 평가와 이어지는 대화 평가를 한 파일에서 처리한다.
 
-### `evals/eval_dialogue.py`
-
-이어지는 대화 흐름을 평가한다.
-
-여러 턴을 이어서 보내면서 이전 대화 `history`와 평가용 단기기억이 답변에 잘 반영되는지 확인한다. 운영 단기기억 파일을 건드리지 않도록 임시 파일을 쓴다.
+같은 질문 또는 같은 대화 흐름에 대해 기본 모델, 파인튜닝 모델, 초기 프로토타입 모델 답변을 나란히 비교한다. 필요하면 `--show-rag`, `--show-points`, `--show-memory` 옵션으로 검색된 기억, 평가 포인트, 단기기억 판정도 같이 볼 수 있다.
 
 ### `evals/eval_suite.py`
 
-단발 평가와 대화형 평가를 한 번에 실행한다.
+기존 실행 명령을 유지하기 위한 호환용 wrapper다.
 
-보통 프롬프트를 수정한 뒤에는 이 파일을 실행해서 전체 답변 품질을 비교한다.
+새로 실행할 때는 `evals/evaluation.py`를 쓰는 것이 기준이다.
 
 ```bash
-python -m evals.eval_suite C
+python -m evals.evaluation C
 ```
 
 ### `evals/results/`
@@ -295,19 +291,19 @@ uvicorn server:app --port 8000
 평가 전체 실행:
 
 ```bash
-python -m evals.eval_suite C
+python -m evals.evaluation C
 ```
 
 단발 질문만 평가:
 
 ```bash
-python -m evals.eval_all C
+python -m evals.evaluation C --single
 ```
 
 이어지는 대화만 평가:
 
 ```bash
-python -m evals.eval_dialogue C
+python -m evals.evaluation C --dialogue
 ```
 
 백엔드 import용 장기기억 생성:
