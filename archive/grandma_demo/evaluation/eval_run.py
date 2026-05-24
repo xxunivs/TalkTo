@@ -86,10 +86,22 @@ class EvalLogger:
         return path
 
 
+def format_memory_item(title, content, tags=None):
+    """
+    RAG 메모리 한 항목을 시스템 프롬프트용 한 줄 텍스트로 포맷.
+    서비스 코드(server.py:format_memory_item)와 동일한 형식이라 평가/서비스 정합성 유지.
+    """
+    tag_text = f" [tags: {', '.join(tags)}]" if tags else ""
+    return f"- {title}{tag_text}: {content}"
+
+
 def build_rag_prompt(system_prompt, memories):
     if not memories:
         return system_prompt
-    memory_text = "\n".join([f"- {m['title']}: {m['content']}" for m in memories])
+    memory_text = "\n".join(
+        format_memory_item(m["title"], m["content"], m.get("tags"))
+        for m in memories
+    )
     return system_prompt + f"\n\n[할머니의 관련 장기기억]\n{memory_text}"
 
 
@@ -130,7 +142,9 @@ def print_rag(memories, logger):
         score_text = f"{score}"
         if base_score is not None and boost is not None:
             score_text = f"{score} = {base_score}+{boost}"
-        logger.write(f"  {idx}. [{score_text}] {memory['id']} | {memory['title']} | {content}")
+        tags = memory.get("tags") or []
+        tag_text = f" [tags: {', '.join(tags)}]" if tags else ""
+        logger.write(f"  {idx}. [{score_text}] {memory['id']}{tag_text} | {memory['title']} | {content}")
 
 
 def create_clients():

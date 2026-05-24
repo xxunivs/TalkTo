@@ -12,7 +12,7 @@ services:
       - key: OPENAI_API_KEY
         sync: false
       - key: OPENAI_CHAT_MODEL
-        value: ft:gpt-4.1-mini-2025-04-14:talkto::DeJqGFij
+        value: gpt-4.1-mini
       - key: PERSONA_ENABLE_LOCAL_SHORT_TERM
         value: "false"
       - key: AI_SERVER_TOKEN
