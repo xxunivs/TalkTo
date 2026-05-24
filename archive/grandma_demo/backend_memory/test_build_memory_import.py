@@ -46,5 +46,37 @@ class ExportBackendMemoriesTest(unittest.TestCase):
 
         self.assertEqual(payload["relatedPeople"], ["신금자", "향이", "규하"])
 
+    def test_backend_payload_preserves_memory_tags(self) -> None:
+        payload = to_backend_memory(
+            {
+                "id": "death_passing",
+                "category": "사후정보",
+                "title": "2025년 1월 9일 별세와 임종 상황",
+                "content": "할머니는 심근경색으로 돌아가셨다.",
+                "tags": ["sensitive"],
+            }
+        )
+
+        self.assertEqual(
+            payload["tags"],
+            [
+                "category:사후정보",
+                "legacy_id:death_passing",
+                "sensitive",
+            ],
+        )
+
+    def test_backend_payload_does_not_include_confidence_score(self) -> None:
+        payload = to_backend_memory(
+            {
+                "id": "identity_basic",
+                "category": "정체성",
+                "title": "할머니 기본 정보",
+                "content": "할머니는 신금자이다.",
+            }
+        )
+
+        self.assertNotIn("confidenceScore", payload)
+
 if __name__ == "__main__":
     unittest.main()

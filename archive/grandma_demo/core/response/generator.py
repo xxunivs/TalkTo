@@ -23,6 +23,10 @@ def local_short_term_enabled() -> bool:
     value = os.getenv("PERSONA_ENABLE_LOCAL_SHORT_TERM", "false").lower()
     return value in {"1", "true", "yes", "on"}
 
+def format_memory(title: str, content: str, tags: list = None) -> str:
+    tag_text = f" [tags: {', '.join(tags)}]" if tags else ""
+    return f"- {title}{tag_text}: {content}"
+
 def generate_response(message: str, history: list = None, memory_text: str = None) -> str:
     if history is None:
         history = []
@@ -33,7 +37,10 @@ def generate_response(message: str, history: list = None, memory_text: str = Non
 
         memory_parts = []
         if long_term:
-            lt_text = "\n".join([f"- {m['title']}: {m['content']}" for m in long_term])
+            lt_text = "\n".join([
+                format_memory(m["title"], m["content"], m.get("tags", []))
+                for m in long_term
+            ])
             memory_parts.append(f"[장기기억]\n{lt_text}")
 
         if local_short_term_enabled():

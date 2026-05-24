@@ -35,6 +35,7 @@ class MemoryItem(BaseModel):
     id: str = ""
     title: str = ""
     content: str = ""
+    tags: list[str] = Field(default_factory=list)
 
 class ChatRequest(BaseModel):
     message: str
@@ -73,6 +74,10 @@ class STTResponse(BaseModel):
 class TTSRequest(BaseModel):
     text: str
 
+def format_memory_item(title: str, content: str, tags: list[str] | None = None) -> str:
+    tag_text = f" [tags: {', '.join(tags)}]" if tags else ""
+    return f"- {title}{tag_text}: {content}"
+
 @app.post("/ai/chat", response_model=ChatResponse)
 def chat(req: ChatRequest):
     start = time.time()
@@ -81,12 +86,18 @@ def chat(req: ChatRequest):
     if provided_memories is not None:
 
         memory_ids = [m.id for m in provided_memories]
-        memory_text = "\n".join([f"- {m.title}: {m.content}" for m in provided_memories])
+        memory_text = "\n".join([
+            format_memory_item(m.title, m.content, m.tags)
+            for m in provided_memories
+        ])
     else:
 
         found = search_memories(req.message, top_k=5)
         memory_ids = [m["id"] for m in found]
-        memory_text = "\n".join([f"- {m['title']}: {m['content']}" for m in found])
+        memory_text = "\n".join([
+            format_memory_item(m["title"], m["content"], m.get("tags", []))
+            for m in found
+        ])
 
     reply = generate_response(req.message, req.history, memory_text=memory_text)
 

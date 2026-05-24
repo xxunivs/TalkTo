@@ -10,10 +10,23 @@ RELATED_PERSON_ALIASES = (
     ("이재산", ("이재산", "할아버지")),
     ("이종서", ("이종서",)),
     ("손현선", ("손현선",)),
+    ("이신화", ("이신화", "신화", "큰고모")),
+    ("이신경", ("이신경", "신경", "작은고모")),
+    ("윤보영", ("윤보영", "큰고모부")),
+    ("남석찬", ("남석찬", "작은고모부")),
     ("이준혁", ("이준혁", "준혁")),
     ("이채민", ("이채민", "채민")),
     ("향이", ("향이",)),
     ("규하", ("규하",)),
+    ("남향", ("남향",)),
+    ("남규하", ("남규하",)),
+    ("홍윤현", ("홍윤현",)),
+    ("남해욱", ("남해욱",)),
+    ("윤선혜", ("윤선혜", "선혜")),
+    ("윤선화", ("윤선화", "선화")),
+    ("윤유진", ("윤유진", "유진")),
+    ("신희용", ("신희용",)),
+    ("신욱", ("신욱",)),
     ("향이 엄마", ("향이 엄마",)),
     ("향이 아빠", ("향이 아빠",)),
 )
@@ -30,6 +43,7 @@ def extract_related_people(item: dict) -> list[str]:
 def to_backend_memory(item: dict) -> dict:
     legacy_id = item["id"]
     category = item["category"]
+    item_tags = item.get("tags", [])
 
     return {
         "title": item["title"],
@@ -40,8 +54,8 @@ def to_backend_memory(item: dict) -> dict:
         "tags": [
             f"category:{category}",
             f"legacy_id:{legacy_id}",
+            *item_tags,
         ],
-        "confidenceScore": 1.0,
     }
 
 def main() -> None:

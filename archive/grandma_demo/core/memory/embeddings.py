@@ -23,6 +23,26 @@ KEYWORD_BOOST_RULES = [
         "boost": 0.22,
     },
     {
+        "keywords": ["정읍", "큰오빠", "어린 시절", "고향", "새어머니"],
+        "memory_ids": ["identity_childhood", "identity_basic"],
+        "boost": 0.24,
+    },
+    {
+        "keywords": ["천주교", "성당", "신앙", "기도", "하늘", "평온", "지켜보고", "응원"],
+        "memory_ids": ["religion_catholic"],
+        "boost": 0.24,
+    },
+    {
+        "keywords": ["돌아가", "돌아가셨", "사망", "임종", "심근경색", "중환자실", "스텐트"],
+        "memory_ids": ["death_passing"],
+        "boost": 0.36,
+    },
+    {
+        "keywords": ["보고 싶", "그리워", "그립"],
+        "memory_ids": ["death_passing", "religion_catholic"],
+        "boost": 0.18,
+    },
+    {
         "keywords": ["엄마", "아빠", "부모"],
         "memory_ids": ["family_hyangi_parents"],
         "boost": 0.16,
@@ -35,6 +55,36 @@ KEYWORD_BOOST_RULES = [
     {
         "keywords": ["할아버지", "이재산", "남편"],
         "memory_ids": ["family_husband"],
+        "boost": 0.20,
+    },
+    {
+        "keywords": ["큰고모", "작은고모", "이신화", "이신경", "딸"],
+        "memory_ids": ["family_daughters", "family_big_daughter_ishinhwa", "family_small_daughter_ishingyeong"],
+        "boost": 0.22,
+    },
+    {
+        "keywords": ["큰고모부", "작은고모부", "윤보영", "남석찬"],
+        "memory_ids": ["family_aunt_husbands"],
+        "boost": 0.24,
+    },
+    {
+        "keywords": ["남향", "홍윤현", "국립중앙도서관"],
+        "memory_ids": ["family_namhyang"],
+        "boost": 0.34,
+    },
+    {
+        "keywords": ["남규하", "남해욱"],
+        "memory_ids": ["family_namgyuha"],
+        "boost": 0.30,
+    },
+    {
+        "keywords": ["윤선혜", "윤선화", "윤유진"],
+        "memory_ids": ["family_yoon_cousins"],
+        "boost": 0.30,
+    },
+    {
+        "keywords": ["친척", "큰오빠", "신희용", "신욱", "고모"],
+        "memory_ids": ["family_extended_relatives", "identity_childhood"],
         "boost": 0.20,
     },
     {
@@ -96,6 +146,66 @@ KEYWORD_BOOST_RULES = [
         "keywords": ["건강", "운동", "면역력", "건강하려면"],
         "memory_ids": ["values_health"],
         "boost": 0.20,
+    },
+    {
+        "keywords": ["희생", "가족 사랑", "가족에게", "어떤 사람", "자식", "손주", "사랑", "챙겨"],
+        "memory_ids": ["values_family_sacrifice", "food_care"],
+        "boost": 0.20,
+    },
+    {
+        "keywords": ["정직", "거짓말", "싸우지", "다투지", "화목"],
+        "memory_ids": ["values_honesty_harmony"],
+        "boost": 0.22,
+    },
+    {
+        "keywords": ["용돈", "반찬", "과일", "죽", "마늘장아찌", "오이소박이", "음식으로"],
+        "memory_ids": ["food_care"],
+        "boost": 0.22,
+    },
+    {
+        "keywords": ["수내동", "분당", "중앙공원", "이마트", "홈플러스"],
+        "memory_ids": ["life_late_places", "life_home_daily_scene"],
+        "boost": 0.22,
+    },
+    {
+        "keywords": ["건대", "면목동", "중곡동", "어디 살", "거주", "이사"],
+        "memory_ids": ["life_residence_history"],
+        "boost": 0.24,
+    },
+    {
+        "keywords": ["담배", "술", "아버지 건강", "이종서 건강"],
+        "memory_ids": ["family_father_health_worry"],
+        "boost": 0.28,
+    },
+    {
+        "keywords": ["용돈", "절약", "아껴", "돈을 어떻게"],
+        "memory_ids": ["values_saving_allowance"],
+        "boost": 0.24,
+    },
+    {
+        "keywords": ["전화", "받을 때", "끊을 때", "잘 자", "사랑한다"],
+        "memory_ids": ["speech_call_open_close"],
+        "boost": 0.22,
+    },
+    {
+        "keywords": ["말투", "방언", "표현", "어투"],
+        "memory_ids": ["speech_dialect_expressions", "speech_common_family_phrases", "speech_call_open_close"],
+        "boost": 0.24,
+    },
+    {
+        "keywords": ["감정 표현", "담담", "서운", "유머"],
+        "memory_ids": ["emotion_style"],
+        "boost": 0.22,
+    },
+    {
+        "keywords": ["마지막", "스텐트", "응급실", "중환자실", "심장 통증"],
+        "memory_ids": ["health_final_course", "death_passing"],
+        "boost": 0.30,
+    },
+    {
+        "keywords": ["마지막 못", "못 봐서", "못 가서", "갔어야", "미안", "죄책감", "후회", "임종 못"],
+        "memory_ids": ["memorial_guilt_comfort"],
+        "boost": 0.34,
     },
 ]
 
@@ -170,6 +280,7 @@ def search_memories(query, top_k=5):
             "id": mem["id"],
             "title": mem["title"],
             "content": mem["content"],
+            "tags": mem.get("tags", []),
             "score": round(score, 4),
             "base_score": round(base_score, 4),
             "boost": round(boost, 4),
