@@ -118,25 +118,13 @@ ElevenLabs API로 텍스트를 할머니 목소리 mp3로 변환한다.
 
 ### `prompts/system_prompt.py`
 
-현재 서버가 실제로 쓰는 프롬프트 선택 파일이다.
+현재 서버와 평가 코드가 실제로 쓰는 단일 시스템 프롬프트다.
 
-지금은 `system_prompt_C.py`를 바라보게 되어 있다. 서버 응답 말투를 바꾸고 싶으면 보통 `system_prompt_C.py`를 고치거나, 이 파일이 다른 버전을 바라보게 바꾸면 된다.
-
-### `prompts/system_prompt_A.py`
-
-프롬프트 후보 A다.
-
-### `prompts/system_prompt_B.py`
-
-프롬프트 후보 B다.
-
-### `prompts/system_prompt_C.py`
-
-프롬프트 후보 C다.
+서버 응답 말투나 메모리 사용 정책을 바꾸고 싶으면 이 파일을 수정한다.
 
 ## `evaluation/`
 
-프롬프트와 모델 답변 품질을 비교하는 평가 코드다.
+현재 시스템 프롬프트와 모델 답변 품질을 평가하는 코드다.
 
 ### `evaluation/eval_questions.py`
 
@@ -148,9 +136,9 @@ ElevenLabs API로 텍스트를 할머니 목소리 mp3로 변환한다.
 
 프롬프트 평가의 메인 실행 파일이다.
 
-단발 질문 평가와 이어지는 대화 평가를 한 파일에서 처리한다.
+reproduction, memorial, deep 평가 세트를 한 파일에서 처리한다.
 
-같은 질문 또는 같은 대화 흐름에 대해 기본 모델, 파인튜닝 모델, 초기 프로토타입 모델 답변을 나란히 비교한다. 필요하면 `--show-rag`, `--show-points`, `--show-memory` 옵션으로 검색된 기억, 평가 포인트, 단기기억 판정도 같이 볼 수 있다.
+같은 질문 또는 같은 대화 흐름에 대해 MVP 모델과 초기 프로토타입 모델 답변을 나란히 비교한다. 필요하면 `--show-rag`, `--show-memory` 옵션으로 검색된 기억과 단기기억 판정도 같이 볼 수 있다.
 
 ### `evaluation/results/`
 
@@ -275,19 +263,19 @@ uvicorn server:app --port 8000
 평가 전체 실행:
 
 ```bash
-python -m evaluation.eval_run C
+python -m evaluation.eval_run
 ```
 
-단발 질문만 평가:
+특정 세트만 평가:
 
 ```bash
-python -m evaluation.eval_run C --single
+python -m evaluation.eval_run --set memorial
 ```
 
-이어지는 대화만 평가:
+RAG와 단기기억 디버그까지 같이 보기:
 
 ```bash
-python -m evaluation.eval_run C --dialogue
+python -m evaluation.eval_run --show-rag --show-memory
 ```
 
 백엔드 import용 장기기억 생성:

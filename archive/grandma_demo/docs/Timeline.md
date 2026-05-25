@@ -52,11 +52,9 @@ TalkTo 사후 Phase(Persona AI)의 AI 파트 개발 타임라인
 
 ## Stage 3: 프롬프팅 강화 ✅
 
-### 3-1. 시스템 프롬프트 후보 A/B/C 작성
+### 3-1. 시스템 프롬프트 작성
 
-- `prompts/system_prompt_A.py` — 프롬프트 후보 A
-- `prompts/system_prompt_B.py` — 프롬프트 후보 B
-- `prompts/system_prompt_C.py` — 프롬프트 후보 C
+- `prompts/system_prompt.py` — 현재 서버와 평가 코드가 사용하는 단일 시스템 프롬프트
 
 ### 3-2. 말투 평가 세트 구축
 
@@ -84,9 +82,9 @@ TalkTo 사후 Phase(Persona AI)의 AI 파트 개발 타임라인
 
 ### 4-3. 모델 비교 테스트
 
-- `evaluation/eval_run.py` — 선택 프롬프트별 기본모델+RAG / 파인튜닝모델+RAG / 초기 프로토타입 3-way 비교
+- `evaluation/eval_run.py` — 현재 MVP 모델+RAG / 초기 프로토타입 비교
 - `evaluation/results/` — 평가 실행 결과 자동 저장 폴더
-- 현재는 프롬프트 C를 기준으로 기본모델과 파인튜닝모델을 계속 비교
+- 현재는 단일 시스템 프롬프트와 기본 모델을 기준으로 평가
 
 ### 이 Stage가 끝나면:
 
@@ -173,16 +171,14 @@ TalkTo 사후 Phase(Persona AI)의 AI 파트 개발 타임라인
 
 ## Stage 8: 프롬프트 조정 ← 다음
 
-> 파일: `prompts/system_prompt_A.py`
+> 파일: `prompts/system_prompt.py`
 
 ### 8-1. eval 결과 기반 문제점 파악
 
-- `python -m evaluation.eval_run C --single`로 단발 질문 답변과 RAG 검색 결과 확인
-- `python -m evaluation.eval_run C --dialogue`로 실제 단기기억 저장/조회 흐름을 포함한 이어지는 대화 맥락 유지 확인
-- `python -m evaluation.eval_run C`로 두 평가를 한 번에 실행 가능
-- 기본 결과는 답변 중심으로 출력하고, RAG/평가포인트/단기기억 판정은 옵션으로 확인
-- 실행 결과는 `evaluation/results/`에 자동 저장
-- 현재 후보 프롬프트: C
+- `python -m evaluation.eval_run`으로 reproduction, memorial, deep 평가를 한 번에 실행 가능
+- `python -m evaluation.eval_run --set memorial`처럼 특정 세트만 실행 가능
+- 기본 결과는 답변 중심으로 출력하고, RAG/단기기억 판정은 옵션으로 확인
+- 실행 결과는 `evaluation/results/`에 하나의 파일로 자동 저장
 
 ### 8-2. 말투 자연스러움 개선
 
@@ -211,7 +207,7 @@ TalkTo 사후 Phase(Persona AI)의 AI 파트 개발 타임라인
 
 ### 8-6. eval 재실행 + 비교
 
-- 프롬프트/RAG 수정 후 `python -m evaluation.eval_run C`로 재평가
+- 프롬프트/RAG 수정 후 `python -m evaluation.eval_run`으로 재평가
 - 이전 결과와 비교해서 개선 여부 확인
 - 만족스러울 때까지 8-2 ~ 8-6 반복
 

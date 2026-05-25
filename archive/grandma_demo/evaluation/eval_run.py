@@ -9,7 +9,7 @@ assistant 발화는 reference(기대답변)로 사용된다.
 기대답변(reference)을 누적해 다음 턴 시뮬레이션에 사용한다.
 
 사용법:
-    python -m evaluation.eval_run [A|B|C] [--set reproduction|memorial|deep|all]
+    python -m evaluation.eval_run [--set reproduction|memorial|deep|all]
                                   [--show-rag] [--show-memory]
 """
 
@@ -23,9 +23,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from dotenv import dotenv_values, load_dotenv
 from openai import OpenAI
-from prompts.system_prompt_A import SYSTEM_PROMPT as PROMPT_A
-from prompts.system_prompt_B import SYSTEM_PROMPT as PROMPT_B
-from prompts.system_prompt_C import SYSTEM_PROMPT as PROMPT_C
+from prompts.system_prompt import SYSTEM_PROMPT
 from evaluation.eval_questions import EVAL_SETS, EVAL_SET_LABELS
 from core.memory.embeddings import search_memories
 from core.memory.extract import extract_and_save
@@ -45,12 +43,6 @@ PROTO_MODEL = (
     or PROTO_ENV_VALUES.get("OPENAI_MODEL")
     or "ft:gpt-4.1-mini-2025-04-14:picky::C0g3PIpn"
 )
-
-PROMPTS = {
-    "A": {"name": "프롬프트 A", "prompt": PROMPT_A},
-    "B": {"name": "프롬프트 B", "prompt": PROMPT_B},
-    "C": {"name": "프롬프트 C", "prompt": PROMPT_C},
-}
 
 RESULT_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -76,10 +68,10 @@ class EvalLogger:
         print(text)
         self.lines.append(text)
 
-    def save(self, prefix, prompt_key, set_name):
+    def save(self, prefix, set_name):
         os.makedirs(RESULT_DIR, exist_ok=True)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        path = os.path.join(RESULT_DIR, f"{prefix}_{set_name}_{prompt_key}_{timestamp}.md")
+        path = os.path.join(RESULT_DIR, f"{prefix}_{set_name}_{timestamp}.md")
         with open(path, "w", encoding="utf-8") as f:
             f.write("\n".join(self.lines) + "\n")
         return path
@@ -177,13 +169,16 @@ def parse_dialogue(dialogue):
     return pairs
 
 
-def write_eval_header(logger, set_name, prompt_key, prompt_info, show_rag, show_memory):
-    label = EVAL_SET_LABELS.get(set_name, set_name)
-    logger.write(f"# Eval Result - {label} - Prompt {prompt_key} ({prompt_info['name']})")
+def write_eval_header(logger, set_arg, show_rag, show_memory):
+    if set_arg == "all":
+        label = "전체 평가"
+    else:
+        label = EVAL_SET_LABELS.get(set_arg, set_arg)
+    logger.write(f"# Eval Result - {label}")
     logger.write("")
     logger.write(f"- 실행시각: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    logger.write(f"- 평가 세트: {label}")
-    logger.write(f"- MVP: {BASE_MODEL} + {prompt_info['name']} + RAG")
+    logger.write(f"- 평가 범위: {label}")
+    logger.write(f"- MVP: {BASE_MODEL} + system_prompt + RAG")
     logger.write(f"- Prototype: {PROTO_MODEL}")
     logger.write(f"- RAG 상세 출력: {'켜짐' if show_rag else '꺼짐'}")
     logger.write(f"- 단기기억 디버그 출력: {'켜짐' if show_memory else '꺼짐'}")
@@ -193,10 +188,16 @@ def write_eval_header(logger, set_name, prompt_key, prompt_info, show_rag, show_
     logger.write("=" * 60)
 
 
-def init_eval_memory_file(prompt_key, set_name, scenario_idx, label):
+def write_set_header(logger, set_name):
+    label = EVAL_SET_LABELS.get(set_name, set_name)
+    logger.write("")
+    logger.write(f"# {label}")
+
+
+def init_eval_memory_file(set_name, scenario_idx, label):
     path = os.path.join(
         tempfile.gettempdir(),
-        f"persona_eval_short_term_{prompt_key}_{set_name}_{scenario_idx}_{label}.json",
+        f"persona_eval_short_term_{set_name}_{scenario_idx}_{label}.json",
     )
     with open(path, "w", encoding="utf-8") as f:
         f.write("[]")
@@ -239,17 +240,13 @@ def append_history(history, user_message, assistant_message):
         history.append({"role": "assistant", "content": assistant_message})
 
 
-def run_eval(prompt_key, set_name, show_rag=False, show_memory=False):
+def run_eval_set(set_name, logger, main_client, proto_client, show_rag=False, show_memory=False):
     """단일 세트 평가 실행."""
     if set_name not in EVAL_SETS:
         raise ValueError(f"알 수 없는 세트: {set_name}. 사용 가능: {list(EVAL_SETS.keys())}")
 
-    prompt_info = PROMPTS[prompt_key]
     eval_set = EVAL_SETS[set_name]
-    main_client, proto_client = create_clients()
-    logger = EvalLogger()
-
-    write_eval_header(logger, set_name, prompt_key, prompt_info, show_rag, show_memory)
+    write_set_header(logger, set_name)
 
     for scenario_idx, scenario in enumerate(eval_set, 1):
         dialogue = scenario.get("dialogue")
@@ -262,8 +259,8 @@ def run_eval(prompt_key, set_name, show_rag=False, show_memory=False):
         # 모델별 history와 단기기억 파일 초기화
         base_history = []
         proto_history = []
-        base_memory_path = init_eval_memory_file(prompt_key, set_name, scenario_idx, "base")
-        proto_memory_path = init_eval_memory_file(prompt_key, set_name, scenario_idx, "proto")
+        base_memory_path = init_eval_memory_file(set_name, scenario_idx, "base")
+        proto_memory_path = init_eval_memory_file(set_name, scenario_idx, "proto")
 
         logger.write("")
         logger.write(f"## 시나리오 {scenario_idx}")
@@ -278,7 +275,7 @@ def run_eval(prompt_key, set_name, show_rag=False, show_memory=False):
             base_reply = generate(
                 main_client,
                 BASE_MODEL,
-                build_dialogue_prompt(prompt_info["prompt"], memories, base_short_term),
+                build_dialogue_prompt(SYSTEM_PROMPT, memories, base_short_term),
                 user_message,
                 history=base_history,
             )
@@ -324,40 +321,51 @@ def run_eval(prompt_key, set_name, show_rag=False, show_memory=False):
                 if proto_client:
                     logger.write(f"저장판정(Prototype): {proto_extract}")
 
-    logger.write("")
-    logger.write("=" * 60)
-    logger.write("완료!")
-    saved_path = logger.save("eval", prompt_key, set_name)
-    logger.write(f"저장: {saved_path}")
 
+def run_eval(set_arg="all", show_rag=False, show_memory=False):
+    """선택한 세트 또는 전체 세트를 한 파일로 평가 실행."""
+    if set_arg != "all" and set_arg not in EVAL_SETS:
+        raise ValueError(f"알 수 없는 세트: {set_arg}. 사용 가능: {list(EVAL_SETS.keys())} 또는 'all'")
 
-def run_all(prompt_key, show_rag=False, show_memory=False):
-    """세 세트(A/D/E) 모두 순차 실행."""
+    main_client, proto_client = create_clients()
+    logger = EvalLogger()
+
+    write_eval_header(logger, set_arg, show_rag, show_memory)
+
+    set_names = list(EVAL_SETS.keys()) if set_arg == "all" else [set_arg]
     print("=" * 60)
-    print(f"Eval suite 시작: 프롬프트 {prompt_key} ({PROMPTS[prompt_key]['name']})")
-    print(f"세트: {', '.join(EVAL_SET_LABELS.values())}")
+    print(f"Eval suite 시작: {', '.join(EVAL_SET_LABELS[name] for name in set_names)}")
     print("=" * 60)
     print()
 
-    for set_name in EVAL_SETS.keys():
-        run_eval(prompt_key, set_name, show_rag=show_rag, show_memory=show_memory)
+    for set_name in set_names:
+        run_eval_set(
+            set_name,
+            logger,
+            main_client,
+            proto_client,
+            show_rag=show_rag,
+            show_memory=show_memory,
+        )
         print()
         print("=" * 60)
         print(f"{EVAL_SET_LABELS[set_name]} 평가 완료.")
         print("=" * 60)
         print()
 
+    logger.write("")
+    logger.write("=" * 60)
+    logger.write("완료!")
+    saved_path = logger.save("eval", set_arg)
+    logger.write(f"저장: {saved_path}")
+
     print("Eval suite 완료.")
-    print("결과 파일은 evaluation/results/에 각 세트별로 저장됐습니다.")
+    print(f"결과 파일 저장: {saved_path}")
 
 
 def print_usage():
-    print("사용법: python -m evaluation.eval_run [A|B|C] [--set reproduction|memorial|deep|all]")
+    print("사용법: python -m evaluation.eval_run [--set reproduction|memorial|deep|all]")
     print("                                       [--show-rag] [--show-memory]")
-    print()
-    print("프롬프트:")
-    for key, value in PROMPTS.items():
-        print(f"  {key}: {value['name']}로 평가")
     print()
     print("세트:")
     for key, label in EVAL_SET_LABELS.items():
@@ -366,7 +374,7 @@ def print_usage():
 
 
 if __name__ == "__main__":
-    args = [arg for arg in sys.argv[1:] if not arg.startswith("--")]
+    args = sys.argv[1:]
     show_rag = "--show-rag" in sys.argv
     show_memory = "--show-memory" in sys.argv
 
@@ -377,20 +385,22 @@ if __name__ == "__main__":
             set_arg = sys.argv[i + 1]
             break
 
-    if len(args) < 1:
+    if "-h" in args or "--help" in args:
         print_usage()
         sys.exit(0)
 
-    selected_prompt = args[0].upper()
-    if selected_prompt not in PROMPTS:
-        print("A, B, C 중 선택하세요.")
+    allowed_options = {"--set", "--show-rag", "--show-memory", "-h", "--help"}
+    unknown_args = [
+        arg for arg in args
+        if arg not in allowed_options and arg != set_arg
+    ]
+    if unknown_args:
+        print(f"알 수 없는 인자: {unknown_args}")
+        print_usage()
         sys.exit(1)
 
-    if set_arg == "all":
-        run_all(selected_prompt, show_rag=show_rag, show_memory=show_memory)
-    elif set_arg in EVAL_SETS:
-        run_eval(selected_prompt, set_arg, show_rag=show_rag, show_memory=show_memory)
-    else:
-        print(f"알 수 없는 세트: {set_arg}")
-        print(f"사용 가능: {list(EVAL_SETS.keys())} 또는 'all'")
+    try:
+        run_eval(set_arg, show_rag=show_rag, show_memory=show_memory)
+    except ValueError as error:
+        print(error)
         sys.exit(1)

@@ -4,7 +4,7 @@ import json
 import re
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from prompts.system_prompt_B import SYSTEM_PROMPT
+from prompts.system_prompt import SYSTEM_PROMPT
 
 INPUT_PATH = "data/transcript.txt"
 OUTPUT_TRAIN = "finetune/train.jsonl"

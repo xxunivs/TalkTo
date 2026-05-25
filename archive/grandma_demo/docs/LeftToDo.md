@@ -35,12 +35,12 @@
 
 ### 3. 프롬프트 엔지니어링
 
-답변 품질 개선을 위해 `prompts/system_prompt_C.py`를 중심으로 프롬프트를 계속 조정한다.
+답변 품질 개선을 위해 `prompts/system_prompt.py`를 중심으로 프롬프트를 계속 조정한다.
 
 우선 백엔드 실연동과 별개로 AI repo의 JSON 기반 eval을 사용해서 단발 질문과 이어지는 대화 결과를 비교한다.
 
 ```bash
-python -m evaluation.eval_run C
+python -m evaluation.eval_run
 ```
 
 확인할 내용은 다음과 같다.
