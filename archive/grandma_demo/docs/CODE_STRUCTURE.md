@@ -1,285 +1,391 @@
 # PersonaAI 코드 구조
 
-이 문서는 PersonaAI 레포에서 각 폴더와 주요 파일이 어떤 역할을 하는지 쉽게 보기 위한 정리다.
+이 문서는 PersonaAI 레포의 폴더 구조와 각 파일의 역할을 설명한다.
+실제 코드와 데이터가 모여 있는 하위 구조만 정리한다.
 
 ## 전체 구조
 
 ```text
 PersonaAI/
-  server.py
-  render.yaml
-  requirements.txt
-  README.md
-
   core/
     response/
+      generator.py
     memory/
+      embeddings.py
+      importance.py
+      extract.py
+      short_term.py
     voice/
+      stt.py
+      tts.py
 
   prompts/
+    system_prompt.py
+
   evaluation/
+    eval_questions.py
+    eval_run.py
     results/
 
-  finetune/
-  backend_memory/
-  tests/
   data/
+    memories.json
+    memory_embeddings.json
+    short_term_memories.json
+    transcript.txt
+    interview.txt
+    persona_analysis.md
+    voice_raw/
+
+  backend_memory/
+    build_memory_import.py
+    memory_import.json
+    test_build_memory_import.py
+
+  finetune/
+    build_dataset.py
+    run_finetune.py
+    train.jsonl
+    val.jsonl
+
   docs/
+    CODE_STRUCTURE.md
 ```
-
-루트에는 서버 실행과 배포에 바로 필요한 파일만 남겼다. 실제 PersonaAI의 본체 로직은 `core/`에 있고, 프롬프트 실험은 `prompts/`, 평가 실행은 `evaluation/`, 파인튜닝 재현 자료는 `finetune/`, 백엔드 memory import 자료는 `backend_memory/`에 둔다.
-
-## 루트 파일
-
-### `server.py`
-
-백엔드가 호출하는 FastAPI 서버의 입구다.
-
-현재 제공하는 엔드포인트는 다음과 같다.
-
-- `GET /health`: Render와 백엔드가 서버 상태를 확인할 때 사용한다.
-- `POST /ai/chat`: 사용자 메시지와 기억을 받아 할머니 답변을 만든다.
-- `POST /ai/embed`: 백엔드가 기억 검색용 임베딩을 만들 때 사용한다.
-- `POST /ai/memory/extract`: 현재 대화에서 새 단기기억으로 저장할 만한 내용이 있는지 판단한다.
-- `POST /ai/stt`: 음성 파일을 텍스트로 바꾼다.
-- `POST /ai/tts`: 텍스트를 할머니 목소리 mp3로 바꾼다.
-
-`AI_SERVER_TOKEN`이 설정되어 있으면 `/ai/*` 요청에는 `X-AI-Server-Token` 헤더가 필요하다. `/health`는 배포 상태 확인용이라 토큰 없이 열어둔다.
-
-### `render.yaml`
-
-Render 배포 설정 파일이다.
-
-Render는 이 파일을 보고 Python 버전, build command, start command, 환경변수 목록을 잡는다. 그래서 `requirements.txt`와 함께 유지해야 한다.
-
-### `requirements.txt`
-
-로컬과 Render에서 같은 Python 패키지를 설치하기 위한 목록이다.
-
-로컬에서는 `pip install -r requirements.txt`, Render에서는 `render.yaml`의 build command가 같은 파일을 사용한다.
-
-### `README.md`
-
-새로 레포를 받은 사람이 서버 실행, 평가 실행, Render 배포 흐름을 빠르게 따라갈 수 있도록 적어둔 시작 문서다.
 
 ## `core/`
 
-PersonaAI의 실제 실행 로직이 들어있는 본체 폴더다. API 입구인 `server.py`는 루트에 남겨두고, 그 안에서 호출되는 핵심 기능을 `core/` 아래에 묶었다.
+서비스 런타임에서 실제로 호출되는 본체 로직이다.
+답변 생성, 기억 검색·추출, 음성 변환처럼 API 요청을 처리할 때 필요한 기능이 이 폴더 아래에 모여 있다.
 
-### `core/response/generator.py`
+### `core/response/`
 
-할머니 답변을 생성하는 중심 파일이다.
+할머니 답변을 생성하는 응답 레이어다.
 
-사용자 메시지, 이전 대화 `history`, 장기기억/단기기억 텍스트를 합쳐 OpenAI Chat 모델을 호출한다. 운영에서는 백엔드가 검색한 기억을 받아 쓰고, 로컬 테스트에서는 내부 JSON 기억에서 직접 검색할 수 있다.
+#### `core/response/generator.py`
 
-`OPENAI_CHAT_MODEL` 환경변수를 바꾸면 기본 모델과 파인튜닝 모델을 코드 수정 없이 교체할 수 있다.
+사용자 메시지, 대화 히스토리, 장기기억, 단기기억을 합쳐 OpenAI Chat 모델을 호출한다.
 
-### `core/memory/embeddings.py`
+주요 역할:
 
-로컬 JSON 기반 RAG 검색을 담당한다.
+- `prompts/system_prompt.py`의 단일 시스템 프롬프트를 불러온다.
+- `OPENAI_CHAT_MODEL` 환경변수로 사용할 Chat 모델을 결정한다.
+- 백엔드가 넘겨준 memory text가 있으면 그 기억을 우선 사용한다.
+- memory text가 없으면 로컬 JSON 기반 RAG를 fallback으로 사용한다.
+- `PERSONA_ENABLE_LOCAL_SHORT_TERM=true`일 때만 로컬 단기기억을 조회한다.
 
-`data/memories.json`의 장기기억과 `data/memory_embeddings.json`의 임베딩을 읽고, 사용자 질문과 가까운 기억을 찾는다. 현재는 임베딩 유사도에 키워드 boost를 더해서 가족, 건강, 요리처럼 명확한 질문에서 관련 기억이 더 잘 올라오게 한다.
+운영 Render 환경에서는 단기기억의 기준이 백엔드 DB이므로 `PERSONA_ENABLE_LOCAL_SHORT_TERM=false`로 둔다.
+
+### `core/memory/`
+
+장기기억 검색, 단기기억 후보 판단, 로컬 단기기억 저장을 담당한다.
+
+#### `core/memory/embeddings.py`
+
+로컬 JSON 기반 장기기억 RAG 검색기다.
+
+입력 데이터:
+
+- `data/memories.json`
+- `data/memory_embeddings.json`
+
+검색 방식:
+
+- 사용자 질문을 `text-embedding-3-small`로 임베딩한다.
+- 저장된 기억 임베딩과 cosine similarity를 계산한다.
+- 가족 이름, 요리, 추모, 건강, 성당 등 명확한 키워드는 boost rule로 보정한다.
+- 상위 기억을 `id`, `title`, `content`, `tags`, `score` 형태로 반환한다.
 
 운영에서는 백엔드 DB 검색이 기준이고, 이 파일은 AI 단독 테스트와 fallback 용도다.
 
-### `core/memory/importance.py`
+#### `core/memory/importance.py`
 
-대화 한 턴이 기억할 만큼 중요한지 판단한다.
+현재 대화 턴이 나중에 기억할 만한 정보인지 판단한다.
 
-현재 사용자 메시지와 할머니 답변뿐 아니라 최근 대화 `history`도 함께 보고, 중요도, 카테고리, 요약, 판단 이유를 JSON으로 받는다.
+입력:
 
-### `core/memory/extract.py`
+- 최근 대화 히스토리
+- 현재 사용자 메시지
+- 현재 assistant 답변
 
-`importance.py`의 판단 결과를 받아 실제 단기기억 후보를 만든다.
+출력:
 
-로컬 테스트에서는 중요도 6 이상이면 `short_term.py`를 통해 JSON 파일에 저장한다. 운영에서는 `/ai/memory/extract`가 후보만 반환하고, 실제 DB 저장은 백엔드가 맡는다.
+- `importance`: 1~10 중요도
+- `category`: 가족, 건강, 직장, 일상, 감정, 기타
+- `summary`: 저장할 한 줄 요약
+- `reason`: 판단 이유
 
-### `core/memory/short_term.py`
+중요도 판단은 `gpt-4.1-mini`를 사용하고, 응답은 JSON으로 파싱한다.
 
-로컬 단기기억 JSON 파일을 읽고 쓰는 파일이다.
+#### `core/memory/extract.py`
 
-`PERSONA_ENABLE_LOCAL_SHORT_TERM=true`일 때만 대화 생성 과정에서 로컬 단기기억을 자동 저장/조회한다. Render 운영 환경에서는 백엔드 DB를 기준으로 삼기 위해 꺼둔다.
+`importance.py`의 판단 결과를 받아 단기기억 저장 여부를 결정한다.
 
-### `core/voice/stt.py`
+로컬 테스트에서는 중요도 6 이상이면 `short_term.py`를 통해 JSON 파일에 저장한다.
+운영에서는 이 로직이 `/ai/memory/extract` 응답의 기준이 되고, 실제 DB 저장은 백엔드가 담당한다.
 
-OpenAI Whisper API로 음성 파일을 텍스트로 변환한다.
+#### `core/memory/short_term.py`
 
-백엔드는 음성 파일을 `/ai/stt`로 보내고, AI 서버는 변환된 텍스트를 반환한다.
+로컬 단기기억 JSON 파일을 읽고 쓰는 유틸리티다.
 
-### `core/voice/tts.py`
+주요 역할:
 
-ElevenLabs API로 텍스트를 할머니 목소리 mp3로 변환한다.
+- 단기기억 추가
+- 활성 단기기억 조회
+- 기억 recall count와 strength 갱신
+- `PERSONA_SHORT_TERM_PATH` 환경변수를 통한 평가용 임시 파일 분리
 
-백엔드는 `/ai/tts` 응답으로 받은 mp3 파일을 저장하고, 프론트가 접근할 수 있는 URL을 만든다.
+기본 저장 위치는 `data/short_term_memories.json`이다.
+
+### `core/voice/`
+
+음성 입출력 기능을 담당한다.
+
+#### `core/voice/stt.py`
+
+음성 파일을 텍스트로 변환한다.
+OpenAI 음성 인식 API를 사용하며, 백엔드의 음성 입력 흐름에서 호출된다.
+
+#### `core/voice/tts.py`
+
+텍스트 답변을 할머니 목소리 mp3로 변환한다.
+ElevenLabs API를 사용하며, 백엔드는 반환된 음성 파일을 저장해 프론트에서 재생할 수 있게 한다.
 
 ## `prompts/`
 
-할머니 페르소나 프롬프트를 관리하는 폴더다.
+운영 프롬프트를 관리하는 폴더다.
 
 ### `prompts/system_prompt.py`
 
-현재 서버와 평가 코드가 실제로 쓰는 단일 시스템 프롬프트다.
+현재 서버와 평가가 공통으로 사용하는 단일 시스템 프롬프트다.
 
-서버 응답 말투나 메모리 사용 정책을 바꾸고 싶으면 이 파일을 수정한다.
+포함 내용:
+
+- 신금자 할머니 기본 정보
+- 사용자 식별 정책
+- 가족 8명별 호칭과 관계 톤
+- 말투와 대화 흐름 원칙
+- 추모·사후 응답 기준
+- 장기기억·단기기억 활용 원칙
+- 금지 표현과 안전 가드레일
+
+프롬프트 품질을 바꾸려면 이 파일을 수정하고, `evaluation/`의 평가를 돌려 변경 전후를 비교한다.
 
 ## `evaluation/`
 
-현재 시스템 프롬프트와 모델 답변 품질을 평가하는 코드다.
+프롬프트와 모델 답변 품질을 비교 평가하는 코드다.
+운영 서버를 직접 띄우지 않고도 같은 프롬프트, 같은 로컬 RAG 기준으로 답변을 확인할 수 있다.
 
 ### `evaluation/eval_questions.py`
 
-평가 질문과 기대 답변 포인트가 들어 있다.
+평가 질문과 기대답변을 관리한다.
+모든 평가 항목은 user/assistant가 교대로 들어 있는 dialogue 배열이다.
 
-단발 질문 평가와 이어지는 대화 평가 시나리오를 모두 이 파일에서 관리한다.
+현재 평가 영역:
+
+- `reproduction`: A. 전사본 재현
+- `persona`: B. 페르소나 일관성
+- `user_tone`: C. 사용자별 톤
+- `memorial`: D. 추모/사후
+- `deep`: E. 깊어진 대화
+- `edge`: F. 엣지/안전
+
+총 35개 시나리오이며, 각 시나리오는 3~4턴 대화형 구조로 구성되어 있다.
 
 ### `evaluation/eval_run.py`
 
-프롬프트 평가의 메인 실행 파일이다.
+평가 실행기다.
 
-reproduction, memorial, deep 평가 세트를 한 파일에서 처리한다.
+주요 역할:
 
-같은 질문 또는 같은 대화 흐름에 대해 MVP 모델과 초기 프로토타입 모델 답변을 나란히 비교한다. 필요하면 `--show-rag`, `--show-memory` 옵션으로 검색된 기억과 단기기억 판정도 같이 볼 수 있다.
+- 선택한 평가 세트 또는 전체 세트를 순서대로 실행한다.
+- MVP 모델과 초기 프로토타입 모델 답변을 나란히 출력한다.
+- 현재 운영 프롬프트와 로컬 RAG 검색 결과를 사용한다.
+- 평가 중 단기기억은 운영 파일이 아니라 임시 JSON 파일에 저장한다.
+- 결과를 Markdown 파일로 `evaluation/results/`에 저장한다.
 
-### `evaluation/results/`
-
-평가 실행 결과가 자동 저장되는 폴더다.
-
-결과 파일을 남겨두면 프롬프트나 모델을 바꿨을 때 이전 결과와 비교하기 쉽다.
-
-## `finetune/`
-
-파인튜닝 재현에 필요한 스크립트와 데이터가 들어 있다.
-
-현재 운영 답변은 `OPENAI_CHAT_MODEL` 환경변수에 설정된 모델을 사용한다. 파인튜닝을 다시 실험하거나 재현해야 할 때만 이 폴더를 보면 된다.
-
-### `finetune/build_dataset.py`
-
-화자 구분된 전사본에서 파인튜닝용 JSONL 파일을 만든다.
-
-입력은 `data/transcript.txt`, 출력은 `finetune/train.jsonl`과 `finetune/val.jsonl`이다.
-
-### `finetune/run_finetune.py`
-
-OpenAI 파인튜닝 작업을 실행하는 스크립트다.
-
-학습 데이터 업로드, validation 데이터 업로드, fine-tuning job 생성까지 담당한다.
-
-### `finetune/train.jsonl`, `finetune/val.jsonl`
-
-파인튜닝 학습과 검증에 사용한 JSONL 파일이다.
-
-## `backend_memory/`
-
-백엔드 DB에 기존 장기기억을 넣기 위한 import 파일과 생성 스크립트가 들어 있다.
-
-서비스 런타임에서 계속 읽는 폴더는 아니고, 백엔드 DB를 새로 만들거나 기존 장기기억을 다시 import해야 할 때 사용한다.
-
-### `backend_memory/build_memory_import.py`
-
-AI 레포의 장기기억 JSON을 백엔드 import 형식으로 변환한다.
-
-입력은 `data/memories.json`, 출력은 `backend_memory/memory_import.json`이다.
-
-### `backend_memory/memory_import.json`
-
-백엔드가 기존 장기기억을 DB로 가져갈 때 쓰는 import 데이터다.
-
-이미 운영 DB에 import가 끝난 경우 매 요청마다 쓰이는 파일은 아니지만, 새 DB 세팅이나 재import가 필요할 때 기준 파일로 사용한다.
-
-## `tests/`
-
-테스트 코드가 들어 있다.
-
-### `backend_memory/test_build_memory_import.py`
-
-`backend_memory/build_memory_import.py`가 백엔드 import 형식에 맞게 변환하는지 확인한다.
-
-특히 가족 이름, 별칭, `relatedPeople` 추출이 의도대로 되는지 검사한다.
-
-## `data/`
-
-모델이 참조하거나 도구가 생성하는 데이터 파일이다.
-
-### `data/memories.json`
-
-AI 단독 테스트용 장기기억 원본이다.
-
-운영에서는 백엔드 DB가 기준이지만, 백엔드 DB가 완전히 붙기 전에는 이 파일로 RAG 품질을 테스트한다.
-
-### `data/memory_embeddings.json`
-
-`memories.json`의 각 기억에 대한 임베딩 캐시다.
-
-로컬 RAG 검색에서 매번 임베딩을 새로 만들지 않기 위해 저장해둔다.
-
-### `data/short_term_memories.json`
-
-로컬 테스트용 단기기억 저장 파일이다.
-
-운영 Render에서는 `PERSONA_ENABLE_LOCAL_SHORT_TERM=false`라서 이 파일을 기준으로 삼지 않는다.
-
-### `data/transcript.txt`, `data/persona_analysis.md`
-
-`data/transcript.txt`는 화자 구분이 끝난 최종 전사본이다. 파인튜닝 데이터 생성은 이 파일을 기준으로 한다.
-
-`data/persona_analysis.md`는 전사본을 바탕으로 말투, 성격, 관계 정보를 정리한 분석 자료다.
-
-### `data/voice_raw/`
-
-할머니 목소리 원본 파일이 들어 있다.
-
-STT 테스트나 음성 관련 실험에서 참조한다.
-
-## `docs/`
-
-프로젝트 설명과 백엔드 협의 문서를 모아둔 폴더다.
-
-### `docs/CODE_STRUCTURE.md`
-
-현재 보고 있는 코드 구조 설명 문서다.
-
-### `docs/Timeline.md`
-
-프로젝트가 어떤 순서로 발전했는지 기록한 개발 타임라인이다.
-
-### `docs/LeftToDo.md`
-
-아직 나중에 정리해야 할 임시 운영 사항을 적어둔 파일이다.
-
-### `docs/ai_backend_integration/ai_backend_integration_ver*.md`
-
-백엔드와 AI 서버 연동을 논의하면서 남긴 버전별 문서다.
-
-`ver1`, `ver2`, `ver3`는 논의 과정 기록이라 현재 코드와 일부 표현이 다를 수 있다. 최신 운영 기준은 `ver4`와 현재 코드 구조를 함께 보면 된다.
-
-## 자주 보는 실행 명령
-
-서버 실행:
-
-```bash
-uvicorn server:app --port 8000
-```
-
-평가 전체 실행:
+자주 쓰는 실행 예:
 
 ```bash
 python -m evaluation.eval_run
-```
-
-특정 세트만 평가:
-
-```bash
-python -m evaluation.eval_run --set memorial
-```
-
-RAG와 단기기억 디버그까지 같이 보기:
-
-```bash
+python -m evaluation.eval_run --set user_tone
 python -m evaluation.eval_run --show-rag --show-memory
 ```
 
-백엔드 import용 장기기억 생성:
+### `evaluation/results/`
 
-```bash
-python backend_memory/build_memory_import.py
+평가 결과 Markdown 파일이 저장되는 위치다.
+프롬프트 변경 전후 답변을 비교하거나, 특정 세트에서 회귀가 생겼는지 확인할 때 사용한다.
+
+## `data/`
+
+페르소나 원천 자료와 로컬 테스트용 기억 데이터가 들어 있다.
+운영 DB의 기준 데이터와 AI 단독 테스트 기준 데이터를 맞추기 위해 유지한다.
+
+### `data/memories.json`
+
+로컬 RAG용 장기기억 원본이다.
+가족 정보, 생애 정보, 요리법, 추억, 말투, 추모 정책에 필요한 기억들이 구조화되어 있다.
+
+운영에서는 백엔드 DB가 장기기억의 기준이지만, 평가와 AI 단독 테스트에서는 이 파일을 사용한다.
+
+### `data/memory_embeddings.json`
+
+`memories.json` 각 항목의 임베딩 캐시다.
+로컬 RAG 검색에서 매번 모든 장기기억을 다시 임베딩하지 않기 위해 사용한다.
+
+`data/memories.json`을 크게 바꾸면 임베딩도 다시 생성해야 한다.
+
+### `data/short_term_memories.json`
+
+로컬 단기기억 테스트용 JSON 파일이다.
+운영 Render에서는 사용하지 않는 것이 원칙이다.
+
+### `data/transcript.txt`
+
+화자 구분이 끝난 전사본이다.
+파인튜닝 데이터 생성과 말투 분석의 원천 자료로 사용한다.
+
+### `data/interview.txt`
+
+가족 인터뷰 정리 자료다.
+전사본만으로 부족한 가족 관계, 생애 정보, 사후 정보 보강에 사용한다.
+
+### `data/persona_analysis.md`
+
+전사본, 인터뷰, 가족 확인 정보를 합쳐 정리한 페르소나 분석 문서다.
+
+주요 내용:
+
+- 서비스 정체성과 페르소나 메타 원칙
+- 신금자 할머니 기본 정보
+- 가족 관계와 사용자별 호칭
+- 말투, 언어 습관, 감정 표현
+- 음식과 요리 기억
+- 추모·사후 응답 기준
+- 민감정보 처리 기준
+
+프롬프트와 평가 질문을 고칠 때 가장 중요한 참고 문서다.
+
+### `data/voice_raw/`
+
+할머니 목소리 원본 파일이 들어 있는 폴더다.
+STT 테스트, TTS 목소리 기준 확인, 음성 관련 실험에서 참조한다.
+
+## `backend_memory/`
+
+AI 레포의 장기기억을 백엔드 DB import 형식으로 변환하기 위한 폴더다.
+서비스 런타임에서 매 요청마다 읽는 폴더는 아니고, DB 초기 세팅이나 재import가 필요할 때 사용한다.
+
+### `backend_memory/build_memory_import.py`
+
+`data/memories.json`을 백엔드 import 형식으로 변환한다.
+
+변환 내용:
+
+- `title`
+- `memoryType`
+- `relatedPeople`
+- `relatedPeriod`
+- `bodyMarkdown`
+- `tags`
+
+`relatedPeople`은 기억의 제목과 본문에 등장하는 가족 이름·별칭을 기준으로 추출한다.
+
+### `backend_memory/memory_import.json`
+
+백엔드가 장기기억을 DB로 가져갈 때 사용하는 import 결과물이다.
+새 DB를 세팅하거나 장기기억을 다시 넣어야 할 때 기준 파일로 사용한다.
+
+### `backend_memory/test_build_memory_import.py`
+
+memory import 변환 결과가 기대 형식에 맞는지 확인하는 테스트다.
+특히 가족 이름과 별칭이 `relatedPeople`에 제대로 들어가는지 검증한다.
+
+## `finetune/`
+
+파인튜닝 재현 자료가 들어 있는 폴더다.
+현재 운영 답변은 기본 모델과 시스템 프롬프트, RAG를 중심으로 사용하지만, 과거 파인튜닝 실험을 재현할 수 있도록 자료를 남겨 둔다.
+
+### `finetune/build_dataset.py`
+
+`data/transcript.txt`를 기반으로 파인튜닝용 JSONL 데이터를 만든다.
+
+출력:
+
+- `finetune/train.jsonl`
+- `finetune/val.jsonl`
+
+### `finetune/run_finetune.py`
+
+OpenAI 파인튜닝 작업을 실행한다.
+
+주요 단계:
+
+- 학습 파일 업로드
+- 검증 파일 업로드
+- fine-tuning job 생성
+
+### `finetune/train.jsonl`, `finetune/val.jsonl`
+
+파인튜닝 학습과 검증에 사용한 JSONL 데이터다.
+모델 실험을 다시 해야 할 때 재현 기준으로 사용한다.
+
+## `docs/`
+
+레포 구조 설명 문서만 남긴다.
+
+### `docs/CODE_STRUCTURE.md`
+
+현재 보고 있는 문서다.
+코드와 데이터의 역할을 폴더 중심으로 설명한다.
+
+## 주요 흐름
+
+### 답변 생성 흐름
+
+```text
+사용자 메시지
+  -> 백엔드가 검색한 memories 또는 로컬 RAG fallback
+  -> prompts/system_prompt.py
+  -> core/response/generator.py
+  -> OpenAI Chat 모델
+  -> 할머니 답변
 ```
+
+운영에서는 백엔드가 장기기억과 단기기억을 검색해 AI 서버에 넘긴다.
+백엔드가 memories를 넘기지 않는 로컬 테스트 상황에서는 `core/memory/embeddings.py`가 `data/memories.json` 기반으로 검색한다.
+
+### 단기기억 후보 추출 흐름
+
+```text
+사용자 메시지 + assistant 답변 + 최근 history
+  -> core/memory/importance.py
+  -> core/memory/extract.py
+  -> 저장 여부, 중요도, 카테고리, 요약 반환
+```
+
+운영에서는 백엔드가 이 결과를 받아 DB에 저장한다.
+로컬 테스트에서만 `data/short_term_memories.json`에 직접 저장할 수 있다.
+
+### 평가 흐름
+
+```text
+evaluation/eval_questions.py
+  -> evaluation/eval_run.py
+  -> prompts/system_prompt.py
+  -> data/memories.json + data/memory_embeddings.json
+  -> evaluation/results/*.md
+```
+
+평가는 실제 운영 프롬프트를 기준으로 진행한다.
+프롬프트를 바꾼 뒤에는 전체 평가 또는 관련 세트를 실행해서 답변 품질과 가드레일을 확인한다.
+
+### 백엔드 장기기억 import 흐름
+
+```text
+data/memories.json
+  -> backend_memory/build_memory_import.py
+  -> backend_memory/memory_import.json
+  -> 백엔드 DB import
+```
+
+AI 레포의 로컬 RAG 원본과 백엔드 DB의 장기기억 원천을 맞추기 위한 흐름이다.

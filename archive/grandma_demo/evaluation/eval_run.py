@@ -1,7 +1,7 @@
 """
 페르소나 평가 실행기.
 
-세 가지 평가 영역(A/D/E)을 dialogue 핑퐁 형식으로 평가한다.
+여섯 가지 평가 영역(A~F)을 dialogue 핑퐁 형식으로 평가한다.
 각 항목은 user/assistant 교대로 구성된 dialogue 배열을 갖고,
 assistant 발화는 reference(기대답변)로 사용된다.
 
@@ -9,7 +9,7 @@ assistant 발화는 reference(기대답변)로 사용된다.
 기대답변(reference)을 누적해 다음 턴 시뮬레이션에 사용한다.
 
 사용법:
-    python -m evaluation.eval_run [--set reproduction|memorial|deep|all]
+    python -m evaluation.eval_run [--set reproduction|persona|user_tone|memorial|deep|edge|all]
                                   [--show-rag] [--show-memory]
 """
 
@@ -177,11 +177,8 @@ def write_eval_header(logger, set_arg, show_rag, show_memory):
     logger.write(f"# Eval Result - {label}")
     logger.write("")
     logger.write(f"- 실행시각: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    logger.write(f"- 평가 범위: {label}")
     logger.write(f"- MVP: {BASE_MODEL} + system_prompt + RAG")
     logger.write(f"- Prototype: {PROTO_MODEL}")
-    logger.write(f"- RAG 상세 출력: {'켜짐' if show_rag else '꺼짐'}")
-    logger.write(f"- 단기기억 디버그 출력: {'켜짐' if show_memory else '꺼짐'}")
     if not PROTO_KEY:
         logger.write("- Prototype 결과: PROTO_OPENAI_API_KEY 없음 - 생략")
     logger.write("")
@@ -305,18 +302,21 @@ def run_eval_set(set_name, logger, main_client, proto_client, show_rag=False, sh
             # 출력 — 사용자/기대답변 블록과 MVP/Prototype 블록을 구분선으로 분리
             logger.write("")
             logger.write(f"### 턴 {turn_idx}")
-            logger.write(f"사용자:     {user_message}")
-            logger.write(f"기대답변:   {expected if expected is not None else '(없음)'}")
+            logger.write(f"사용자: {user_message}  ")
+            logger.write(f"기대답변: {expected if expected is not None else '(없음)'}")
             if show_rag:
                 print_rag(memories, logger)
+                logger.write("")
             if show_memory:
                 logger.write(f"단기기억(MVP):       {format_short_term(base_short_term)}")
                 if proto_client:
                     logger.write(f"단기기억(Prototype): {format_short_term(proto_short_term)}")
+                logger.write("")
             logger.write("-" * 40)
-            logger.write(f"MVP:        {base_reply}")
-            logger.write(f"Prototype:  {proto_reply}")
+            logger.write(f"MVP: {base_reply}  ")
+            logger.write(f"Prototype: {proto_reply}")
             if show_memory:
+                logger.write("")
                 logger.write(f"저장판정(MVP):       {base_extract}")
                 if proto_client:
                     logger.write(f"저장판정(Prototype): {proto_extract}")
@@ -364,13 +364,13 @@ def run_eval(set_arg="all", show_rag=False, show_memory=False):
 
 
 def print_usage():
-    print("사용법: python -m evaluation.eval_run [--set reproduction|memorial|deep|all]")
+    print("사용법: python -m evaluation.eval_run [--set reproduction|persona|user_tone|memorial|deep|edge|all]")
     print("                                       [--show-rag] [--show-memory]")
     print()
     print("세트:")
     for key, label in EVAL_SET_LABELS.items():
         print(f"  {key}: {label}")
-    print(f"  all: 세 세트 모두 실행 (기본값)")
+    print(f"  all: 모든 세트 실행 (기본값)")
 
 
 if __name__ == "__main__":
