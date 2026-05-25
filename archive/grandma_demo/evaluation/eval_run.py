@@ -40,7 +40,6 @@ MY_KEY = os.getenv("OPENAI_API_KEY")
 PROTO_KEY = os.getenv("PROTO_OPENAI_API_KEY") or PROTO_ENV_VALUES.get("OPENAI_API_KEY")
 
 BASE_MODEL = "gpt-4.1-mini"
-FINETUNED_MODEL = "ft:gpt-4.1-mini-2025-04-14:talkto::DeJqGFij"
 PROTO_MODEL = (
     os.getenv("PROTO_OPENAI_MODEL")
     or PROTO_ENV_VALUES.get("OPENAI_MODEL")
@@ -184,13 +183,12 @@ def write_eval_header(logger, set_name, prompt_key, prompt_info, show_rag, show_
     logger.write("")
     logger.write(f"- 실행시각: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     logger.write(f"- 평가 세트: {label}")
-    logger.write(f"- 기본모델: {BASE_MODEL} + {prompt_info['name']} + RAG")
-    logger.write(f"- 파인튜닝모델: {FINETUNED_MODEL} + {prompt_info['name']} + RAG")
-    logger.write(f"- 초기 프로토타입: {PROTO_MODEL}")
+    logger.write(f"- MVP: {BASE_MODEL} + {prompt_info['name']} + RAG")
+    logger.write(f"- Prototype: {PROTO_MODEL}")
     logger.write(f"- RAG 상세 출력: {'켜짐' if show_rag else '꺼짐'}")
     logger.write(f"- 단기기억 디버그 출력: {'켜짐' if show_memory else '꺼짐'}")
     if not PROTO_KEY:
-        logger.write("- 프로토타입 결과: PROTO_OPENAI_API_KEY 없음 - 생략")
+        logger.write("- Prototype 결과: PROTO_OPENAI_API_KEY 없음 - 생략")
     logger.write("")
     logger.write("=" * 60)
 
@@ -263,10 +261,8 @@ def run_eval(prompt_key, set_name, show_rag=False, show_memory=False):
 
         # 모델별 history와 단기기억 파일 초기화
         base_history = []
-        finetuned_history = []
         proto_history = []
         base_memory_path = init_eval_memory_file(prompt_key, set_name, scenario_idx, "base")
-        finetuned_memory_path = init_eval_memory_file(prompt_key, set_name, scenario_idx, "finetuned")
         proto_memory_path = init_eval_memory_file(prompt_key, set_name, scenario_idx, "proto")
 
         logger.write("")
@@ -276,7 +272,6 @@ def run_eval(prompt_key, set_name, show_rag=False, show_memory=False):
             # RAG와 단기기억 조회
             memories = search_memories(user_message, top_k=5)
             base_short_term = get_eval_short_term_memories(base_memory_path)
-            finetuned_short_term = get_eval_short_term_memories(finetuned_memory_path)
             proto_short_term = get_eval_short_term_memories(proto_memory_path)
 
             # 모델별 답변 생성
@@ -286,13 +281,6 @@ def run_eval(prompt_key, set_name, show_rag=False, show_memory=False):
                 build_dialogue_prompt(prompt_info["prompt"], memories, base_short_term),
                 user_message,
                 history=base_history,
-            )
-            finetuned_reply = generate(
-                main_client,
-                FINETUNED_MODEL,
-                build_dialogue_prompt(prompt_info["prompt"], memories, finetuned_short_term),
-                user_message,
-                history=finetuned_history,
             )
             if proto_client:
                 proto_reply = generate(
@@ -307,9 +295,6 @@ def run_eval(prompt_key, set_name, show_rag=False, show_memory=False):
 
             # 단기기억 추출은 기대답변 기준 (매 턴 독립 평가)
             base_extract = extract_eval_memory(base_memory_path, user_message, expected or "")
-            finetuned_extract = extract_eval_memory(
-                finetuned_memory_path, user_message, expected or ""
-            )
             if proto_client:
                 proto_extract = extract_eval_memory(proto_memory_path, user_message, expected or "")
             else:
@@ -317,11 +302,10 @@ def run_eval(prompt_key, set_name, show_rag=False, show_memory=False):
 
             # history에는 기대답변(reference)을 누적 — 매 턴 독립 평가용
             append_history(base_history, user_message, expected)
-            append_history(finetuned_history, user_message, expected)
             if proto_client:
                 append_history(proto_history, user_message, expected)
 
-            # 출력
+            # 출력 — 사용자/기대답변 블록과 MVP/Prototype 블록을 구분선으로 분리
             logger.write("")
             logger.write(f"### 턴 {turn_idx}")
             logger.write(f"사용자:     {user_message}")
@@ -329,18 +313,16 @@ def run_eval(prompt_key, set_name, show_rag=False, show_memory=False):
             if show_rag:
                 print_rag(memories, logger)
             if show_memory:
-                logger.write(f"단기기억(기본):       {format_short_term(base_short_term)}")
-                logger.write(f"단기기억(파인튜닝):   {format_short_term(finetuned_short_term)}")
+                logger.write(f"단기기억(MVP):       {format_short_term(base_short_term)}")
                 if proto_client:
-                    logger.write(f"단기기억(프로토타입): {format_short_term(proto_short_term)}")
-            logger.write(f"기본모델:   {base_reply}")
-            logger.write(f"파인튜닝:   {finetuned_reply}")
-            logger.write(f"프로토타입: {proto_reply}")
+                    logger.write(f"단기기억(Prototype): {format_short_term(proto_short_term)}")
+            logger.write("-" * 40)
+            logger.write(f"MVP:        {base_reply}")
+            logger.write(f"Prototype:  {proto_reply}")
             if show_memory:
-                logger.write(f"저장판정(기본):       {base_extract}")
-                logger.write(f"저장판정(파인튜닝):   {finetuned_extract}")
+                logger.write(f"저장판정(MVP):       {base_extract}")
                 if proto_client:
-                    logger.write(f"저장판정(프로토타입): {proto_extract}")
+                    logger.write(f"저장판정(Prototype): {proto_extract}")
 
     logger.write("")
     logger.write("=" * 60)
