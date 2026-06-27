@@ -1,44 +1,43 @@
 # TalkTo APP AI
 
-`TalkTo_APP_AI` is the integrated AI service and worker foundation for the TalkTo app.
+TalkTo 앱에서 사용하는 통합 AI 서비스/worker 저장소입니다.
 
-## System boundary
-
-The default request flow is:
+기본 호출 흐름은 다음과 같습니다.
 
 ```text
-TalkTo App -> TalkTo Backend -> TalkTo APP AI
-                              -> Backend persistence
-                              -> Archive / Memories / Voice Persona
+TalkTo App → TalkTo Backend → TalkTo APP AI
+                           → Backend DB 저장
+                           → Archive / Memories / Voice Persona
 ```
 
-This service processes inputs supplied by the backend and returns validated AI result JSON. It is intended to support recording analysis, Persona responses, memory/RAG context handling, STT, TTS, and Voice Persona workflows.
+## 역할
 
-This service does **not** own:
+- BE가 전달한 입력을 AI로 처리
+- 녹음 분석, Persona 응답, STT/TTS 기능 제공
+- BE 저장 구조에 맞는 JSON 반환
+- OpenAI, ElevenLabs 등 provider 연동
 
-- end-user authentication or authorization;
-- database reads or writes;
-- consent, payment, or entitlement decisions;
-- permanent storage of original recordings;
-- direct calls from the TalkTo App.
+담당하지 않는 범위:
 
-The backend remains responsible for access control, storage, job orchestration, retrieval, and persistence. Temporary files created during processing must be removed after each request.
+- 사용자 인증과 권한 확인
+- DB 읽기/쓰기
+- 결제, 동의, entitlement 판단
+- 녹음 원본 영구 저장
+- App의 직접 호출
 
-## Current scope
+## 현재 구현 상태
 
-This initial repository contains only:
+- FastAPI 기본 구조
+- 중앙 환경변수 설정
+- OpenAI/ElevenLabs provider interface
+- 요청/응답 schema
+- 내부 `AI_SERVER_TOKEN` 검증 기반
+- `/health`, `/ready`
+- 최소 import 및 endpoint 테스트
 
-- FastAPI application wiring;
-- central environment configuration;
-- OpenAI and ElevenLabs provider interfaces;
-- request and response schema foundations;
-- `/health` and `/ready` endpoints;
-- placeholder feature endpoints that return HTTP 501;
-- import, configuration, health, readiness, and schema tests.
+실제 OpenAI/ElevenLabs 호출과 녹음 분석, Persona, STT/TTS 기능은 아직 구현하지 않았습니다. 기능 endpoint는 HTTP 501을 반환합니다.
 
-No OpenAI or ElevenLabs call is implemented. No recording analysis, Persona response, STT, TTS, embedding, or memory extraction is performed yet.
-
-## Local setup
+## 실행
 
 ```bash
 python3.11 -m venv .venv
@@ -48,16 +47,16 @@ cp .env.example .env
 uvicorn app.main:app --reload --port 8000
 ```
 
-API documentation is available at `http://localhost:8000/docs` while the service is running.
+API 문서: `http://localhost:8000/docs`
 
-## Endpoints
+## Endpoint
 
-Implemented:
+구현됨:
 
 - `GET /health`
 - `GET /ready`
 
-Placeholders returning HTTP 501:
+Placeholder:
 
 - `POST /v1/persona/responses`
 - `POST /v1/persona/memory-candidates`
@@ -68,46 +67,29 @@ Placeholders returning HTTP 501:
 - `POST /v1/voice/transcriptions`
 - `POST /v1/voice/speech`
 
-When `AI_SERVER_TOKEN` is configured, feature endpoints require the same value in the `X-AI-Server-Token` header. Health and readiness endpoints remain available without that header.
+## 환경변수
 
-## Logging and sensitive data
+필요한 값은 `.env.example`을 참고합니다. Chat, Analysis, STT, Embedding 모델은 용도별 환경변수로 분리합니다.
 
-Logs must contain operational metadata only, such as request ID, job ID, recording ID, stage, status, latency, provider, and model name.
+현재 BE pgvector 계약에 맞춰 `OPENAI_EMBEDDING_DIMENSIONS=1536`을 기본값으로 사용합니다.
 
-Never log:
+## 로깅 원칙
 
-- raw user messages or Persona responses;
-- transcripts or memory text;
-- uploaded audio or derived voice data;
-- health, family, financial, memorial, or other sensitive content;
-- signed URLs, authorization headers, API keys, or internal tokens;
-- raw provider request or response bodies.
+로그에는 job ID, recording ID, 처리 단계, 상태, 지연시간 같은 운영 메타데이터만 기록합니다.
 
-Errors exposed to callers must use stable codes and safe messages. Provider errors must be sanitized before logging or returning them.
+다음 데이터는 로그에 남기지 않습니다.
 
-## Configuration
+- 사용자 원문과 Persona 응답
+- 전사문과 기억 내용
+- 음성 데이터
+- 민감정보
+- signed URL, 인증 헤더, API key, 내부 token
+- provider 요청/응답 원문
 
-Configuration is loaded centrally from environment variables and an optional local `.env` file. Secrets are represented with Pydantic `SecretStr` values so accidental object rendering does not expose them.
+## 테스트
 
-The initial model settings are separated by responsibility:
-
-- `OPENAI_CHAT_MODEL`: Persona response generation
-- `OPENAI_ANALYSIS_MODEL`: extraction, classification, summarization, and structured analysis
-- `OPENAI_STT_MODEL`: speech transcription
-- `OPENAI_EMBEDDING_MODEL`: search embeddings
-
-`OPENAI_EMBEDDING_DIMENSIONS` defaults to `1536` to match the current backend pgvector contract. Changing it requires backend schema and re-indexing coordination.
-
-## Tests
-
-Standard-library test command, requiring no provider credentials:
+실제 provider 호출 없이 실행됩니다.
 
 ```bash
 python -m unittest discover -s tests -v
-```
-
-After installing development dependencies, pytest can also run the suite:
-
-```bash
-pytest
 ```
