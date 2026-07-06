@@ -10,8 +10,6 @@
 
 현재 `POST /v1/analysis/transcriptions` 요청 모델에는 jobId, recordingId 등 식별자만 있고 오디오가 들어올 자리가 없다. AI 서버는 stateless이고 백엔드 스토리지에 직접 접근하지 않는 원칙이므로, 백엔드가 스토리지의 presigned GET URL을 요청에 담아 전달해주면 된다 (storage의 getSignedUrl 재사용이면 될 것 같음).
 
-**호출 스펙** — `POST {AI_SERVER_URL}/v1/analysis/transcriptions`, 헤더 `x-ai-server-token: {AI_SERVER_TOKEN}` (기존 방식 동일). 요청 본문:
-
 ```json
 {
   "jobId": "8f3c...-uuid",
@@ -29,28 +27,9 @@
 - `audioMimeType`: 선택. 없으면 URL 확장자로 판별한다.
 - `mode`: `"full"`(기본) 또는 `"preview"`. 무료 샘플 분석(기능명세 PRV-001·002)용 — preview면 앞부분 일부 전사만 반환한다. preview 산출물의 분리 저장(preview_only)과 무료 한도·본분석 게이트 체크는 백엔드 담당.
 - `glossary`: family glossary 용어들. 전사 후 이름·지명 보정에 사용한다. glossary 미입력 사용자는 빈 배열로 보내면 된다(보정 스킵하고 진행).
+- 응답은 기존 TranscriptionResponse(segments/provider/model) 유지, 세그먼트별 `confidence`가 채워져서 온다. 상세 호출 스펙(주소·헤더·응답 예시)은 서버 배포 시 함께 전달한다.
 
-**응답 (200)** — 기존 TranscriptionResponse 형태 그대로, `confidence`가 채워져서 온다:
-
-```json
-{
-  "segments": [
-    {
-      "id": null,
-      "segmentIndex": 0,
-      "startMs": 239,
-      "endMs": 1779,
-      "speakerLabel": "SPK_0",
-      "transcriptText": "미끄러워 가지고.",
-      "confidence": 0.84
-    }
-  ],
-  "provider": "elevenlabs",
-  "model": "scribe_v1"
-}
-```
-
-**실패 응답 (422)** — 본문은 `{ "error": { "code", "message" } }` 형태:
+실패 처리 — AI가 422와 아래 사유 코드를 반환한다:
 
 | 코드 | 의미 | 백엔드 처리 |
 |---|---|---|
