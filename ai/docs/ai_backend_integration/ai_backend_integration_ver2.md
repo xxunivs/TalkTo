@@ -1,7 +1,5 @@
 # AI <-> 백엔드 연동 요청 ver2
 
----
-
 ## 1. [요청] 용어집 전달에 pronunciationHint 포함
 
 `buildGlossaryTerms`가 `FamilyGlossaryTerm.term`만 추출하고 **`pronunciationHint`를 버리고 있다**. 발음 힌트("찬민"의 "찬미니")는 STT가 잘못 받아쓴 이름을 교정하는 핵심 재료라, 있으면 함께 보내주면 된다 — 별도 구조 없이 glossary 배열에 term과 나란히 넣어주면 AI가 그대로 쓴다.
