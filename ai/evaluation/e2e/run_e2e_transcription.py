@@ -14,6 +14,8 @@ Options:
     --server URL       AI server base URL (default: http://localhost:8400)
     --file-port N      port for the local audio file server (default: 8401)
     --only NAMES       comma-separated audio stems to run (default: all)
+    --glossary PATH    keyword file (one per line) sent as glossary — enables
+                       the correction pass (e.g. evaluation/bakeoff/gold/keywords.txt)
     --out PATH         output directory (default: evaluation/e2e/results)
 
 Requires the AI server to be running (uvicorn app.main:app). Results contain
@@ -53,6 +55,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--server", type=str, default="http://localhost:8400")
     parser.add_argument("--file-port", type=int, default=8401)
     parser.add_argument("--only", type=str, default=None)
+    parser.add_argument("--glossary", type=Path, default=None)
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT)
     return parser.parse_args()
 
@@ -85,7 +88,11 @@ def start_file_server(directory: Path, port: int) -> ThreadingHTTPServer:
 
 
 def transcribe(
-    client: httpx.Client, server: str, audio_url: str, index: int
+    client: httpx.Client,
+    server: str,
+    audio_url: str,
+    index: int,
+    glossary: list[str],
 ) -> tuple[int, dict, float]:
     body = {
         "jobId": f"00000000-0000-0000-0000-{index:012d}",
@@ -95,7 +102,7 @@ def transcribe(
         "mode": "full",
         "language": "ko",
         "speakerDiarization": True,
-        "glossary": [],
+        "glossary": glossary,
     }
     started = time.monotonic()
     response = client.post(f"{server}/v1/analysis/transcriptions", json=body)
@@ -109,6 +116,14 @@ def main() -> int:
     env = dotenv_values(REPO_ROOT / ".env")
     token = (env.get("AI_SERVER_TOKEN") or "").strip()
     headers = {"x-ai-server-token": token} if token else {}
+
+    glossary: list[str] = []
+    if args.glossary and args.glossary.exists():
+        glossary = [
+            line.strip()
+            for line in args.glossary.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
 
     audio_files = sorted(args.audio_dir.glob("*.wav"), key=natural_key)
     if args.only:
@@ -131,7 +146,9 @@ def main() -> int:
                     f"{urllib.parse.quote(audio_path.name)}"
                 )
                 print(f"[{audio_path.stem}] 전사 요청...", flush=True)
-                status, body, latency = transcribe(client, args.server, url, index)
+                status, body, latency = transcribe(
+                    client, args.server, url, index, glossary
+                )
                 if status != 200:
                     print(
                         f"[{audio_path.stem}] 실패 {status}: {json.dumps(body, ensure_ascii=False)[:200]}",
@@ -154,6 +171,8 @@ def main() -> int:
                     "status": status,
                     "latency": latency,
                     "segments": len(segments),
+                    "corrections": sum(1 for s in segments if s.get("correctedText")),
+                    "needsReview": sum(1 for s in segments if s.get("needsReview")),
                     "speakers": len(stats),
                     "durationMs": max(s["endMs"] for s in segments),
                     "meanConfidence": (
@@ -171,7 +190,8 @@ def main() -> int:
                 rows.append(row)
                 print(
                     f"[{audio_path.stem}] {latency}s, {row['segments']} seg, "
-                    f"화자 {row['speakers']}, CER {row['cer']}"
+                    f"화자 {row['speakers']}, 교정 {row['corrections']}, "
+                    f"CER {row['cer']}"
                     f"{' (채점 제외)' if row['cerExcluded'] else ''}",
                     flush=True,
                 )
@@ -190,12 +210,15 @@ def write_summary(out_dir: Path, rows: list[dict]) -> None:
         "",
         f"실행: {time.strftime('%Y-%m-%d %H:%M')}",
         "",
-        "| 파일 | 상태 | 처리(s) | 길이(분) | 세그먼트 | 화자 | 평균 confidence | CER |",
-        "|---|---|---|---|---|---|---|---|",
+        "| 파일 | 상태 | 처리(s) | 길이(분) | 세그먼트 | 화자 | 교정 | 리뷰 | 평균 confidence | CER |",
+        "|---|---|---|---|---|---|---|---|---|---|",
     ]
     for row in rows:
         if row["status"] != 200:
-            lines.append(f"| {row['stem']} | ❌ {row['status']} | {row['latency']} | - | - | - | - | - |")
+            lines.append(
+                f"| {row['stem']} | ❌ {row['status']} | {row['latency']} "
+                "| - | - | - | - | - | - | - |"
+            )
             continue
         duration_min = round(row["durationMs"] / 60_000, 1)
         cer_cell = "-" if row["cer"] is None else f"{row['cer']:.4f}"
@@ -203,7 +226,9 @@ def write_summary(out_dir: Path, rows: list[dict]) -> None:
             cer_cell += " (제외: 골드 후반부 누락)"
         lines.append(
             f"| {row['stem']} | 200 | {row['latency']} | {duration_min} "
-            f"| {row['segments']} | {row['speakers']} | {row['meanConfidence']} | {cer_cell} |"
+            f"| {row['segments']} | {row['speakers']} "
+            f"| {row.get('corrections', '-')} | {row.get('needsReview', '-')} "
+            f"| {row['meanConfidence']} | {cer_cell} |"
         )
 
     scored = [
