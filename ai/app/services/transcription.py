@@ -4,6 +4,7 @@ from app.providers.stt.interface import STTProvider
 from app.schemas.transcript import TranscriptionRequest, TranscriptionResponse
 from app.services.audio import download_audio
 from app.services.correction import correct_segments
+from app.services.glossary import build_glossary
 
 
 def transcribe_recording(
@@ -44,8 +45,10 @@ def transcribe_recording(
             if segment.start_ms < settings.preview_window_ms
         ]
 
+    derived = build_glossary(request.subject_context, request.intake_context)
+    merged_glossary = list(dict.fromkeys([*request.glossary, *derived]))
     segments = correct_segments(
-        segments, glossary=request.glossary, settings=settings
+        segments, glossary=merged_glossary, settings=settings
     )
 
     return TranscriptionResponse(

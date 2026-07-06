@@ -22,11 +22,29 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 load_dotenv(REPO_ROOT / ".env")
 
 from app.core.config import load_settings
+from app.schemas.context import IntakeContext, SubjectContext
 from app.schemas.transcript import TranscriptSegment
 from app.services.correction import correct_segments
+from app.services.glossary import build_glossary
 
 RESULTS = REPO_ROOT / "evaluation" / "e2e" / "results"
-GLOSSARY = ["향", "향아", "규하", "해욱", "준혁", "채민", "종서", "신경", "금자", "정읍"]
+# 용어는 하드코딩하지 않는다 — BE가 보낼 컨텍스트 JSON(픽스처)에서 자동 파생.
+# 픽스처 값 출처: Intake 작성본 (evaluation/fixtures/, gitignore됨)
+FIXTURE = REPO_ROOT / "evaluation" / "fixtures" / "subject_context_singeumja.json"
+
+
+def load_glossary() -> list[str]:
+    payload = json.loads(FIXTURE.read_text(encoding="utf-8"))
+    subject = SubjectContext(**payload["subjectContext"])
+    intake = (
+        IntakeContext(**payload["intakeContext"])
+        if payload.get("intakeContext")
+        else None
+    )
+    return build_glossary(subject, intake)
+
+
+GLOSSARY = load_glossary()
 
 # (파일, 원문, 기대) — "교정:향아" = 향아로 교정돼야 함 / "불변" = 건드리면 안 됨
 # 둘 다 실녹음에서 관찰된 사례: 이름 오전사(10번), 사투리 "그려유" 오인(7번)

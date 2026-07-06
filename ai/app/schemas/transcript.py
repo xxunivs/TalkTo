@@ -4,6 +4,7 @@ from uuid import UUID
 from pydantic import Field, HttpUrl
 
 from app.schemas.common import ApiModel
+from app.schemas.context import IntakeContext, SubjectContext
 
 
 class TranscriptionRequest(ApiModel):
@@ -15,6 +16,9 @@ class TranscriptionRequest(ApiModel):
     language: str = Field(default="ko", min_length=2, max_length=20)
     speaker_diarization: bool = True
     glossary: list[str] = Field(default_factory=list, max_length=500)
+    # 계약 2: 보정·화자식별 용어는 이 컨텍스트에서 자동 파생 (glossary 필드와 합집합)
+    subject_context: SubjectContext | None = None
+    intake_context: IntakeContext | None = None
 
 
 class TranscriptSegment(ApiModel):
