@@ -81,8 +81,10 @@
 
 ## 3. 확인 요청 정리
 
-1. 1절 audioUrl 방식 + 유효기간 30분 — 가능 여부
-2. 2절 subjectContext/intakeContext 변환 전달 — 형태 확인
-3. 전사 보정은 기능명세 ANL-005(corrected_text/needs_review를 원문과 분리 저장) 그대로 따를 예정 — 저장 컬럼만 확인
+1. **파이프라인 호출 주체** — 현재 BE analysis 모듈은 워커 전이 API(`PATCH /admin/analysis/jobs/:jobId/transitions/*`)만 있고, 잡 생성 시 AI 서버를 호출하는 디스패처가 없는 것으로 보임. 이 문서는 "BE가 잡 상태에 맞춰 AI 엔드포인트를 호출"하는 모델을 가정하고 있는데, 이 모델로 가는 게 맞는지 확인 부탁. (AI가 잡 목록을 폴링하는 모델이면 전이 API 인증이 ADMIN JWT라 AI 워커용 계정/토큰 협의도 필요)
+2. 1절 audioUrl 방식 + 유효기간 30분 — 가능 여부 (storage의 getSignedUrl 재사용이면 될 것 같음)
+3. 2절 subjectContext/intakeContext 변환 전달 — 형태 확인
+4. **transcript 저장에 confidence 추가** — AI가 세그먼트별 confidence를 반환하는데 현재 `TranscriptSegmentInputDto`·엔티티에 받는 자리가 없음. 기능명세 ANL-003(신뢰도 저장)에 필요하니 컬럼·DTO 필드 추가 부탁 (float 0~1, nullable)
+5. 전사 보정은 기능명세 ANL-005(corrected_text/needs_review를 원문과 분리 저장) 그대로 따를 예정 — 저장 컬럼만 확인. 마스킹은 BE MaskingService가 이미 구현돼 있는 것 확인했고 AI는 중복 구현하지 않음 — redaction 전이와 MaskingService 연결만 BE 쪽 일정 확인
 
 연동 중 AI 서버 응답 형식, 엔드포인트, 입력 방식 등 AI 쪽 수정이 필요한 부분이 있으면 전달해주세요.
