@@ -4,8 +4,6 @@
 
 자동화 파이프라인의 전사 단계 구현이 완료되어(실제 통화 녹음 13건으로 검증) 백엔드에 아래 3건을 요청한다. 항목별로 회신해주면 된다.
 
-AI 서버는 기능명세의 엔드포인트 표 기준으로 **백엔드가 호출하는 API**(`POST /v1/analysis/transcriptions` 등)로 제공한다.
-
 ---
 
 ## 1. [요청] 전사 요청에 audioUrl 추가
@@ -105,7 +103,3 @@ AI 서버는 기능명세의 엔드포인트 표 기준으로 **백엔드가 호
 ## 3. [요청] transcript 저장에 confidence 추가
 
 AI가 전사 세그먼트별 confidence(STT 단어 신뢰도 평균, float 0~1)를 반환하는데(기능명세 ANL-003), 현재 `TranscriptSegmentInputDto`와 transcript_segments 엔티티에 받는 자리가 없어 값이 버려진다. **컬럼·DTO 필드 추가 부탁 (float, nullable).**
-
----
-
-연동 중 AI 서버 응답 형식, 엔드포인트, 입력 방식 등 AI 쪽 수정이 필요한 부분이 있으면 전달해주세요.
