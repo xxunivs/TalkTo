@@ -1,7 +1,5 @@
 # AI <-> 백엔드 연동 요청 ver2
 
-ver1 요청 3건(audioUrl·컨텍스트 2소스·confidence) 반영 확인했다 (PR #10, `analysis-ai-transcription.service`). URL 만료 재시도까지 구현돼 있어 계약대로 동작한다. 확인 과정에서 나온 추가 요청 3건.
-
 ---
 
 ## 1. [요청] 용어집 전달에 pronunciationHint 포함
@@ -30,7 +28,3 @@ AI 전사 응답의 각 세그먼트에는 보정 결과가 이미 포함돼 있
 2. 분석 요청의 `intakeContext.sttHints.voiceSampleRef`에 현재 `documentId`만 담기는데, `startMs`/`endMs`도 포함 (ver1 계약 2의 형태 그대로)
 
 이 구간이 화자 식별(누가 대상자 목소리인지)의 reference 등록에 쓰인다. 구간 없이 파일 전체가 오면 다른 화자 음성이 섞여 reference 품질이 떨어진다. 선택 화면(FE)은 별개 트랙이고, BE는 받을 자리만 먼저 만들어주면 된다.
-
----
-
-연동 중 AI 서버 응답 형식, 엔드포인트, 입력 방식 등 AI 쪽 수정이 필요한 부분이 있으면 전달해주세요.
