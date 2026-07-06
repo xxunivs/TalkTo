@@ -2,13 +2,22 @@
 
 새 AI 서비스 레포 `TalkTo_APP_AI` 기준. 기존 원칙(staged 연동, camelCase 계약, AI_SERVER_TOKEN, 민감 데이터 로그 금지)은 그대로 유지한다.
 
-자동화 파이프라인의 전사 단계 구현이 완료되어(실제 통화 녹음 13건으로 검증) 백엔드에 아래 2건을 요청한다.
+자동화 파이프라인의 전사 단계 구현이 완료되어(실제 통화 녹음 13건으로 검증) 백엔드에 아래 5건을 요청한다. 항목별로 회신해주면 된다.
 
 ---
 
-## 1. [요청] 전사 요청에 audioUrl 추가
+## 1. [확인] 파이프라인 호출 주체
 
-현재 `POST /v1/analysis/transcriptions` 요청 모델에는 jobId, recordingId 등 식별자만 있고 오디오가 들어올 자리가 없다. AI 서버는 stateless이고 백엔드 스토리지에 직접 접근하지 않는 원칙이므로, 백엔드가 스토리지의 presigned GET URL을 요청에 담아 전달해주면 된다.
+현재 BE analysis 모듈은 워커 전이 API(`PATCH /admin/analysis/jobs/:jobId/transitions/*`)만 있고, 잡 생성 시 AI 서버를 호출하는 디스패처가 없는 것으로 보인다. 이 문서는 **"BE가 잡 상태에 맞춰 AI 엔드포인트를 호출"하는 모델을 가정**하고 있는데, 이 모델로 가는 게 맞는지 확인 부탁.
+
+- 만약 반대로 AI가 잡 목록을 폴링해서 가져가는 모델이면: 전이 API 인증이 ADMIN JWT라 AI 워커용 계정/토큰 협의가 추가로 필요하다.
+- 이 답에 따라 아래 2·3번의 구현 위치가 정해지므로 가장 먼저 확정이 필요하다.
+
+---
+
+## 2. [요청] 전사 요청에 audioUrl 추가
+
+현재 `POST /v1/analysis/transcriptions` 요청 모델에는 jobId, recordingId 등 식별자만 있고 오디오가 들어올 자리가 없다. AI 서버는 stateless이고 백엔드 스토리지에 직접 접근하지 않는 원칙이므로, 백엔드가 스토리지의 presigned GET URL을 요청에 담아 전달해주면 된다 (storage의 getSignedUrl 재사용이면 될 것 같음).
 
 ```json
 {
@@ -27,7 +36,7 @@
 - `audioMimeType`: 선택. 없으면 URL 확장자로 판별한다.
 - `mode`: `"full"`(기본) 또는 `"preview"`. 무료 샘플 분석(기능명세 PRV-001·002)용 — preview면 앞부분 일부 전사만 반환한다. preview 산출물의 분리 저장(preview_only)과 무료 한도·본분석 게이트 체크는 백엔드 담당.
 - `glossary`: family glossary 용어들. 전사 후 이름·지명 보정에 사용한다. glossary 미입력 사용자는 빈 배열로 보내면 된다(보정 스킵하고 진행).
-- 응답은 기존 TranscriptionResponse(segments/provider/model) 유지. segments의 `confidence`는 STT 단어 신뢰도 평균으로 전 세그먼트 채워서 반환한다(기능명세 ANL-003).
+- 응답은 기존 TranscriptionResponse(segments/provider/model) 유지.
 
 실패 처리 — AI가 422와 아래 사유 코드를 반환한다:
 
@@ -40,9 +49,9 @@
 
 ---
 
-## 2. [요청] 컨텍스트 입력 — 시점별 2소스
+## 3. [요청] 컨텍스트 입력 — 시점별 2소스
 
-분석 파이프라인은 설문/프로필 정보를 힌트로 사용한다. 재료가 두 시점에 나뉘어 존재하므로(온보딩: subject profile + family glossary / Voice Persona 신청: intake 제출), AI 요청에도 두 오브젝트로 나눠 전달해주면 된다. **백엔드 저장 구조는 바꿀 필요 없고, 전달 시 아래 형태로 변환만 해주면 된다.**
+분석 파이프라인은 설문/프로필 정보를 힌트로 사용한다. 재료가 두 시점에 나뉘어 존재하므로(온보딩: subject profile + family glossary / Voice Persona 신청: intake 제출), AI 요청에도 두 오브젝트로 나눠 전달해주면 된다. **백엔드 저장 구조는 바꿀 필요 없고, 호출 시 저장된 값을 아래 형태로 변환해 요청에 포함해주기만 하면 된다.**
 
 ```json
 {
@@ -79,12 +88,17 @@
 
 ---
 
-## 3. 확인 요청 정리
+## 4. [요청] transcript 저장에 confidence 추가
 
-1. **파이프라인 호출 주체** — 현재 BE analysis 모듈은 워커 전이 API(`PATCH /admin/analysis/jobs/:jobId/transitions/*`)만 있고, 잡 생성 시 AI 서버를 호출하는 디스패처가 없는 것으로 보임. 이 문서는 "BE가 잡 상태에 맞춰 AI 엔드포인트를 호출"하는 모델을 가정하고 있는데, 이 모델로 가는 게 맞는지 확인 부탁. (AI가 잡 목록을 폴링하는 모델이면 전이 API 인증이 ADMIN JWT라 AI 워커용 계정/토큰 협의도 필요)
-2. 1절 audioUrl 방식 + 유효기간 30분 — 가능 여부 (storage의 getSignedUrl 재사용이면 될 것 같음)
-3. 2절 subjectContext/intakeContext 변환 전달 — 형태 확인
-4. **transcript 저장에 confidence 추가** — AI가 세그먼트별 confidence를 반환하는데 현재 `TranscriptSegmentInputDto`·엔티티에 받는 자리가 없음. 기능명세 ANL-003(신뢰도 저장)에 필요하니 컬럼·DTO 필드 추가 부탁 (float 0~1, nullable)
-5. 전사 보정은 기능명세 ANL-005(corrected_text/needs_review를 원문과 분리 저장) 그대로 따를 예정 — 저장 컬럼만 확인. 마스킹은 BE MaskingService가 이미 구현돼 있는 것 확인했고 AI는 중복 구현하지 않음 — redaction 전이와 MaskingService 연결만 BE 쪽 일정 확인
+AI가 전사 세그먼트별 confidence(STT 단어 신뢰도 평균, float 0~1)를 반환하는데(기능명세 ANL-003), 현재 `TranscriptSegmentInputDto`와 transcript_segments 엔티티에 받는 자리가 없어 값이 버려진다. **컬럼·DTO 필드 추가 부탁 (float, nullable).**
+
+---
+
+## 5. [확인] 전사 보정 저장 컬럼 + 마스킹 연결 일정
+
+- 전사 보정은 기능명세 ANL-005(corrected_text/needs_review를 원문과 분리 저장) 그대로 따를 예정 — **저장 컬럼이 준비돼 있는지 확인 부탁.**
+- 마스킹은 BE MaskingService가 이미 구현돼 있는 것을 확인했고 AI는 중복 구현하지 않는다(redacted 입력 사용 준수만). 다만 redaction 전이가 아직 MaskingService와 연결돼 있지 않은 것으로 보여 **연결 일정만 확인 부탁.**
+
+---
 
 연동 중 AI 서버 응답 형식, 엔드포인트, 입력 방식 등 AI 쪽 수정이 필요한 부분이 있으면 전달해주세요.
