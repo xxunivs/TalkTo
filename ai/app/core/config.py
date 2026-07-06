@@ -28,6 +28,13 @@ class Settings(BaseModel):
     elevenlabs_model: str | None = None
     elevenlabs_default_voice_id: str | None = None
 
+    stt_provider: str = "elevenlabs"
+    elevenlabs_stt_model: str = "scribe_v1"
+    stt_timeout_seconds: float = Field(default=1800, gt=0)
+    audio_download_timeout_seconds: float = Field(default=120, gt=0)
+    preview_window_ms: int = Field(default=180_000, gt=0)
+    min_speech_ms: int = Field(default=3_000, gt=0)
+
     max_audio_bytes: int | None = Field(default=None, gt=0)
     temp_dir: Path | None = None
 
@@ -81,6 +88,14 @@ def load_settings(env_file: str | Path | None = ".env") -> Settings:
         elevenlabs_api_key=os.getenv("ELEVENLABS_API_KEY"),
         elevenlabs_model=os.getenv("ELEVENLABS_MODEL"),
         elevenlabs_default_voice_id=os.getenv("ELEVENLABS_DEFAULT_VOICE_ID"),
+        stt_provider=os.getenv("STT_PROVIDER", "elevenlabs"),
+        elevenlabs_stt_model=os.getenv("ELEVENLABS_STT_MODEL", "scribe_v1"),
+        stt_timeout_seconds=os.getenv("STT_TIMEOUT_SECONDS", "1800"),
+        audio_download_timeout_seconds=os.getenv(
+            "AUDIO_DOWNLOAD_TIMEOUT_SECONDS", "120"
+        ),
+        preview_window_ms=os.getenv("PREVIEW_WINDOW_MS", "180000"),
+        min_speech_ms=os.getenv("MIN_SPEECH_MS", "3000"),
         max_audio_bytes=os.getenv("MAX_AUDIO_BYTES"),
         temp_dir=os.getenv("TEMP_DIR"),
     )

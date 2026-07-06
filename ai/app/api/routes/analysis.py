@@ -2,14 +2,16 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends
 
-from app.api.dependencies import require_internal_request
+from app.api.dependencies import SettingsDependency, require_internal_request
 from app.core.errors import FeatureNotImplementedError
+from app.providers.stt import create_stt_provider
 from app.schemas.analysis import EnrichmentRequest, EnrichmentResponse
 from app.schemas.memory import (
     MemorySegmentExtractionRequest,
     MemorySegmentExtractionResponse,
 )
 from app.schemas.transcript import TranscriptionRequest, TranscriptionResponse
+from app.services.transcription import transcribe_recording
 
 
 router = APIRouter(tags=["analysis"])
@@ -18,10 +20,12 @@ InternalRequest = Annotated[None, Depends(require_internal_request)]
 
 @router.post("/transcriptions", response_model=TranscriptionResponse)
 def create_analysis_transcription(
-    _request: TranscriptionRequest,
+    request: TranscriptionRequest,
     _authorized: InternalRequest,
+    settings: SettingsDependency,
 ) -> TranscriptionResponse:
-    raise FeatureNotImplementedError("Recording transcription analysis")
+    provider = create_stt_provider(settings)
+    return transcribe_recording(request, settings=settings, provider=provider)
 
 
 @router.post("/memory-segments", response_model=MemorySegmentExtractionResponse)

@@ -1,6 +1,7 @@
+from typing import Literal
 from uuid import UUID
 
-from pydantic import Field
+from pydantic import Field, HttpUrl
 
 from app.schemas.common import ApiModel
 
@@ -8,6 +9,9 @@ from app.schemas.common import ApiModel
 class TranscriptionRequest(ApiModel):
     job_id: UUID
     recording_id: UUID
+    audio_url: HttpUrl
+    audio_mime_type: str | None = Field(default=None, max_length=100)
+    mode: Literal["full", "preview"] = "full"
     language: str = Field(default="ko", min_length=2, max_length=20)
     speaker_diarization: bool = True
     glossary: list[str] = Field(default_factory=list, max_length=500)
