@@ -18,6 +18,7 @@ class Settings(BaseModel):
     openai_chat_model: str = "gpt-4.1-mini"
     openai_analysis_model: str = "gpt-4.1-mini"
     openai_stt_model: str = "whisper-1"
+    openai_correction_model: str = "gpt-4.1-mini"
     openai_embedding_model: str = "text-embedding-3-small"
     openai_embedding_dimensions: int = Field(default=1536, gt=0)
     openai_timeout_seconds: float = Field(default=60, gt=0)
@@ -76,6 +77,7 @@ def load_settings(env_file: str | Path | None = ".env") -> Settings:
         openai_chat_model=os.getenv("OPENAI_CHAT_MODEL", "gpt-4.1-mini"),
         openai_analysis_model=os.getenv("OPENAI_ANALYSIS_MODEL", "gpt-4.1-mini"),
         openai_stt_model=os.getenv("OPENAI_STT_MODEL", "whisper-1"),
+        openai_correction_model=os.getenv("OPENAI_CORRECTION_MODEL", "gpt-4.1-mini"),
         openai_embedding_model=os.getenv(
             "OPENAI_EMBEDDING_MODEL", "text-embedding-3-small"
         ),

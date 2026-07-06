@@ -3,6 +3,7 @@ from app.core.errors import AudioTooShortError, EmptyTranscriptError
 from app.providers.stt.interface import STTProvider
 from app.schemas.transcript import TranscriptionRequest, TranscriptionResponse
 from app.services.audio import download_audio
+from app.services.correction import correct_segments
 
 
 def transcribe_recording(
@@ -42,6 +43,10 @@ def transcribe_recording(
             for segment in segments
             if segment.start_ms < settings.preview_window_ms
         ]
+
+    segments = correct_segments(
+        segments, glossary=request.glossary, settings=settings
+    )
 
     return TranscriptionResponse(
         segments=segments, provider=result.provider, model=result.model

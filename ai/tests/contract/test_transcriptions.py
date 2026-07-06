@@ -58,6 +58,10 @@ class TranscriptionsEndpointTest(unittest.TestCase):
                 "app.services.transcription.download_audio",
                 return_value=Path("/nonexistent/audio.m4a"),
             ),
+            patch(
+                "app.services.transcription.correct_segments",
+                side_effect=lambda segments, **_kwargs: segments,
+            ),
         ):
             response = self.client.post(
                 "/v1/analysis/transcriptions", json=request_body()
@@ -77,6 +81,8 @@ class TranscriptionsEndpointTest(unittest.TestCase):
                 "speakerLabel": "SPK_0",
                 "transcriptText": "밥은 먹었냐",
                 "confidence": 0.93,
+                "correctedText": None,
+                "needsReview": False,
             },
         )
 
