@@ -2,17 +2,13 @@
 
 새 AI 서비스 레포 `TalkTo_APP_AI` 기준. 기존 원칙(staged 연동, camelCase 계약, AI_SERVER_TOKEN, 민감 데이터 로그 금지)은 그대로 유지한다.
 
-자동화 파이프라인의 전사 단계 구현이 완료되어(실제 통화 녹음 13건으로 검증) 백엔드에 아래 5건을 요청한다. 항목별로 회신해주면 된다.
+자동화 파이프라인의 전사 단계 구현이 완료되어(실제 통화 녹음 13건으로 검증) 백엔드에 아래 3건을 요청한다. 항목별로 회신해주면 된다.
+
+AI 서버는 기능명세의 엔드포인트 표 기준으로 **백엔드가 호출하는 API**(`POST /v1/analysis/transcriptions` 등)로 제공한다. 분석 잡 디스패처 구현 시 아래 계약대로 호출해주면 된다.
 
 ---
 
-## 1. [확인] 분석 시작 시 AI 호출 주체
-
-녹음 분석이 시작될 때 **백엔드가 AI 서버 API(`POST /v1/analysis/transcriptions` 등)를 호출해주는 구조**로 이해하고 아래 2·3번을 설계했다. 이게 맞는지 확인 부탁 — 현재 BE 코드에는 워커 전이 API만 있고 AI를 호출하는 부분이 아직 없어 보여서, 반대로 AI가 잡 목록을 폴링해서 가져가는 모델을 생각하고 있다면 알려달라(그 경우 전이 API 인증 방식 협의가 추가로 필요). 이 답에 따라 2·3번 구현 위치가 정해지므로 가장 먼저 확정이 필요하다.
-
----
-
-## 2. [요청] 전사 요청에 audioUrl 추가
+## 1. [요청] 전사 요청에 audioUrl 추가
 
 현재 `POST /v1/analysis/transcriptions` 요청 모델에는 jobId, recordingId 등 식별자만 있고 오디오가 들어올 자리가 없다. AI 서버는 stateless이고 백엔드 스토리지에 직접 접근하지 않는 원칙이므로, 백엔드가 스토리지의 presigned GET URL을 요청에 담아 전달해주면 된다 (storage의 getSignedUrl 재사용이면 될 것 같음).
 
@@ -46,7 +42,7 @@
 
 ---
 
-## 3. [요청] 컨텍스트 입력 — 시점별 2소스
+## 2. [요청] 컨텍스트 입력 — 시점별 2소스
 
 분석 파이프라인은 설문/프로필 정보를 힌트로 사용한다. 재료가 두 시점에 나뉘어 존재하므로(온보딩: subject profile + family glossary / Voice Persona 신청: intake 제출), AI 요청에도 두 오브젝트로 나눠 전달해주면 된다. **백엔드 저장 구조는 바꿀 필요 없고, 호출 시 저장된 값을 아래 형태로 변환해 요청에 포함해주기만 하면 된다.**
 
@@ -85,15 +81,9 @@
 
 ---
 
-## 4. [요청] transcript 저장에 confidence 추가
+## 3. [요청] transcript 저장에 confidence 추가
 
 AI가 전사 세그먼트별 confidence(STT 단어 신뢰도 평균, float 0~1)를 반환하는데(기능명세 ANL-003), 현재 `TranscriptSegmentInputDto`와 transcript_segments 엔티티에 받는 자리가 없어 값이 버려진다. **컬럼·DTO 필드 추가 부탁 (float, nullable).**
-
----
-
-## 5. [확인] 전사 보정 결과 저장 자리
-
-이번 주 내로 전사 응답에 보정 결과 필드가 추가된다(기능명세 ANL-005: correctedText / needsReview를 원문과 분리 저장, 의미 변경 금지). 4번 confidence처럼 **받아서 저장할 컬럼·DTO 자리가 준비돼 있는지 확인 부탁.**
 
 ---
 
