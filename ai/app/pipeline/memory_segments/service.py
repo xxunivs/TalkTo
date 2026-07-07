@@ -32,6 +32,18 @@ def has_foreign_script(text: str) -> bool:
     return bool(_FOREIGN_CHARS.search(text))
 
 
+# 태그 통제 어휘 (노션 확정 초안) — 이 밖의 값은 게이트에서 버린다
+_ALLOWED_TAGS = {
+    # 주제
+    "음식요리", "건강병원", "가족안부", "명절기념일", "날씨계절",
+    "신앙", "일·학교", "추억", "장소고향",
+    # 생애시기
+    "유년", "젊은시절", "중년", "노년", "최근",
+    # 감정
+    "애정", "그리움", "걱정", "기쁨", "슬픔", "유머",
+}
+
+
 def extract_memory_segments(
     segments: list[TranscriptSegment],
     *,
@@ -139,6 +151,17 @@ def validate_memory_payload(
             for name in (memory.get("relatedPeople") or [])
             if str(name).strip() and str(name).strip() != subject_name
         ]
+        # importance: 1~10 정수로 클램프 (범위 밖·비정수는 중앙값 5)
+        raw_importance = memory.get("importance")
+        importance = (
+            min(10, max(1, int(raw_importance)))
+            if isinstance(raw_importance, (int, float))
+            else 5
+        )
+        # tags: 통제 어휘 밖 값은 버린다 (코드 게이트, T1 룰)
+        tags = [
+            tag for tag in (memory.get("tags") or []) if tag in _ALLOWED_TAGS
+        ]
         memories.append(
             {
                 "segmentIndex": len(memories),
@@ -149,6 +172,8 @@ def validate_memory_payload(
                 "memoryText": text,
                 "relatedPeople": related,
                 "confidence": memory["confidence"],
+                "importanceScore": importance,
+                "tags": tags,
                 "sensitivityFlags": flags,
             }
         )

@@ -33,10 +33,27 @@ def load_all_memories() -> list[dict]:
                     "stem": stem,
                     "text": seg["memoryText"],
                     "importance": seg.get("importanceScore"),
-                    "tags": seg.get("tags") or [],
+                    "tags": set(seg.get("tags") or []),
                 }
             )
     return items
+
+
+_QUERY_TAG_HINTS = {
+    "음식요리": ["양념", "김치", "국", "끓", "만들", "요리", "도시락", "죽", "찌개"],
+    "건강병원": ["병원", "주사", "예방", "아프", "약", "건강"],
+    "명절기념일": ["새해", "생일", "명절"],
+    "날씨계절": ["추운", "눈", "겨울", "날씨"],
+    "가족안부": ["인사", "안부"],
+}
+
+
+def infer_query_tags(query: str) -> set:
+    tags = set()
+    for tag, hints in _QUERY_TAG_HINTS.items():
+        if any(h in query for h in hints):
+            tags.add(tag)
+    return tags
 
 
 def cosine(a: list[float], b: list[float]) -> float:
@@ -50,6 +67,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--rerank", action="store_true")
     parser.add_argument("--k", type=int, default=5)
+    parser.add_argument("--w1", type=float, default=0.15)  # importance 가중
+    parser.add_argument("--w2", type=float, default=0.10)  # 태그겹침 가중
     args = parser.parse_args()
 
     settings = load_settings(REPO_ROOT / ".env")
@@ -57,16 +76,19 @@ def main() -> int:
     print(f"기억 {len(memories)}건 임베딩 중...")
     mem_vectors = embed_texts([m["text"] for m in memories], settings=settings)
     query_vectors = embed_texts([q for q, _ in QUERIES], settings=settings)
+    query_tag_list = [infer_query_tags(q) for q, _ in QUERIES]
 
     hits = 0
     print(f"\n[검색 Recall@{args.k}]  {'(P1 재정렬)' if args.rerank else '(P0 코사인)'}")
-    for (query, answer_stem), qvec in zip(QUERIES, query_vectors):
+    for (query, answer_stem), qvec, query_tags in zip(QUERIES, query_vectors, query_tag_list):
         scored = []
         for mem, mvec in zip(memories, mem_vectors):
             sim = cosine(qvec, mvec)
             score = sim
-            if args.rerank and mem["importance"] is not None:
-                score = sim + 0.1 * (mem["importance"] / 10)
+            if args.rerank:
+                imp = (mem["importance"] or 5) / 10
+                overlap = (len(mem["tags"] & query_tags) / len(query_tags)) if query_tags else 0.0
+                score = sim + args.w1 * imp + args.w2 * overlap
             scored.append((score, sim, mem))
         scored.sort(key=lambda x: x[0], reverse=True)
         topk = scored[: args.k]

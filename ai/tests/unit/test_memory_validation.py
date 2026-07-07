@@ -110,6 +110,37 @@ class ForeignScriptGateTest(unittest.TestCase):
         self.assertEqual(result["validationDropped"]["memories"], 1)
 
 
+class ImportanceTagGateTest(unittest.TestCase):
+    def test_clamps_importance_and_filters_tags(self) -> None:
+        result = validate_memory_payload(
+            {
+                "memorySegments": [
+                    {
+                        "memoryText": "생애 핵심 기억",
+                        "sourceSegmentIds": [0],
+                        "confidence": "confirmed",
+                        "importance": 15,
+                        "tags": ["음식요리", "존재하지않는태그", "노년"],
+                    }
+                ]
+            },
+            SEGMENTS,
+        )
+
+        m = result["memorySegments"][0]
+        self.assertEqual(m["importanceScore"], 10)  # 15 -> 클램프 10
+        self.assertEqual(m["tags"], ["음식요리", "노년"])  # 통제 어휘 밖 제거
+
+    def test_missing_importance_defaults_to_mid(self) -> None:
+        result = validate_memory_payload(
+            {"memorySegments": [{"memoryText": "x", "sourceSegmentIds": [0], "confidence": "inferred"}]},
+            SEGMENTS,
+        )
+
+        self.assertEqual(result["memorySegments"][0]["importanceScore"], 5)
+        self.assertEqual(result["memorySegments"][0]["tags"], [])
+
+
 class RelatedPeopleGateTest(unittest.TestCase):
     def test_excludes_subject_from_related_people(self) -> None:
         result = validate_memory_payload(
