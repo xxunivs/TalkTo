@@ -115,20 +115,20 @@ def validate_persons_payload(
             continue
 
         relations = []
-        for relation in person.get("relationsToOthers") or []:
+        for relation_entry in person.get("relationsToOthers") or []:
             relation_ids = (
-                clean_source_ids(relation.get("sourceSegmentIds"))
-                if isinstance(relation, dict)
+                clean_source_ids(relation_entry.get("sourceSegmentIds"))
+                if isinstance(relation_entry, dict)
                 else None
             )
             if (
                 relation_ids is None
-                or relation.get("confidence") not in _CONFIDENCE_VALUES
-                or not str(relation.get("name") or "").strip()
+                or relation_entry.get("confidence") not in _CONFIDENCE_VALUES
+                or not str(relation_entry.get("name") or "").strip()
             ):
                 dropped["relations"] += 1
                 continue
-            relations.append({**relation, "sourceSegmentIds": relation_ids})
+            relations.append({**relation_entry, "sourceSegmentIds": relation_ids})
 
         facts = []
         for fact in person.get("facts") or []:

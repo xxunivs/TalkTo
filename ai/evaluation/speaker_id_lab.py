@@ -13,27 +13,16 @@ evaluation/e2e/results/*.json (전사 결과), evaluation/bakeoff/gold/*.txt.
 """
 
 import argparse
-import json
 import re
-from pathlib import Path
 
-from evaluation.bakeoff.metrics import cer
-from evaluation.e2e.run_e2e_transcription import natural_key
 from app.schemas.transcript import TranscriptSegment
 from app.services.speaker_id import SpeakerEmbedder, cosine_similarity
+from evaluation.bakeoff.metrics import cer
+from evaluation.common import AUDIO_DIR, GOLD_DIR, load_segments, result_stems
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-RESULTS = REPO_ROOT / "evaluation" / "e2e" / "results"
-GOLD_DIR = REPO_ROOT / "evaluation" / "bakeoff" / "gold"
-AUDIO_DIR = REPO_ROOT.parent / "TalkTo_PersonaAI_AI" / "data" / "voice_raw"
 SUBJECT_GOLD_LABEL = "할머니"
 # reference 클립 길이(초) — Intake 음성 샘플 구간을 흉내 낸다
 REFERENCE_CLIP_SECONDS = 20.0
-
-
-def load_segments(stem: str) -> list[TranscriptSegment]:
-    body = json.loads((RESULTS / f"{stem}.json").read_text(encoding="utf-8"))
-    return [TranscriptSegment(**segment) for segment in body["segments"]]
 
 
 def gold_speaker_texts(stem: str) -> dict[str, str]:
@@ -103,9 +92,7 @@ def main() -> int:
     parser.add_argument("--reference", type=str, default="할머니 목소리 1")
     args = parser.parse_args()
 
-    stems = sorted(
-        (path.stem for path in RESULTS.glob("*.json")), key=lambda s: natural_key(Path(s))
-    )
+    stems = result_stems()
     embedder = SpeakerEmbedder()
 
     # 1) 정답 매핑

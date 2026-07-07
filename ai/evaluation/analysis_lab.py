@@ -10,30 +10,20 @@ Usage:
 
 import argparse
 import json
-from pathlib import Path
 
 from app.core.config import load_settings
-from app.schemas.context import SubjectContext
-from app.schemas.transcript import TranscriptSegment
 from app.services.analysis.persons import run_persons_analysis
 from app.services.analysis.sensitivity import run_sensitivity_analysis
-from evaluation.e2e.run_e2e_transcription import natural_key
+from evaluation.common import (
+    REPO_ROOT,
+    RESULTS_DIR,
+    load_context_fixture,
+    load_segments,
+    result_stems,
+)
 from evaluation.speaker_id_lab import gold_speaker_texts, subject_label_by_text
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-RESULTS = REPO_ROOT / "evaluation" / "e2e" / "results"
-OUT_DIR = RESULTS / "analysis"
-FIXTURE = REPO_ROOT / "evaluation" / "fixtures" / "subject_context_singeumja.json"
-
-
-def load_segments(stem: str) -> list[TranscriptSegment]:
-    body = json.loads((RESULTS / f"{stem}.json").read_text(encoding="utf-8"))
-    return [TranscriptSegment(**segment) for segment in body["segments"]]
-
-
-def load_subject_context() -> SubjectContext:
-    payload = json.loads(FIXTURE.read_text(encoding="utf-8"))
-    return SubjectContext(**payload["subjectContext"])
+OUT_DIR = RESULTS_DIR / "analysis"
 
 
 def main() -> int:
@@ -48,16 +38,13 @@ def main() -> int:
         settings = settings.model_copy(update={"openai_analysis_model": args.model})
     print(f"모델: {settings.openai_analysis_model}")
 
-    stems = sorted(
-        (path.stem for path in RESULTS.glob("*.json")),
-        key=lambda stem: natural_key(Path(stem)),
-    )
+    stems = result_stems()
     if args.only:
         wanted = {name.strip() for name in args.only.split(",")}
         stems = [stem for stem in stems if stem in wanted]
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    subject_context = load_subject_context()
+    subject_context, _ = load_context_fixture()
 
     for stem in stems:
         segments = load_segments(stem)

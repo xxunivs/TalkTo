@@ -1,102 +1,70 @@
-"""Offline lab for the transcript correction pass (backlog 3, spec ANL-005).
+"""전사 보정 오프라인 랩 (백로그 3, 명세 ANL-005).
 
-Feeds saved transcription results (evaluation/e2e/results/*.json) straight into
-the correction service — no STT rerun, so inputs are fixed and model/prompt
-changes are comparable. Canary cases come from real mis-transcriptions found
-in our recordings.
+캔어리는 실녹음에서 관찰된 오전사 사례의 고정 스냅샷이다 — 저장된 전사
+결과에 앵커하지 않으므로 전사를 재생성해도 깨지지 않는다. 용어는 하드코딩
+없이 컨텍스트 픽스처(BE가 보낼 JSON 모양)에서 자동 파생한다.
 
 Usage:
-    python -m evaluation.correction_lab [model ...]   # default: gpt-4.1-mini
-
-Requires OPENAI_API_KEY in .env and saved results from
-evaluation.e2e.run_e2e_transcription.
+    python -m evaluation.correction_lab [model ...]   # default: .env 설정
 """
 
-import json
 import sys
-from pathlib import Path
-
-from dotenv import load_dotenv
-
-REPO_ROOT = Path(__file__).resolve().parents[1]
-load_dotenv(REPO_ROOT / ".env")
 
 from app.core.config import load_settings
-from app.schemas.context import IntakeContext, SubjectContext
 from app.schemas.transcript import TranscriptSegment
 from app.services.correction import correct_segments
 from app.services.glossary import build_glossary
-
-RESULTS = REPO_ROOT / "evaluation" / "e2e" / "results"
-# 용어는 하드코딩하지 않는다 — BE가 보낼 컨텍스트 JSON(픽스처)에서 자동 파생.
-# 픽스처 값 출처: Intake 작성본 (evaluation/fixtures/, gitignore됨)
-FIXTURE = REPO_ROOT / "evaluation" / "fixtures" / "subject_context_singeumja.json"
+from evaluation.common import REPO_ROOT, load_context_fixture
 
 
-def load_glossary() -> list[str]:
-    payload = json.loads(FIXTURE.read_text(encoding="utf-8"))
-    subject = SubjectContext(**payload["subjectContext"])
-    intake = (
-        IntakeContext(**payload["intakeContext"])
-        if payload.get("intakeContext")
-        else None
+def segment(index: int, text: str) -> TranscriptSegment:
+    return TranscriptSegment(
+        segment_index=index,
+        start_ms=index * 1000,
+        end_ms=(index + 1) * 1000,
+        speaker_label="SPK_0",
+        transcript_text=text,
     )
-    return build_glossary(subject, intake)
 
 
-GLOSSARY = load_glossary()
-
-# (파일, 원문, 기대) — "교정:향아" = 향아로 교정돼야 함 / "불변" = 건드리면 안 됨
-# 둘 다 실녹음에서 관찰된 사례: 이름 오전사(10번), 사투리 "그려유" 오인(7번)
+# 실녹음 관찰 사례의 고정 스냅샷: (설명, 원문, 기대 — "교정:단어" 또는 "불변")
 CANARIES = [
-    ("할머니 목소리 10", "어, 영아.", "교정:향아"),
-    ("할머니 목소리 7", "구려유. 할머니도 잘 자.", "불변"),
+    ("이름 오전사 (10번 관찰)", "어, 영아.", "교정:향아"),
+    ("이름 오전사 — 일반명사와 동형이라 애매 (10번 재생성 관찰)", "어, 상아.", "교정또는리뷰:향아"),
+    ("사투리 — 이름으로 바꾸면 안 됨 (7번 관찰)", "구려유. 할머니도 잘 자.", "불변"),
 ]
 
 
-def load_segments(stem: str) -> list[TranscriptSegment]:
-    body = json.loads((RESULTS / f"{stem}.json").read_text(encoding="utf-8"))
-    return [TranscriptSegment(**segment) for segment in body["segments"]]
-
-
-def run(model: str) -> None:
+def run(model: str | None) -> bool:
     settings = load_settings(REPO_ROOT / ".env")
-    settings = settings.model_copy(update={"openai_correction_model": model})
+    if model:
+        settings = settings.model_copy(update={"openai_correction_model": model})
+    print(f"모델: {settings.openai_correction_model}")
 
-    total_corrections = 0
-    verdicts = []
-    for stem in sorted({canary[0] for canary in CANARIES}):
-        segments = load_segments(stem)
-        for segment in segments:
-            segment.corrected_text, segment.needs_review = None, False
-        correct_segments(segments, glossary=GLOSSARY, settings=settings)
-        corrected = [s for s in segments if s.corrected_text]
-        total_corrections += len(corrected)
-        for file_stem, original, expectation in CANARIES:
-            if file_stem != stem:
-                continue
-            target = next(s for s in segments if s.transcript_text == original)
-            if expectation == "불변":
-                ok = target.corrected_text is None
-                got = "불변 유지" if ok else f"오교정→{target.corrected_text}"
-            else:
-                want = expectation.split(":")[1]
-                ok = target.corrected_text is not None and want in target.corrected_text
-                got = target.corrected_text or ("리뷰만" if target.needs_review else "미교정")
-            verdicts.append((original, got, ok))
-        for segment in corrected:
-            print(
-                f"    [{stem} {segment.segment_index}] "
-                f"{segment.transcript_text} → {segment.corrected_text}"
-            )
+    subject, intake = load_context_fixture()
+    glossary = build_glossary(subject, intake)
 
-    passed = sum(1 for *_, ok in verdicts if ok)
-    print(f"  캔어리 {passed}/{len(verdicts)} | 총 교정 수 {total_corrections}")
-    for original, got, ok in verdicts:
-        print(f"  {'✅' if ok else '❌'} '{original}' → {got}")
+    segments = [segment(i, text) for i, (_, text, _) in enumerate(CANARIES)]
+    correct_segments(segments, glossary=glossary, settings=settings)
+
+    all_ok = True
+    for (label, original, expectation), seg in zip(CANARIES, segments):
+        if expectation == "불변":
+            ok = seg.corrected_text is None
+            got = "불변 유지" if ok else f"오교정→{seg.corrected_text}"
+        else:
+            kind, want = expectation.split(":")
+            corrected_ok = seg.corrected_text is not None and want in seg.corrected_text
+            # "교정또는리뷰" = 애매한 케이스: 교정 또는 검수 표시 둘 다 안전 (오교정·무반응만 실패)
+            review_ok = kind == "교정또는리뷰" and seg.corrected_text is None and seg.needs_review
+            ok = corrected_ok or review_ok
+            got = seg.corrected_text or ("리뷰 표시(검수행)" if seg.needs_review else "미교정")
+        all_ok &= ok
+        print(f"  {'✅' if ok else '❌'} [{label}] '{original}' → {got}")
+    return all_ok
 
 
 if __name__ == "__main__":
-    for model_name in sys.argv[1:] or ["gpt-4.1-mini"]:
-        print(f"\n===== model: {model_name} =====")
-        run(model_name)
+    models = sys.argv[1:] or [None]
+    ok = all(run(model) for model in models)
+    raise SystemExit(0 if ok else 1)

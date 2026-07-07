@@ -3,9 +3,9 @@ import unittest
 
 class SchemaImportTest(unittest.TestCase):
     def test_schema_and_provider_interfaces_import_without_calls(self) -> None:
-        from app.providers.elevenlabs import ElevenLabsProvider
-        from app.providers.openai import OpenAIProvider
+        from app.providers.stt import STTProvider, STTResult
         from app.schemas.analysis import EnrichmentRequest, EnrichmentResponse
+        from app.schemas.context import IntakeContext, SubjectContext
         from app.schemas.embeddings import EmbeddingRequest, EmbeddingResponse
         from app.schemas.memory import MemorySegmentExtractionRequest
         from app.schemas.persona import PersonaResponseRequest
@@ -13,10 +13,12 @@ class SchemaImportTest(unittest.TestCase):
         from app.schemas.voice import SpeechSynthesisRequest
 
         imported = (
-            OpenAIProvider,
-            ElevenLabsProvider,
+            STTProvider,
+            STTResult,
             EnrichmentRequest,
             EnrichmentResponse,
+            SubjectContext,
+            IntakeContext,
             EmbeddingRequest,
             EmbeddingResponse,
             MemorySegmentExtractionRequest,
@@ -24,7 +26,7 @@ class SchemaImportTest(unittest.TestCase):
             TranscriptionRequest,
             SpeechSynthesisRequest,
         )
-        self.assertEqual(len(imported), 10)
+        self.assertEqual(len(imported), 12)
 
 
 if __name__ == "__main__":

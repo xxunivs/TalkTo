@@ -15,9 +15,20 @@ _TRIM = ".,?!~… "
 _KOREAN_FULL_NAME = re.compile(r"^[가-힣]{2,4}$")
 
 
+def _has_batchim(char: str) -> bool:
+    code = ord(char)
+    return 0xAC00 <= code <= 0xD7A3 and (code - 0xAC00) % 28 != 0
+
+
+def _vocative(name: str) -> str:
+    """이름을 부르는 형태 (한국어 호격: 받침 있으면 '아', 없으면 '야')."""
+    return name + ("아" if _has_batchim(name[-1]) else "야")
+
+
 def _with_given_name(full_name: str) -> list[str]:
     if _KOREAN_FULL_NAME.fullmatch(full_name):
-        return [full_name, full_name[1:]]
+        given = full_name[1:]
+        return [full_name, given, _vocative(given)]
     return [full_name]
 
 
