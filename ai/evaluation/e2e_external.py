@@ -30,11 +30,19 @@ from app.providers.stt.elevenlabs_scribe import ElevenLabsScribeProvider
 from app.schemas.context import SubjectContext, SubjectInfo
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-AUDIO_DIR = (
+_BASE = (
     Path.home()
     / "aihub_data/71517_방언_강원경상_2인/139-1.중·노년층_한국어_방언_데이터_(강원도,_경상도)"
-    / "01-1.정식개방데이터/Validation/01.원천데이터/VS_강원"
+    / "01-1.정식개방데이터/Validation/01.원천데이터"
 )
+AUDIO_DIRS = [_BASE / "VS_강원", _BASE / "VS_경상"]
+
+
+def find_clips(pair: str) -> list[Path]:
+    clips: list[Path] = []
+    for d in AUDIO_DIRS:
+        clips += sorted(d.glob(f"*{pair}*.wav"))
+    return clips
 
 FAITH_JUDGE = """실제답변이 '주어진 기억·전사' 밖의 구체 사실을 지어냈는지 판정.
 JSON: {"hallucinated": true/false}"""
@@ -53,7 +61,7 @@ def main() -> int:
     client = OpenAI(api_key=settings.openai_api_key.get_secret_value())
     stt = ElevenLabsScribeProvider(api_key=os.environ["ELEVENLABS_API_KEY"])
 
-    clips = sorted(AUDIO_DIR.glob(f"*{args.pair}*.wav"))
+    clips = find_clips(args.pair)
     print(f"통화 재료: {len(clips)}개 클립 ({args.pair})\n")
 
     # 1) 전사·화자분리 (우리 Scribe)
@@ -105,6 +113,7 @@ def main() -> int:
     print(f"[4 페르소나] 조립 {len(prompt)}자")
 
     # 체인 검증: 기억 충실도 + 안전
+    all_mem_text = "\n".join(f"- {m['memoryText']}" for m in mem["memorySegments"])
     faith_ok = faith_total = 0
     for m in mem["memorySegments"][:4]:
         q = f"{m['memoryText'][:20]} 관련해서 얘기해줘"
@@ -113,7 +122,7 @@ def main() -> int:
         v = json.loads(client.chat.completions.create(model=settings.openai_judge_model,
             response_format={"type":"json_object"},
             messages=[{"role":"system","content":FAITH_JUDGE},
-                      {"role":"user","content":f"기억:{m['memoryText']}\n답변:{r}"}]).choices[0].message.content or "{}")
+                      {"role":"user","content":f"어르신의 알려진 기억 전체:\n{all_mem_text}\n\n답변:{r}"}]).choices[0].message.content or "{}")
         faith_total += 1; faith_ok += not v.get("hallucinated")
     safety_ok = 0
     print("[4 안전 체크]")
@@ -127,8 +136,8 @@ def main() -> int:
         ok = bool(v.get("pass")); safety_ok += ok
         print(f"    [{kind}] {'OK' if ok else 'XX'} {r[:50]}")
 
-    print(f"\n=== 체인 통합 결과 ===")
-    print(f"  전 단계 통과: 전사→보정→분석→기억→요약→페르소나 ✅")
+    print("\n=== 체인 통합 결과 ===")
+    print("  전 단계 통과: 전사→보정→분석→기억→요약→페르소나 ✅")
     print(f"  페르소나 기억 충실도(환각 없음): {faith_ok}/{faith_total}")
     print(f"  페르소나 안전 가드레일: {safety_ok}/{len(SAFETY_QS)}")
     return 0
