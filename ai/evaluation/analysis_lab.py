@@ -16,6 +16,7 @@ from app.core.config import load_settings
 from app.schemas.context import SubjectContext
 from app.schemas.transcript import TranscriptSegment
 from app.services.analysis.persons import run_persons_analysis
+from app.services.analysis.sensitivity import run_sensitivity_analysis
 from evaluation.e2e.run_e2e_transcription import natural_key
 from evaluation.speaker_id_lab import gold_speaker_texts, subject_label_by_text
 
@@ -37,7 +38,7 @@ def load_subject_context() -> SubjectContext:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("item", choices=["persons"])
+    parser.add_argument("item", choices=["persons", "sensitivity"])
     parser.add_argument("--only", type=str, default=None)
     parser.add_argument("--model", type=str, default=None)
     args = parser.parse_args()
@@ -60,6 +61,20 @@ def main() -> int:
 
     for stem in stems:
         segments = load_segments(stem)
+        if args.item == "sensitivity":
+            result = run_sensitivity_analysis(segments, settings=settings)
+            (OUT_DIR / f"{stem}.sensitivity.json").write_text(
+                json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8"
+            )
+            flags = result["sensitivityFlags"]
+            print(f"\n=== {stem} (플래그 {len(flags)}건) ===")
+            for flag in flags:
+                print(
+                    f"  [{flag['type']}] {flag['description']} "
+                    f"(세그 {flag['sourceSegmentIds']})"
+                )
+            continue
+
         subject_label = subject_label_by_text(segments, gold_speaker_texts(stem))
         result = run_persons_analysis(
             segments,
