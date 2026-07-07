@@ -66,7 +66,10 @@ def build_context(stem) -> str:
     subject, _ = load_context_fixture()
     subject_name = subject.subject.name if subject.subject else "대상자"
     segments = _load(stem)
-    label = subject_label_by_text(segments, gold_speaker_texts(stem))
+    try:
+        label = subject_label_by_text(segments, gold_speaker_texts(stem))
+    except FileNotFoundError:
+        label = segments[0].speaker_label if segments else None  # 골드 없으면 첫 화자를 대상자로
     other_labels = sorted({s.speaker_label for s in segments} - {label})
     if label:
         lines.append(f"- 대상자 본인 = {subject_name} = 전사문의 {label} 화자 (셋이 같은 사람)")
