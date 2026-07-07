@@ -46,5 +46,26 @@ class SttHints(ContextModel):
     voice_sample_ref: VoiceSampleRef | None = None
 
 
+class SituationalReaction(ContextModel):
+    situation: str
+    response: str  # 대상자가 할 법한 답 (스크립트)
+    avoid: str | None = None  # 피해야 할 답
+
+
+class FamilyNote(ContextModel):
+    name: str
+    relation: str | None = None
+    tone: str | None = None  # 이 사람에게 하는 말투·챙김 (예: 담배·술 걱정)
+
+
 class IntakeContext(ContextModel):
+    # 섹션 내부 필드는 설문지 v1.0 문항 키 기준 (BE 계약 2). 부록 확정 전이라
+    # 유연 타입으로 받고, 조립기가 방어적으로 읽는다.
+    basic_profile: dict = Field(default_factory=dict)  # 사망 여부·한줄 소개 등
+    family_map: list[FamilyNote] = Field(default_factory=list)  # 가족별 톤
+    speech_style: str | None = None  # 말투 성향 서술
+    personality: str | None = None  # 성격·가치관 서술
+    situational_reactions: list[SituationalReaction] = Field(default_factory=list)
+    taboo_topics: list[str] = Field(default_factory=list)
+    memory_cards: list[dict] = Field(default_factory=list)
     stt_hints: SttHints | None = None
