@@ -78,11 +78,22 @@ def build_context(stem) -> str:
         for p in persons:
             rel = p.get("relationToSubject") or "관계 미상"
             lines.append(f"- {p['name']}: 대상자의 {rel} (전사문 지칭: {', '.join(p.get('mentions', []))})")
-    # 2인 통화에서 비대상자 화자가 1명이면 그 화자 = 통화 상대(대상자가 아닌 발화의 주체)
+    # 통화 상대 확정: 대상자가 전사문에서 어떤 인물을 이름/호칭으로 직접 부르면
+    # (그 지칭이 대상자 발화에 등장), 그 인물이 통화 상대다. 없으면 미확정.
+    subject_texts = " ".join(
+        (seg.corrected_text or seg.transcript_text)
+        for seg in segments if seg.speaker_label == label
+    )
+    addressed = None
+    for person in persons:
+        if any(m and m in subject_texts for m in person.get("mentions", [])):
+            addressed = person["name"]
+            break
     if len(other_labels) == 1:
-        # 통화 상대의 이름은 확정하지 않는다 — persons는 '언급된' 인물일 뿐
-        # 상대와 동일인이 아닐 수 있다 (제3자 언급 케이스)
-        lines.append(f"- {other_labels[0]} 화자 = 통화 상대방(대상자가 아닌 발화의 주체, 이름 미확정)")
+        if addressed:
+            lines.append(f"- {other_labels[0]} 화자 = 통화 상대방 = {addressed} (대상자가 전사문에서 직접 부름)")
+        else:
+            lines.append(f"- {other_labels[0]} 화자 = 통화 상대방(대상자가 아닌 발화의 주체, 이름 미확정)")
     return "\n".join(lines) or "(추가 확정 정보 없음)"
 
 
