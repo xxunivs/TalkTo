@@ -79,8 +79,9 @@ def build_context(stem) -> str:
             lines.append(f"- {p['name']}: 대상자의 {rel} (전사문 지칭: {', '.join(p.get('mentions', []))})")
     # 2인 통화에서 비대상자 화자가 1명이면 그 화자 = 통화 상대(대상자가 아닌 발화의 주체)
     if len(other_labels) == 1:
-        partner = f" (persons에서 식별된 상대: {persons[0]['name']})" if len(persons) == 1 else ""
-        lines.append(f"- {other_labels[0]} 화자 = 통화 상대방(대상자가 아닌 발화의 주체){partner}")
+        # 통화 상대의 이름은 확정하지 않는다 — persons는 '언급된' 인물일 뿐
+        # 상대와 동일인이 아닐 수 있다 (제3자 언급 케이스)
+        lines.append(f"- {other_labels[0]} 화자 = 통화 상대방(대상자가 아닌 발화의 주체, 이름 미확정)")
     return "\n".join(lines) or "(추가 확정 정보 없음)"
 
 
