@@ -11,7 +11,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 RESULTS_DIR = REPO_ROOT / "evaluation" / "e2e" / "results"
 FIXTURE_PATH = REPO_ROOT / "evaluation" / "fixtures" / "subject_context_singeumja.json"
 GOLD_DIR = REPO_ROOT / "evaluation" / "bakeoff" / "gold"
-AUDIO_DIR = REPO_ROOT.parent / "TalkTo_PersonaAI_AI" / "data" / "voice_raw"
+AUDIO_DIR = REPO_ROOT / "data" / "voice_raw"
 
 
 def natural_key(name: str | Path) -> tuple:

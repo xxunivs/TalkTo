@@ -26,7 +26,7 @@ from dotenv import load_dotenv
 from evaluation.bakeoff.metrics import cer
 from evaluation.common import REPO_ROOT
 
-AIHUB_ROOT = Path.home() / "aihub_data"
+AIHUB_ROOT = Path(__file__).resolve().parents[1] / "data" / "external"
 PHONE_BASE = (
     AIHUB_ROOT
     / "571_전화망/007.저음질_전화망_음성인식_데이터/01.데이터/2.Validation"

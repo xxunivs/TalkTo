@@ -9,7 +9,7 @@ Usage:
     python -m evaluation.e2e.run_e2e_transcription [options]
 
 Options:
-    --audio-dir PATH   recordings directory (default: TalkTo_PersonaAI_AI/data/voice_raw)
+    --audio-dir PATH   recordings directory (default: data/voice_raw)
     --gold-dir PATH    gold transcripts, {audio stem}.txt (default: evaluation/bakeoff/gold)
     --server URL       AI server base URL (default: http://localhost:8400)
     --file-port N      port for the local audio file server (default: 8401)
@@ -39,7 +39,7 @@ from dotenv import dotenv_values
 from evaluation.bakeoff.metrics import cer, full_text, speaker_stats
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_AUDIO_DIR = REPO_ROOT.parent / "TalkTo_PersonaAI_AI" / "data" / "voice_raw"
+DEFAULT_AUDIO_DIR = REPO_ROOT / "data" / "voice_raw"
 DEFAULT_GOLD_DIR = REPO_ROOT / "evaluation" / "bakeoff" / "gold"
 DEFAULT_OUT = REPO_ROOT / "evaluation" / "e2e" / "results"
 

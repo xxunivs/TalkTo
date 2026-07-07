@@ -26,3 +26,5 @@ evaluation/bakeoff/gold/
 evaluation/e2e/results/
 # real family data for tests; never commit
 evaluation/fixtures/
+# audio + external datasets; never commit
+data/
