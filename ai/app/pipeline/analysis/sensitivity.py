@@ -41,16 +41,27 @@ def run_sensitivity_analysis(
         timeout=settings.openai_timeout_seconds,
         max_retries=settings.openai_max_retries,
     )
-    response = client.chat.completions.create(
-        model=settings.openai_analysis_model,
-        response_format={"type": "json_object"},
-        messages=[
-            {"role": "system", "content": SENSITIVITY_SYSTEM_PROMPT},
-            {"role": "user", "content": build_sensitivity_user_prompt(segments)},
-        ],
-    )
-    payload = json.loads(response.choices[0].message.content or "{}")
-    result = validate_sensitivity_payload(payload, segments)
+    # 부분 실패 정책: 구조 위반이면 1회 재시도, 재실패 시 예외(녹음 중단)
+    last_error: SensitivityValidationError | None = None
+    result = None
+    for attempt in range(2):
+        response = client.chat.completions.create(
+            model=settings.openai_analysis_model,
+            response_format={"type": "json_object"},
+            messages=[
+                {"role": "system", "content": SENSITIVITY_SYSTEM_PROMPT},
+                {"role": "user", "content": build_sensitivity_user_prompt(segments)},
+            ],
+        )
+        payload = json.loads(response.choices[0].message.content or "{}")
+        try:
+            result = validate_sensitivity_payload(payload, segments)
+            break
+        except SensitivityValidationError as error:
+            last_error = error
+            logger.warning("sensitivity attempt %d invalid: %s", attempt + 1, error)
+    if result is None:
+        raise last_error
 
     # R5 이중 체크: 2차 판정이 "유형 정의에 명백히 부합하지 않는" 플래그만
     # 제거한다. 애매하면 유지 — 재현율은 1차, 정밀도는 2차가 담당

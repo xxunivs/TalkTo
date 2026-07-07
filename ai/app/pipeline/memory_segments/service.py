@@ -7,6 +7,7 @@ LLM은 memoryText·근거·인물·확실성만 제안한다. 시간 구간(star
 
 import json
 import logging
+import re
 import unicodedata
 
 from openai import OpenAI
@@ -22,6 +23,13 @@ from app.schemas.transcript import TranscriptSegment
 logger = logging.getLogger(__name__)
 
 _CONFIDENCE_VALUES = {"confirmed", "inferred"}
+# 허용 문자: 한글(완성형·자모), 영숫자, 공백, 기본 문장부호 — 그 외 스크립트가
+# 섞이면 LLM 출력 오염(실측: 벵골어 혼입)으로 보고 그 기억을 버린다
+_FOREIGN_CHARS = re.compile(r"[^가-힣ㄱ-ㅎㅏ-ㅣa-zA-Z0-9\s.,!?~%:;'\"()\[\]·\-—…]+")
+
+
+def has_foreign_script(text: str) -> bool:
+    return bool(_FOREIGN_CHARS.search(text))
 
 
 def extract_memory_segments(
@@ -55,7 +63,13 @@ def extract_memory_segments(
         ],
     )
     payload = json.loads(response.choices[0].message.content or "{}")
-    return validate_memory_payload(payload, segments, sensitivity_result)
+    subject = subject_context.subject if subject_context is not None else None
+    return validate_memory_payload(
+        payload,
+        segments,
+        sensitivity_result,
+        subject_name=subject.name if subject else None,
+    )
 
 
 def _normalized(text: str) -> str:
@@ -67,6 +81,8 @@ def validate_memory_payload(
     payload: dict,
     segments: list[TranscriptSegment],
     sensitivity_result: dict | None = None,
+    *,
+    subject_name: str | None = None,
 ) -> dict:
     """R1(근거 실존)·enum·중복을 코드로 강제하고 시간·화자·민감플래그를 파생한다."""
     by_index = {segment.segment_index: segment for segment in segments}
@@ -84,7 +100,7 @@ def validate_memory_payload(
             continue
         text = str(memory.get("memoryText") or "").strip()
         source_ids_raw = memory.get("sourceSegmentIds")
-        if not text or not isinstance(source_ids_raw, list):
+        if not text or has_foreign_script(text) or not isinstance(source_ids_raw, list):
             dropped["memories"] += 1
             continue
         source_ids = sorted(
@@ -116,7 +132,7 @@ def validate_memory_payload(
         related = [
             str(name).strip()
             for name in (memory.get("relatedPeople") or [])
-            if str(name).strip()
+            if str(name).strip() and str(name).strip() != subject_name
         ]
         memories.append(
             {

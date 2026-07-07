@@ -72,3 +72,39 @@ class ValidateMemoryPayloadTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ForeignScriptGateTest(unittest.TestCase):
+    def test_drops_memory_with_foreign_script(self) -> None:
+        result = validate_memory_payload(
+            {
+                "memorySegments": [
+                    {"memoryText": "통화 শেষে 인사했다", "sourceSegmentIds": [0], "confidence": "confirmed"},
+                    {"memoryText": "정상 문장 (50%) 이다.", "sourceSegmentIds": [1], "confidence": "confirmed"},
+                ]
+            },
+            SEGMENTS,
+        )
+
+        self.assertEqual(len(result["memorySegments"]), 1)
+        self.assertEqual(result["validationDropped"]["memories"], 1)
+
+
+class RelatedPeopleGateTest(unittest.TestCase):
+    def test_excludes_subject_from_related_people(self) -> None:
+        result = validate_memory_payload(
+            {
+                "memorySegments": [
+                    {
+                        "memoryText": "손주가 감사 인사를 했다",
+                        "sourceSegmentIds": [0],
+                        "relatedPeople": ["이준혁", "신금자"],
+                        "confidence": "confirmed",
+                    }
+                ]
+            },
+            SEGMENTS,
+            subject_name="신금자",
+        )
+
+        self.assertEqual(result["memorySegments"][0]["relatedPeople"], ["이준혁"])
