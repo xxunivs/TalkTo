@@ -1,0 +1,137 @@
+"""3-A 기억 조각 추출 — LLM 제안 + 코드 검증/파생.
+
+LLM은 memoryText·근거·인물·확실성만 제안한다. 시간 구간(startMs/endMs)과
+화자 라벨은 근거 세그먼트에서 코드가 파생하고(LLM이 지어낼 수 없게),
+민감플래그는 ⑤ 분석 결과와 근거 구간 교집합으로 코드가 조인한다.
+"""
+
+import json
+import logging
+import unicodedata
+
+from openai import OpenAI
+
+from app.core.config import Settings
+from app.pipeline.memory_segments.prompts import (
+    MEMORY_SYSTEM_PROMPT,
+    build_memory_user_prompt,
+)
+from app.schemas.context import SubjectContext
+from app.schemas.transcript import TranscriptSegment
+
+logger = logging.getLogger(__name__)
+
+_CONFIDENCE_VALUES = {"confirmed", "inferred"}
+
+
+def extract_memory_segments(
+    segments: list[TranscriptSegment],
+    *,
+    subject_context: SubjectContext | None,
+    subject_speaker_label: str | None,
+    persons_result: dict | None,
+    sensitivity_result: dict | None,
+    settings: Settings,
+) -> dict:
+    if settings.openai_api_key is None:
+        raise RuntimeError("OPENAI_API_KEY is required for memory extraction")
+
+    client = OpenAI(
+        api_key=settings.openai_api_key.get_secret_value(),
+        timeout=settings.openai_timeout_seconds,
+        max_retries=settings.openai_max_retries,
+    )
+    response = client.chat.completions.create(
+        model=settings.openai_analysis_model,
+        response_format={"type": "json_object"},
+        messages=[
+            {"role": "system", "content": MEMORY_SYSTEM_PROMPT},
+            {
+                "role": "user",
+                "content": build_memory_user_prompt(
+                    segments, subject_context, subject_speaker_label, persons_result
+                ),
+            },
+        ],
+    )
+    payload = json.loads(response.choices[0].message.content or "{}")
+    return validate_memory_payload(payload, segments, sensitivity_result)
+
+
+def _normalized(text: str) -> str:
+    text = unicodedata.normalize("NFC", text)
+    return "".join(ch for ch in text if ch.isalnum())
+
+
+def validate_memory_payload(
+    payload: dict,
+    segments: list[TranscriptSegment],
+    sensitivity_result: dict | None = None,
+) -> dict:
+    """R1(근거 실존)·enum·중복을 코드로 강제하고 시간·화자·민감플래그를 파생한다."""
+    by_index = {segment.segment_index: segment for segment in segments}
+    dropped = {"memories": 0, "duplicates": 0}
+    seen_texts: set[str] = set()
+
+    flag_map: list[tuple[set[int], str]] = []
+    for flag in (sensitivity_result or {}).get("sensitivityFlags") or []:
+        flag_map.append((set(flag["sourceSegmentIds"]), flag["type"]))
+
+    memories = []
+    for memory in payload.get("memorySegments") or []:
+        if not isinstance(memory, dict):
+            dropped["memories"] += 1
+            continue
+        text = str(memory.get("memoryText") or "").strip()
+        source_ids_raw = memory.get("sourceSegmentIds")
+        if not text or not isinstance(source_ids_raw, list):
+            dropped["memories"] += 1
+            continue
+        source_ids = sorted(
+            {i for i in source_ids_raw if isinstance(i, int) and i in by_index}
+        )
+        if not source_ids or memory.get("confidence") not in _CONFIDENCE_VALUES:
+            dropped["memories"] += 1
+            continue
+
+        key = _normalized(text)
+        if key in seen_texts:
+            dropped["duplicates"] += 1
+            continue
+        seen_texts.add(key)
+
+        sources = [by_index[i] for i in source_ids]
+        speaker_counts: dict[str, int] = {}
+        for source in sources:
+            speaker_counts[source.speaker_label] = (
+                speaker_counts.get(source.speaker_label, 0) + 1
+            )
+        flags = sorted(
+            {
+                flag_type
+                for flag_ids, flag_type in flag_map
+                if flag_ids & set(source_ids)
+            }
+        )
+        related = [
+            str(name).strip()
+            for name in (memory.get("relatedPeople") or [])
+            if str(name).strip()
+        ]
+        memories.append(
+            {
+                "segmentIndex": len(memories),
+                "sourceSegmentIds": source_ids,
+                "startMs": min(s.start_ms for s in sources),
+                "endMs": max(s.end_ms for s in sources),
+                "speakerLabel": max(speaker_counts, key=speaker_counts.get),
+                "memoryText": text,
+                "relatedPeople": related,
+                "confidence": memory["confidence"],
+                "sensitivityFlags": flags,
+            }
+        )
+
+    if any(dropped.values()):
+        logger.warning("memory validation dropped items: %s", dropped)
+    return {"memorySegments": memories, "validationDropped": dropped}
