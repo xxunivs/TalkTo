@@ -21,10 +21,10 @@ tmp/
 *.amr
 
 # bake-off outputs contain transcripts; never commit
-evaluation/bakeoff/results*/
-evaluation/bakeoff/gold/
-evaluation/e2e/results/
+evaluation/transcription/bakeoff/results*/
+evaluation/transcription/gold/
+evaluation/transcription/results/
 # real family data for tests; never commit
-evaluation/fixtures/
+data/fixtures/
 # audio + external datasets; never commit
 data/

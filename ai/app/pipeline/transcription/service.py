@@ -2,9 +2,9 @@ from app.core.config import Settings
 from app.core.errors import AudioTooShortError, EmptyTranscriptError
 from app.providers.stt.interface import STTProvider
 from app.schemas.transcript import TranscriptionRequest, TranscriptionResponse
-from app.services.audio import download_audio
-from app.services.correction import correct_segments
-from app.services.glossary import build_glossary
+from app.pipeline.transcription.audio import download_audio
+from app.pipeline.correction.service import correct_segments
+from app.pipeline.correction.glossary import build_glossary
 
 
 def transcribe_recording(

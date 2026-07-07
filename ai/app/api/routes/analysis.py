@@ -11,7 +11,7 @@ from app.schemas.memory import (
     MemorySegmentExtractionResponse,
 )
 from app.schemas.transcript import TranscriptionRequest, TranscriptionResponse
-from app.services.transcription import transcribe_recording
+from app.pipeline.transcription.service import transcribe_recording
 
 
 router = APIRouter(tags=["analysis"])

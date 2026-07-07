@@ -10,7 +10,7 @@ import logging
 from openai import OpenAI
 
 from app.core.config import Settings
-from app.prompts.analysis.persons import (
+from app.pipeline.analysis.persons_prompts import (
     PERSONS_SYSTEM_PROMPT,
     build_persons_user_prompt,
 )

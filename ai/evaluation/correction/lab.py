@@ -12,8 +12,8 @@ import sys
 
 from app.core.config import load_settings
 from app.schemas.transcript import TranscriptSegment
-from app.services.correction import correct_segments
-from app.services.glossary import build_glossary
+from app.pipeline.correction.service import correct_segments
+from app.pipeline.correction.glossary import build_glossary
 from evaluation.common import REPO_ROOT, load_context_fixture
 
 

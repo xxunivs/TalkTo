@@ -12,7 +12,7 @@ import logging
 from openai import OpenAI
 
 from app.core.config import Settings
-from app.prompts.analysis.sensitivity import (
+from app.pipeline.analysis.sensitivity_prompts import (
     SENSITIVITY_JUDGE_PROMPT,
     SENSITIVITY_SYSTEM_PROMPT,
     SENSITIVITY_TYPES,

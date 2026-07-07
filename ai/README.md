@@ -73,3 +73,16 @@ python -m unittest discover -s tests -v
 - 로그에는 job ID, recording ID, 처리 단계, 상태, 지연시간 같은 운영 메타데이터만 기록합니다.
 - 사용자 원문, 전사문, 기억 내용, 음성, 민감정보를 로그에 남기지 않습니다.
 - API key, token, 인증 헤더, signed URL, provider 요청·응답 원문을 로그에 남기지 않습니다.
+
+## 파이프라인 단계 지도
+
+| 단계 | 로직·프롬프트 | 실험·결과 |
+|---|---|---|
+| 0. 데이터 | `data/` (가족 녹음 `voice_raw/`, 외부 `external/`, 픽스처 `fixtures/`) | — |
+| 1. 전사·화자분리 | `app/pipeline/transcription/` (+ `app/providers/stt/`) | `evaluation/transcription/` (bake-off, E2E, 외부 CER, `results/`) |
+| 1.5 보정 | `app/pipeline/correction/` (프롬프트+게이트+용어 파생) | `evaluation/correction/` (캔어리 랩) |
+| 화자 식별 | `app/pipeline/speaker_id/` (ECAPA) | `evaluation/speaker_id/` (캘리브레이션) |
+| 2. 심층 분석 | `app/pipeline/analysis/` (인물·민감 프롬프트+게이트) | `evaluation/analysis/` |
+| 3-A. 기억 조각 | `app/pipeline/memory_segments/` | `evaluation/memory_segments/` |
+
+실행 예: `python -m evaluation.analysis.lab persons`, `python -m evaluation.transcription.e2e`

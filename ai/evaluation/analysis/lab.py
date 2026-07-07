@@ -12,8 +12,8 @@ import argparse
 import json
 
 from app.core.config import load_settings
-from app.services.analysis.persons import run_persons_analysis
-from app.services.analysis.sensitivity import run_sensitivity_analysis
+from app.pipeline.analysis.persons import run_persons_analysis
+from app.pipeline.analysis.sensitivity import run_sensitivity_analysis
 from evaluation.common import (
     REPO_ROOT,
     RESULTS_DIR,
@@ -21,7 +21,7 @@ from evaluation.common import (
     load_segments,
     result_stems,
 )
-from evaluation.speaker_id_lab import gold_speaker_texts, subject_label_by_text
+from evaluation.speaker_id.lab import gold_speaker_texts, subject_label_by_text
 
 OUT_DIR = RESULTS_DIR / "analysis"
 

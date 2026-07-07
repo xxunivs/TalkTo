@@ -25,11 +25,11 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from evaluation.bakeoff.metrics import cer, full_text, speaker_stats
-from evaluation.bakeoff.providers import ProviderError, transcribe_rtzr, transcribe_scribe
+from evaluation.metrics import cer, full_text, speaker_stats
+from evaluation.transcription.bakeoff.providers import ProviderError, transcribe_rtzr, transcribe_scribe
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_OUT = REPO_ROOT / "evaluation" / "bakeoff" / "results"
+REPO_ROOT = Path(__file__).resolve().parents[3]
+DEFAULT_OUT = REPO_ROOT / "evaluation" / "transcription" / "bakeoff" / "results"
 
 
 def parse_args() -> argparse.Namespace:

@@ -10,8 +10,8 @@ AI Hub 전사 표기 규칙(이중 전사 (철자)/(발음), 잡음 태그 b/ o/
 쪽을 쓴다 (STT가 어느 쪽으로 써도 정답 취급).
 
 Usage:
-    python -m evaluation.external_lab phone-cer [--clips 30]
-    python -m evaluation.external_lab correction-safety --source phone [--utterances 80]
+    python -m evaluation.transcription.external_cer phone-cer [--clips 30]
+    python -m evaluation.transcription.external_cer correction-safety --source phone [--utterances 80]
 """
 
 import argparse
@@ -23,7 +23,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from evaluation.bakeoff.metrics import cer
+from evaluation.metrics import cer
 from evaluation.common import REPO_ROOT
 
 AIHUB_ROOT = Path(__file__).resolve().parents[1] / "data" / "external"
@@ -105,7 +105,7 @@ SYNTHETIC_GLOSSARY = [
 def run_correction_safety(source: str, utterances: int) -> None:
     from app.core.config import load_settings
     from app.schemas.transcript import TranscriptSegment
-    from app.services.correction import correct_segments
+    from app.pipeline.correction.service import correct_segments
 
     if source == "phone":
         labels = [label for _, label in phone_clip_pairs()]

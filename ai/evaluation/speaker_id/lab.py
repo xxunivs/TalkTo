@@ -6,7 +6,7 @@ Scribe 화자 라벨(SPK_n)을 텍스트 유사도(CER)로 자동 정렬해 "이
 만들어 Intake 음성 샘플(voiceSampleRef) 등록을 시뮬레이션한다.
 
 Usage:
-    python -m evaluation.speaker_id_lab [--reference "할머니 목소리 1"]
+    python -m evaluation.speaker_id.lab [--reference "할머니 목소리 1"]
 
 Requires: pip install speechbrain torchaudio torch (선택 의존성),
 evaluation/e2e/results/*.json (전사 결과), evaluation/bakeoff/gold/*.txt.
@@ -16,8 +16,8 @@ import argparse
 import re
 
 from app.schemas.transcript import TranscriptSegment
-from app.services.speaker_id import SpeakerEmbedder, cosine_similarity
-from evaluation.bakeoff.metrics import cer
+from app.pipeline.speaker_id.service import SpeakerEmbedder, cosine_similarity
+from evaluation.metrics import cer
 from evaluation.common import AUDIO_DIR, GOLD_DIR, load_segments, result_stems
 
 SUBJECT_GOLD_LABEL = "할머니"
@@ -71,7 +71,7 @@ def reference_embedding_from(
     """대상자 발화 앞부분 ~20초로 reference 임베딩 생성 (voiceSampleRef 시뮬레이션)."""
     import torch
 
-    from app.services.speaker_id import SAMPLE_RATE, load_mono_16k, slice_ms
+    from app.pipeline.speaker_id.service import SAMPLE_RATE, load_mono_16k, slice_ms
 
     segments = load_segments(stem)
     waveform = load_mono_16k(AUDIO_DIR / f"{stem}.wav")

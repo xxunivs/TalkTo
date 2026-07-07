@@ -55,11 +55,11 @@ class TranscriptionsEndpointTest(unittest.TestCase):
                 return_value=FakeProvider(SEGMENTS),
             ),
             patch(
-                "app.services.transcription.download_audio",
+                "app.pipeline.transcription.service.download_audio",
                 return_value=Path("/nonexistent/audio.m4a"),
             ),
             patch(
-                "app.services.transcription.correct_segments",
+                "app.pipeline.transcription.service.correct_segments",
                 side_effect=lambda segments, **_kwargs: segments,
             ),
         ):
@@ -93,7 +93,7 @@ class TranscriptionsEndpointTest(unittest.TestCase):
                 return_value=FakeProvider(SEGMENTS),
             ),
             patch(
-                "app.services.transcription.download_audio",
+                "app.pipeline.transcription.service.download_audio",
                 side_effect=AudioUrlExpiredError(),
             ),
         ):

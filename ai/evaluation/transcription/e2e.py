@@ -6,7 +6,7 @@ and scores the responses against gold transcripts (same normalization as the
 bake-off: speaker labels stripped, whitespace/punctuation removed).
 
 Usage:
-    python -m evaluation.e2e.run_e2e_transcription [options]
+    python -m evaluation.transcription.e2e [options]
 
 Options:
     --audio-dir PATH   recordings directory (default: data/voice_raw)
@@ -36,12 +36,12 @@ from pathlib import Path
 import httpx
 from dotenv import dotenv_values
 
-from evaluation.bakeoff.metrics import cer, full_text, speaker_stats
+from evaluation.metrics import cer, full_text, speaker_stats
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_AUDIO_DIR = REPO_ROOT / "data" / "voice_raw"
-DEFAULT_GOLD_DIR = REPO_ROOT / "evaluation" / "bakeoff" / "gold"
-DEFAULT_OUT = REPO_ROOT / "evaluation" / "e2e" / "results"
+DEFAULT_GOLD_DIR = REPO_ROOT / "evaluation" / "transcription" / "gold"
+DEFAULT_OUT = REPO_ROOT / "evaluation" / "transcription" / "results"
 
 # 골드 10·11번은 통화 후반부가 누락된 정리본이라 CER 채점에서 제외한다
 # (10번은 bake-off에서, 11번은 7/6 E2E에서 확인: 골드 888자 vs 실제 발화 1,275자)

@@ -8,9 +8,9 @@ from app.schemas.context import IntakeContext, SubjectContext
 from app.schemas.transcript import TranscriptSegment
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-RESULTS_DIR = REPO_ROOT / "evaluation" / "e2e" / "results"
-FIXTURE_PATH = REPO_ROOT / "evaluation" / "fixtures" / "subject_context_singeumja.json"
-GOLD_DIR = REPO_ROOT / "evaluation" / "bakeoff" / "gold"
+RESULTS_DIR = REPO_ROOT / "evaluation" / "transcription" / "results"
+FIXTURE_PATH = REPO_ROOT / "data" / "fixtures" / "subject_context_singeumja.json"
+GOLD_DIR = REPO_ROOT / "evaluation" / "transcription" / "gold"
 AUDIO_DIR = REPO_ROOT / "data" / "voice_raw"
 
 

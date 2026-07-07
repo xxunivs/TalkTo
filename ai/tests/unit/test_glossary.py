@@ -1,7 +1,7 @@
 import unittest
 
 from app.schemas.context import IntakeContext, SubjectContext
-from app.services.glossary import build_glossary
+from app.pipeline.correction.glossary import build_glossary
 
 
 class BuildGlossaryTest(unittest.TestCase):
