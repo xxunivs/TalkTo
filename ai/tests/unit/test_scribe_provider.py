@@ -61,3 +61,22 @@ class GroupScribeWordsTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class StripNonSpeechNotesTest(unittest.TestCase):
+    def test_removes_pause_and_silence_notes(self) -> None:
+        from app.providers.stt.elevenlabs_scribe import strip_non_speech_notes
+
+        self.assertEqual(
+            strip_non_speech_notes("다이어트도 하려고요. (2초간 멈춤)"),
+            "다이어트도 하려고요.",
+        )
+        self.assertEqual(strip_non_speech_notes("(침묵) 관절 약을 먹었는데"), "관절 약을 먹었는데")
+        self.assertEqual(strip_non_speech_notes("(3초 멈춤)"), "")
+
+    def test_keeps_normal_parentheses(self) -> None:
+        from app.providers.stt.elevenlabs_scribe import strip_non_speech_notes
+
+        self.assertEqual(
+            strip_non_speech_notes("병원(정형외과)에 갔다"), "병원(정형외과)에 갔다"
+        )

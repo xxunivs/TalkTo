@@ -1,6 +1,7 @@
 """ElevenLabs Scribe STT with built-in diarization (bake-off winner, 2026-07-04)."""
 
 import math
+import re
 from pathlib import Path
 
 import httpx
@@ -10,6 +11,17 @@ from app.providers.stt.interface import STTResult
 from app.schemas.transcript import TranscriptSegment
 
 ELEVENLABS_BASE = "https://api.elevenlabs.io"
+
+# Scribe가 무음·소리를 텍스트로 서술하는 패턴 — tag_audio_events를 꺼도
+# 새어 나온다 (외부 데이터 일반화 테스트에서 발견: "(2초간 멈춤)", "(침묵)").
+# 발화가 아니므로 전사에서 제거한다
+_NON_SPEECH_NOTE = re.compile(
+    r"\(\s*(?:\d+\s*초[^)]*|침묵|멈춤|웃음|한숨|박수|기침|음악|잡음)[^)]*\)"
+)
+
+
+def strip_non_speech_notes(text: str) -> str:
+    return " ".join(_NON_SPEECH_NOTE.sub(" ", text).split())
 
 
 class ElevenLabsScribeProvider:
@@ -64,7 +76,7 @@ class ElevenLabsScribeProvider:
                     start_ms=0,
                     end_ms=0,
                     speaker_label="SPK_0",
-                    transcript_text=body["text"].strip(),
+                    transcript_text=strip_non_speech_notes(body["text"]),
                 )
             ]
         return STTResult(provider="elevenlabs", model=self.model_id, segments=segments)
@@ -77,7 +89,7 @@ def group_scribe_words(words: list[dict]) -> list[TranscriptSegment]:
 
     def flush() -> None:
         nonlocal current
-        if current and current["text"].strip():
+        if current and strip_non_speech_notes(current["text"]):
             logprobs: list[float] = current["logprobs"]
             confidence = (
                 round(math.exp(sum(logprobs) / len(logprobs)), 4) if logprobs else None
@@ -88,7 +100,7 @@ def group_scribe_words(words: list[dict]) -> list[TranscriptSegment]:
                     start_ms=current["startMs"],
                     end_ms=current["endMs"],
                     speaker_label=current["speakerLabel"],
-                    transcript_text=current["text"].strip(),
+                    transcript_text=strip_non_speech_notes(current["text"]),
                     confidence=confidence,
                 )
             )
