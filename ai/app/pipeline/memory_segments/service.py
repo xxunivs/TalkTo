@@ -122,11 +122,16 @@ def validate_memory_payload(
             speaker_counts[source.speaker_label] = (
                 speaker_counts.get(source.speaker_label, 0) + 1
             )
+        # 민감플래그 조인은 정확히 인용된 세그먼트가 아니라 기억이 걸친 범위
+        # [최소~최대]로 한다 — 중간 세그먼트를 명시 인용하지 않아도 그 범위 안의
+        # 민감 내용을 놓치지 않기 위함 (근거 인용은 완전하지 않을 수 있음)
+        span = range(source_ids[0], source_ids[-1] + 1)
+        span_set = set(span)
         flags = sorted(
             {
                 flag_type
                 for flag_ids, flag_type in flag_map
-                if flag_ids & set(source_ids)
+                if flag_ids & span_set
             }
         )
         related = [

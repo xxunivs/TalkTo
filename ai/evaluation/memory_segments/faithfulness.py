@@ -24,8 +24,9 @@ from app.core.config import load_settings
 from evaluation.common import REPO_ROOT, RESULTS_DIR, load_segments, result_stems
 
 MEMORY_DIR = RESULTS_DIR / "memory"
-# 근거 창: 인용 세그먼트 앞뒤로 이만큼 더 본다 (인용 불완전 보정)
-WINDOW = 8
+# 근거 창 기본값: 인용 세그먼트 앞뒤로 이만큼 더 본다 (인용 불완전 보정).
+# --window 0 으로 좁히면 '인용이 완전한가'를 검증할 수 있다
+DEFAULT_WINDOW = 8
 
 JUDGE_SYSTEM_PROMPT = """너는 기억 문장이 통화 원문과 확정 정보에 의해 뒷받침되는지 판정하는 채점기다.
 
@@ -85,7 +86,7 @@ def build_context(stem) -> str:
     return "\n".join(lines) or "(추가 확정 정보 없음)"
 
 
-def score_file(client, model, stem, verbose):
+def score_file(client, model, stem, window):
     memory = json.loads((MEMORY_DIR / f"{stem}.memory.json").read_text(encoding="utf-8"))
     by_index = {s.segment_index: s for s in load_segments(stem)}
     context = build_context(stem)
@@ -99,10 +100,10 @@ def score_file(client, model, stem, verbose):
         # 내용이 대화에 있으면 지지로 판정되게 한다
         cited = [i for i in seg["sourceSegmentIds"] if i in by_index]
         lo, hi = min(cited), max(cited)
-        window = [i for i in ordered if lo - WINDOW <= i <= hi + WINDOW]
+        window_ids = [i for i in ordered if lo - window <= i <= hi + window]
         source_lines = [
             f"[{by_index[i].speaker_label}] {by_index[i].corrected_text or by_index[i].transcript_text}"
-            for i in window
+            for i in window_ids
         ]
         response = client.chat.completions.create(
             model=model,
@@ -125,6 +126,7 @@ def score_file(client, model, stem, verbose):
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--only", type=str, default=None)
+    parser.add_argument("--window", type=int, default=DEFAULT_WINDOW)
     args = parser.parse_args()
 
     settings = load_settings(REPO_ROOT / ".env")
@@ -140,7 +142,7 @@ def main() -> int:
     grand = {"supported": 0, "partial": 0, "unsupported": 0}
     all_unsupported = []
     for stem in stems:
-        totals, unsupported = score_file(client, model, stem, args)
+        totals, unsupported = score_file(client, model, stem, args.window)
         for k in grand:
             grand[k] += totals[k]
         all_unsupported.extend(unsupported)

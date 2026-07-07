@@ -16,6 +16,8 @@ def segment(index: int, speaker: str = "SPK_0") -> TranscriptSegment:
 
 SEGMENTS = [segment(0), segment(1, "SPK_1"), segment(2)]
 SENSITIVITY = {"sensitivityFlags": [{"type": "health", "description": "x", "sourceSegmentIds": [2]}]}
+# 기억이 [0,2]를 인용하면 중간 1번의 플래그도 범위 조인으로 잡혀야 한다
+SENSITIVITY_MID = {"sensitivityFlags": [{"type": "asset", "description": "y", "sourceSegmentIds": [1]}]}
 
 
 class ValidateMemoryPayloadTest(unittest.TestCase):
@@ -40,6 +42,24 @@ class ValidateMemoryPayloadTest(unittest.TestCase):
         self.assertEqual(memory["endMs"], 3000)
         self.assertEqual(memory["speakerLabel"], "SPK_0")
         self.assertEqual(memory["sensitivityFlags"], ["health"])
+
+    def test_joins_flag_within_cited_span(self) -> None:
+        result = validate_memory_payload(
+            {
+                "memorySegments": [
+                    {
+                        "memoryText": "범위 조인 확인",
+                        "sourceSegmentIds": [0, 2],
+                        "confidence": "confirmed",
+                    }
+                ]
+            },
+            SEGMENTS,
+            SENSITIVITY_MID,
+        )
+
+        # 1번은 인용 안 했지만 [0,2] 범위 안이므로 asset 플래그가 조인돼야 함
+        self.assertEqual(result["memorySegments"][0]["sensitivityFlags"], ["asset"])
 
     def test_drops_fabricated_ids_and_bad_confidence(self) -> None:
         result = validate_memory_payload(
