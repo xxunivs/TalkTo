@@ -16,7 +16,7 @@ class Settings(BaseModel):
 
     openai_api_key: SecretStr | None = None
     openai_chat_model: str = "gpt-4.1-mini"
-    openai_analysis_model: str = "gpt-4.1-mini"
+    openai_analysis_model: str = "gpt-5.4-mini"
     openai_stt_model: str = "whisper-1"
     openai_correction_model: str = "gpt-4.1-mini"
     # 교정 발음 유사도 게이트(자모 편집거리 비율 상한). 초기값은 실통화 13건
@@ -82,7 +82,7 @@ def load_settings(env_file: str | Path | None = ".env") -> Settings:
         ai_server_token=os.getenv("AI_SERVER_TOKEN"),
         openai_api_key=os.getenv("OPENAI_API_KEY"),
         openai_chat_model=os.getenv("OPENAI_CHAT_MODEL", "gpt-4.1-mini"),
-        openai_analysis_model=os.getenv("OPENAI_ANALYSIS_MODEL", "gpt-4.1-mini"),
+        openai_analysis_model=os.getenv("OPENAI_ANALYSIS_MODEL", "gpt-5.4-mini"),
         openai_stt_model=os.getenv("OPENAI_STT_MODEL", "whisper-1"),
         openai_correction_model=os.getenv("OPENAI_CORRECTION_MODEL", "gpt-4.1-mini"),
         correction_max_jamo_ratio=os.getenv("CORRECTION_MAX_JAMO_RATIO", "0.45"),

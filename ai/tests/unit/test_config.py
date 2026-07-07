@@ -12,7 +12,7 @@ class ConfigTest(unittest.TestCase):
 
         self.assertEqual(settings.app_env, "local")
         self.assertEqual(settings.openai_chat_model, "gpt-4.1-mini")
-        self.assertEqual(settings.openai_analysis_model, "gpt-4.1-mini")
+        self.assertEqual(settings.openai_analysis_model, "gpt-5.4-mini")
         self.assertEqual(settings.openai_stt_model, "whisper-1")
         self.assertEqual(
             settings.openai_embedding_model,

@@ -1,0 +1,93 @@
+"""2단계 분석 오프라인 랩 — 저장된 전사 13건으로 항목별 프롬프트 품질 확인.
+
+Usage:
+    python -m evaluation.analysis_lab persons [--only "할머니 목소리 8,할머니 목소리 10"] [--model gpt-4.1-mini]
+
+입력: evaluation/e2e/results/*.json (전사) + evaluation/fixtures/ (컨텍스트).
+대상자 화자 라벨은 골드 텍스트 정렬(speaker_id_lab과 동일)로 자동 도출.
+출력: 파일별 인물 표 + 코드 검증 위반 수. 결과는 화면 + results/analysis/ 저장.
+"""
+
+import argparse
+import json
+from pathlib import Path
+
+from app.core.config import load_settings
+from app.schemas.context import SubjectContext
+from app.schemas.transcript import TranscriptSegment
+from app.services.analysis.persons import run_persons_analysis
+from evaluation.e2e.run_e2e_transcription import natural_key
+from evaluation.speaker_id_lab import gold_speaker_texts, subject_label_by_text
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+RESULTS = REPO_ROOT / "evaluation" / "e2e" / "results"
+OUT_DIR = RESULTS / "analysis"
+FIXTURE = REPO_ROOT / "evaluation" / "fixtures" / "subject_context_singeumja.json"
+
+
+def load_segments(stem: str) -> list[TranscriptSegment]:
+    body = json.loads((RESULTS / f"{stem}.json").read_text(encoding="utf-8"))
+    return [TranscriptSegment(**segment) for segment in body["segments"]]
+
+
+def load_subject_context() -> SubjectContext:
+    payload = json.loads(FIXTURE.read_text(encoding="utf-8"))
+    return SubjectContext(**payload["subjectContext"])
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("item", choices=["persons"])
+    parser.add_argument("--only", type=str, default=None)
+    parser.add_argument("--model", type=str, default=None)
+    args = parser.parse_args()
+
+    settings = load_settings(REPO_ROOT / ".env")
+    if args.model:
+        settings = settings.model_copy(update={"openai_analysis_model": args.model})
+    print(f"모델: {settings.openai_analysis_model}")
+
+    stems = sorted(
+        (path.stem for path in RESULTS.glob("*.json")),
+        key=lambda stem: natural_key(Path(stem)),
+    )
+    if args.only:
+        wanted = {name.strip() for name in args.only.split(",")}
+        stems = [stem for stem in stems if stem in wanted]
+
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    subject_context = load_subject_context()
+
+    for stem in stems:
+        segments = load_segments(stem)
+        subject_label = subject_label_by_text(segments, gold_speaker_texts(stem))
+        result = run_persons_analysis(
+            segments,
+            subject_context=subject_context,
+            subject_speaker_label=subject_label,
+            settings=settings,
+        )
+        (OUT_DIR / f"{stem}.persons.json").write_text(
+            json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+
+        dropped = result["validationDropped"]
+        print(f"\n=== {stem} (대상자: {subject_label}, 검증 제거: {sum(dropped.values())}) ===")
+        for person in result["persons"]:
+            facts = "; ".join(fact["fact"] for fact in person["facts"]) or "-"
+            print(
+                f"  {person['name']} [{person['relationToSubject'] or '?'}] "
+                f"({person['confidence']}) 지칭: {', '.join(person['mentions']) or '-'}"
+            )
+            if facts != "-":
+                print(f"    사실: {facts}")
+            for relation in person["relationsToOthers"]:
+                print(f"    관계: {relation['name']} = {relation['relation']}")
+        for mention in result["unresolvedMentions"]:
+            print(f"  [미해결] {mention['mention']} — {mention['context']}")
+    print(f"\n결과 저장: {OUT_DIR}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
