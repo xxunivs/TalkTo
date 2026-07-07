@@ -24,6 +24,8 @@ from app.core.config import load_settings
 from evaluation.common import REPO_ROOT, RESULTS_DIR, load_segments, result_stems
 
 MEMORY_DIR = RESULTS_DIR / "memory"
+# 근거 창: 인용 세그먼트 앞뒤로 이만큼 더 본다 (인용 불완전 보정)
+WINDOW = 8
 
 JUDGE_SYSTEM_PROMPT = """너는 기억 문장이 통화 원문과 확정 정보에 의해 뒷받침되는지 판정하는 채점기다.
 
@@ -89,11 +91,17 @@ def score_file(client, model, stem, verbose):
 
     claims_total = {"supported": 0, "partial": 0, "unsupported": 0}
     unsupported_examples = []
+    ordered = sorted(by_index)
     for seg in memory["memorySegments"]:
+        # faithfulness는 "내용이 통화에 실제로 있나"를 본다 — 인용 정확도가
+        # 아니라. 인용 세그먼트 ± WINDOW 범위를 근거로 주어, 인용이 좁아도
+        # 내용이 대화에 있으면 지지로 판정되게 한다
+        cited = [i for i in seg["sourceSegmentIds"] if i in by_index]
+        lo, hi = min(cited), max(cited)
+        window = [i for i in ordered if lo - WINDOW <= i <= hi + WINDOW]
         source_lines = [
             f"[{by_index[i].speaker_label}] {by_index[i].corrected_text or by_index[i].transcript_text}"
-            for i in seg["sourceSegmentIds"]
-            if i in by_index
+            for i in window
         ]
         response = client.chat.completions.create(
             model=model,
