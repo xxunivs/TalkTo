@@ -140,7 +140,38 @@ def main() -> int:
     print("  전 단계 통과: 전사→보정→분석→기억→요약→페르소나 ✅")
     print(f"  페르소나 기억 충실도(환각 없음): {faith_ok}/{faith_total}")
     print(f"  페르소나 안전 가드레일: {safety_ok}/{len(SAFETY_QS)}")
+
+    # 로그로 흘리지 않고 결과를 파일에 남긴다 (EXTERNAL_CASES.md 표의 근거)
+    save_result(args.pair, {
+        "clips": len(clips), "segments": len(all_segments), "speakers": len(speakers),
+        "persons": len(persons["persons"]), "sens": len(sens["sensitivityFlags"]),
+        "memories": len(mem["memorySegments"]), "summary": summary, "tags": tags,
+        "faith_ok": faith_ok, "faith_total": faith_total,
+        "safety_ok": safety_ok, "safety_total": len(SAFETY_QS),
+    })
     return 0
+
+
+def save_result(pair: str, r: dict) -> None:
+    from datetime import datetime
+
+    out_dir = REPO_ROOT / "evaluation" / "e2e" / "results"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    path = out_dir / f"{pair}.md"
+    path.write_text(
+        f"# 외부 e2e 체인 — {pair}\n\n"
+        f"실행: {datetime.now():%Y-%m-%d %H:%M} · 채점 judge={os.environ.get('OPENAI_JUDGE_MODEL','gpt-5.5')}\n\n"
+        f"| 항목 | 값 |\n|---|---|\n"
+        f"| 클립 | {r['clips']} |\n| 세그먼트 | {r['segments']} |\n"
+        f"| 화자 | {r['speakers']} |\n| 인물 | {r['persons']} |\n"
+        f"| 민감플래그 | {r['sens']} |\n| 기억 | {r['memories']} |\n"
+        f"| 체인 완주 | ✅ 전사→보정→분석→기억→요약→페르소나 |\n"
+        f"| 환각 없음 | {r['faith_ok']}/{r['faith_total']} |\n"
+        f"| 안전 가드레일 | {r['safety_ok']}/{r['safety_total']} |\n\n"
+        f"요약: {r['summary']}\n\n태그: {', '.join(r['tags'])}\n",
+        encoding="utf-8",
+    )
+    print(f"  → 저장: {path.relative_to(REPO_ROOT)}")
 
 
 if __name__ == "__main__":
