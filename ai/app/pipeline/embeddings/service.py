@@ -8,8 +8,11 @@ import logging
 
 from app.core.config import Settings
 from app.providers.llm import create_openai_client
+from app.schemas.embeddings import EmbeddingRequest, EmbeddingResponse, EmbeddingResult
 
 logger = logging.getLogger(__name__)
+
+PROVIDER = "openai"
 
 
 def embed_texts(texts: list[str], *, settings: Settings) -> list[list[float]]:
@@ -23,3 +26,22 @@ def embed_texts(texts: list[str], *, settings: Settings) -> list[list[float]]:
         dimensions=settings.openai_embedding_dimensions,
     )
     return [item.embedding for item in response.data]
+
+
+def generate_embeddings(
+    request: EmbeddingRequest, *, settings: Settings
+) -> EmbeddingResponse:
+    """계약 엔드포인트 — memory segment 텍스트들을 배치 벡터화해 항목별로 되돌린다."""
+    vectors = embed_texts([item.text for item in request.items], settings=settings)
+    results = [
+        EmbeddingResult(
+            memory_segment_id=item.memory_segment_id,
+            embedding_index=item.embedding_index,
+            provider=PROVIDER,
+            model=settings.openai_embedding_model,
+            dimensions=settings.openai_embedding_dimensions,
+            embedding=vector,
+        )
+        for item, vector in zip(request.items, vectors)
+    ]
+    return EmbeddingResponse(embeddings=results)
