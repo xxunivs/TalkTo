@@ -21,7 +21,13 @@ import json
 from openai import OpenAI
 
 from app.core.config import load_settings
-from evaluation.common import REPO_ROOT, RESULTS_DIR, load_segments, result_stems
+from evaluation.common import (
+    REPO_ROOT,
+    RESULTS_DIR,
+    load_segments,
+    result_stems,
+    write_summary_md,
+)
 
 MEMORY_DIR = RESULTS_DIR / "memory"
 # 근거 창 기본값: 인용 세그먼트 앞뒤로 이만큼 더 본다 (인용 불완전 보정).
@@ -156,6 +162,7 @@ def main() -> int:
 
     grand = {"supported": 0, "partial": 0, "unsupported": 0}
     all_unsupported = []
+    per_stem = []
     for stem in stems:
         totals, unsupported = score_file(client, model, stem, args.window)
         for k in grand:
@@ -163,6 +170,7 @@ def main() -> int:
         all_unsupported.extend(unsupported)
         n = sum(totals.values())
         rate = totals["supported"] / n if n else 0
+        per_stem.append((stem, n, rate, totals["unsupported"]))
         print(f"  {stem}: 주장 {n}개, 지지 {rate:.0%}, 불지지 {totals['unsupported']}")
 
     total = sum(grand.values())
@@ -175,6 +183,17 @@ def main() -> int:
         print("\n불지지 주장:")
         for memory_text, claim in all_unsupported[:15]:
             print(f"  · [{claim}] ← {memory_text[:45]}")
+
+    lines = [
+        f"**R2 지지율 = {support_rate:.1%}** (합격선 ≥95%·불지지 0 → {verdict}) · "
+        f"총 주장 {total}, 부분 {grand['partial']}, 불지지 {grand['unsupported']} · judge={model} · window={args.window}",
+        "", "| 파일 | 주장 | 지지 | 불지지 |", "|---|---|---|---|",
+        *[f"| {s} | {n} | {r:.0%} | {u} |" for s, n, r, u in per_stem],
+    ]
+    if all_unsupported:
+        lines += ["", "불지지 주장:", *[f"- [{c}] ← {m[:60]}" for m, c in all_unsupported]]
+    out = write_summary_md(MEMORY_DIR / "faithfulness_summary.md", "3-A R2 근거 뒷받침", lines)
+    print(f"→ 저장: {out.relative_to(REPO_ROOT)}")
     return 0
 
 

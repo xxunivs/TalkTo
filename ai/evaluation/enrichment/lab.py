@@ -16,7 +16,13 @@ from app.pipeline.enrichment.service import (
     summarize_recording,
 )
 from app.pipeline.memory_segments.service import _ALLOWED_TAGS
-from evaluation.common import REPO_ROOT, RESULTS_DIR, load_segments, result_stems
+from evaluation.common import (
+    REPO_ROOT,
+    RESULTS_DIR,
+    load_segments,
+    result_stems,
+    write_summary_md,
+)
 
 MEMORY_DIR = RESULTS_DIR / "memory"
 OUT_DIR = RESULTS_DIR / "enrichment"
@@ -77,6 +83,18 @@ def main() -> int:
     print(f"\n=== 채점 ({total}건) ===")
     print(f"  S1 근거율(지어냄 0): {s1_ok}/{total}   S3 형식(2~3문장): {s3_ok}/{total}   S4 민감 미노출: {s4_ok}/{total}")
     print(f"  T1 어휘 준수: {t1_ok}/{total}   T3 개수(3~7): {t3_ok}/{total}")
+
+    lines = [
+        f"채점 대상 {total}건 · judge={settings.openai_judge_model}", "",
+        "| 항목 | 통과 |", "|---|---|",
+        f"| S1 근거율(지어냄 0) | {s1_ok}/{total} |",
+        f"| S3 형식(2~3문장) | {s3_ok}/{total} |",
+        f"| S4 민감 미노출 | {s4_ok}/{total} |",
+        f"| T1 어휘 준수 | {t1_ok}/{total} |",
+        f"| T3 개수(3~7) | {t3_ok}/{total} |",
+    ]
+    out = write_summary_md(OUT_DIR / "enrichment_summary.md", "3-C 요약·태그 채점", lines)
+    print(f"→ 저장: {out.relative_to(REPO_ROOT)}")
     return 0
 
 

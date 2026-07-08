@@ -17,7 +17,13 @@ import json
 from openai import OpenAI
 
 from app.core.config import load_settings
-from evaluation.common import REPO_ROOT, RESULTS_DIR, load_segments, result_stems
+from evaluation.common import (
+    REPO_ROOT,
+    RESULTS_DIR,
+    load_segments,
+    result_stems,
+    write_summary_md,
+)
 
 MEMORY_DIR = RESULTS_DIR / "memory"
 
@@ -68,7 +74,7 @@ def main() -> int:
         wanted = {n.strip() for n in args.only.split(",")}
         stems = [s for s in stems if s in wanted]
 
-    grand_covered, grand_total, all_missed = 0, 0, []
+    grand_covered, grand_total, all_missed, per_stem = 0, 0, [], []
     for stem in stems:
         topics = judge_json(client, model, TOPICS_PROMPT, transcript_text(stem)).get("topics", [])
         if not topics:
@@ -83,6 +89,7 @@ def main() -> int:
         grand_total += total
         missed = [r["topic"] for r in results if r.get("verdict") == "missed"]
         all_missed.extend((stem, t) for t in missed)
+        per_stem.append((stem, total, covered))
         print(f"  {stem}: 화제 {total}개, 커버 {covered} ({covered/total:.0%})")
 
     rate = grand_covered / grand_total if grand_total else 0
@@ -91,6 +98,16 @@ def main() -> int:
         print("놓친 화제:")
         for stem, t in all_missed[:20]:
             print(f"  · [{stem}] {t}")
+
+    lines = [
+        f"**커버리지 = {grand_covered}/{grand_total} = {rate:.1%}** (judge={model})", "",
+        "| 파일 | 화제 | 커버 |", "|---|---|---|",
+        *[f"| {s} | {t} | {c} |" for s, t, c in per_stem],
+    ]
+    if all_missed:
+        lines += ["", "놓친 화제:", *[f"- [{s}] {t}" for s, t in all_missed]]
+    out = write_summary_md(MEMORY_DIR / "coverage_summary.md", "3-A 커버리지", lines)
+    print(f"→ 저장: {out.relative_to(REPO_ROOT)}")
     return 0
 
 

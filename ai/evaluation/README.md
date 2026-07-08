@@ -73,8 +73,9 @@ python -m evaluation.e2e_external --pair <화자쌍>      # 외부 전 파이프
 
 ## 남은 평가 과제
 
-1. **결과 저장 확산** — 전사·화자식별·페르소나(lab)·외부 e2e는 파일 저장 됨. 남은
-   lab(analysis·memory_segments·enrichment·embeddings)도 results/에 요약 md 남기기.
+1. ✅ **결과 저장 확산** — 모든 lab이 파일 저장. analysis·memory·enrichment는 per-stem
+   JSON, embeddings·faithfulness·coverage·enrichment는 요약 md(`write_summary_md`).
+   우리 데이터 파생이라 RESULTS_DIR(gitignore)에 로컬 지속 — 로그뿐 아님.
 2. **다양한 인물 Intake** — 저작 인물 5종(강원3·경상2), 전 파이프라인 e2e 통과. 정확성
    레퍼런스는 최영자·신금자만(다른 3종은 e2e 행동/충실도만).
 3. **페르소나 개선(인물 무관)** — ✅모르면모른다 ✅death-context 누출 ✅자해 채점오염

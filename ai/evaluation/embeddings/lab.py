@@ -14,7 +14,7 @@ import math
 
 from app.core.config import load_settings
 from app.pipeline.embeddings.service import embed_texts
-from evaluation.common import REPO_ROOT, RESULTS_DIR
+from evaluation.common import REPO_ROOT, RESULTS_DIR, write_summary_md
 from evaluation.embeddings.queries import QUERIES
 
 MEMORY_DIR = RESULTS_DIR / "memory"
@@ -56,6 +56,7 @@ def main() -> int:
     query_vectors = embed_texts([q for q, _ in QUERIES], settings=settings)
 
     hits = 0
+    rows = []
     print(f"\n[검색 Recall@{args.k}] (P0 코사인 — 재정렬은 실험 결과 검색 악화로 미채택)")
     for (query, answer_stem), qvec in zip(QUERIES, query_vectors):
         scored = [(cosine(qvec, mvec), cosine(qvec, mvec), mem) for mem, mvec in zip(memories, mem_vectors)]
@@ -65,11 +66,21 @@ def main() -> int:
         hits += hit
         top_stem = topk[0][2]["stem"]
         mark = "✅" if hit else "❌"
+        rows.append((mark, query, answer_stem, top_stem, topk[0][1]))
         print(f"  {mark} {query}  → 정답 {answer_stem} / top1 {top_stem}({topk[0][1]:.2f})")
 
     recall = hits / len(QUERIES)
     print(f"\nRecall@{args.k} = {hits}/{len(QUERIES)} = {recall:.1%} (목표 ≥ 0.8)")
     print("판정:", "합격" if recall >= 0.8 else "미달")
+
+    lines = [
+        f"**Recall@{args.k} = {hits}/{len(QUERIES)} = {recall:.1%}** "
+        f"(목표 ≥ 0.8 → {'합격' if recall >= 0.8 else '미달'})", "",
+        "| | 질의 | 정답 | top1 | 점수 |", "|---|---|---|---|---|",
+        *[f"| {m} | {q} | {a} | {t} | {s:.2f} |" for m, q, a, t, s in rows],
+    ]
+    out = write_summary_md(RESULTS_DIR / "embeddings_summary.md", f"3-B 임베딩 검색 Recall@{args.k}", lines)
+    print(f"→ 저장: {out.relative_to(REPO_ROOT)}")
     return 0
 
 

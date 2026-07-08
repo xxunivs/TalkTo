@@ -37,3 +37,16 @@ def load_context_fixture() -> tuple[SubjectContext, IntakeContext | None]:
         IntakeContext(**payload["intakeContext"]) if payload.get("intakeContext") else None
     )
     return subject, intake
+
+
+def write_summary_md(path: Path, title: str, lines: list[str]) -> Path:
+    """채점 lab의 요약 결과를 md로 저장(로그뿐 아니라 파일로 지속). 반환: 저장 경로.
+
+    RESULTS_DIR 이하는 우리 데이터 파생이라 gitignore — 로컬 지속·프라이버시 안전.
+    """
+    from datetime import datetime
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    header = [f"# {title}", "", f"실행: {datetime.now():%Y-%m-%d %H:%M}", ""]
+    path.write_text("\n".join(header + lines) + "\n", encoding="utf-8")
+    return path
