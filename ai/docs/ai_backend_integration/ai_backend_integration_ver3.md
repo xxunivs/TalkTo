@@ -115,13 +115,15 @@ BE 담당 2가지:
 - **BE 저장**: 응답 `instructions`를 대상자 단위로 저장할 text 컬럼(대상자당 1건, 재신청·재분석 시 갱신).
 - 사후 페르소나(basicProfile.status="사망")면 사망 사인·경위는 조립본에 넣지 않는다(안전). status 플래그만으로 처리된다.
 
-### (참고) 기존 `/ai/chat` 연동과의 관계 — 전환 안내
+### 4·5 변경 이유와 부탁
 
-BE에 이미 있는 chat 연동(`/ai/chat`, 요청 `{message, history, memories}`, 응답 `{content, retrievedMemoryIds, ...}`)과 대부분 정렬된다:
-- **그대로 재사용**: 기억 형태(`{id, title, content, tags}`)·벡터검색·memory-extract는 BE 기존 구현과 동일. 새로 만들 것 없음.
-- **달라지는 2가지**: (1) 경로가 새 서버 규칙인 `/v1/persona/responses`로, (2) 요청에 `persona.instructions`(조립본)가 추가된다.
-- **이유**: 새 AI 서버(TalkTo_APP_AI)는 **stateless**라 페르소나를 자체 보관하지 않는다. MVP에선 AI가 페르소나를 들고 있었지만, 이제는 BE가 위 `/assembly`로 한 번 조립본을 받아 저장했다가 채팅마다 넘겨준다.
-- 위 4·5는 BE 기존 chat 코드에 "instructions 저장·전달"을 더하는 변경이라, **적용 시점·방식은 BE와 맞춘다**(4·5만 조율 대상, 1~3·6은 바로 반영 가능).
+4·5는 BE 기존 chat 연동을 조금 바꾸는 일이라 이유를 먼저 밝힌다.
+
+- 지금(MVP): BE는 `/ai/chat`에 `{message, history, memories}`만 보내고, 페르소나는 예전 AI 서버가 자체 보관했다.
+- 새 AI 서버(TalkTo_APP_AI)는 **stateless**라 페르소나를 자체 보관하지 못한다. 그래서 페르소나 프롬프트를 **BE가 `/assembly`로 한 번 받아 저장했다가 채팅마다 넘겨주는** 형태가 된다.
+- **그대로 재사용(손댈 것 없음)**: 기억 형태(`{id, title, content, tags}`)·벡터검색·memory-extract는 BE 기존 구현과 동일하다.
+- **바꿔주시면 되는 것 두 가지**: (1) 채팅 호출을 `/v1/persona/responses`로, (2) 요청에 저장해둔 `persona.instructions`를 함께 실어주기. 기존 chat 코드에 이 둘만 더해주면 된다.
+- 기존 코드가 잘 돌고 있으니 급히 바꿀 필요는 없다 — **채팅을 새 AI로 옮기는 시점에 함께 반영**해주면 된다(전사·분석부터 붙이고 채팅은 나중이어도 무방).
 
 ## 6. [요청] 전사 호출 타임아웃 상향 (AI_SERVER_TIMEOUT_MS)
 
