@@ -59,15 +59,16 @@ def main() -> int:
     rows = []
     print(f"\n[검색 Recall@{args.k}] (P0 코사인 — 재정렬은 실험 결과 검색 악화로 미채택)")
     for (query, answer_stem), qvec in zip(QUERIES, query_vectors):
-        scored = [(cosine(qvec, mvec), cosine(qvec, mvec), mem) for mem, mvec in zip(memories, mem_vectors)]
+        scored = [(cosine(qvec, mvec), mem) for mem, mvec in zip(memories, mem_vectors)]
         scored.sort(key=lambda x: x[0], reverse=True)
         topk = scored[: args.k]
-        hit = any(mem["stem"] == answer_stem for _, _, mem in topk)
+        hit = any(mem["stem"] == answer_stem for _, mem in topk)
         hits += hit
-        top_stem = topk[0][2]["stem"]
+        top_score, top_mem = topk[0]
+        top_stem = top_mem["stem"]
         mark = "✅" if hit else "❌"
-        rows.append((mark, query, answer_stem, top_stem, topk[0][1]))
-        print(f"  {mark} {query}  → 정답 {answer_stem} / top1 {top_stem}({topk[0][1]:.2f})")
+        rows.append((mark, query, answer_stem, top_stem, top_score))
+        print(f"  {mark} {query}  → 정답 {answer_stem} / top1 {top_stem}({top_score:.2f})")
 
     recall = hits / len(QUERIES)
     print(f"\nRecall@{args.k} = {hits}/{len(QUERIES)} = {recall:.1%} (목표 ≥ 0.8)")

@@ -12,6 +12,7 @@ Usage:
 """
 
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -28,6 +29,7 @@ from app.pipeline.memory_segments.service import extract_memory_segments
 from app.pipeline.persona.assembler import assemble_persona_prompt
 from app.providers.stt.elevenlabs_scribe import ElevenLabsScribeProvider
 from app.schemas.context import IntakeContext, SubjectContext, SubjectInfo
+from app.schemas.transcript import TranscriptSegment
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 _BASE = (
@@ -36,6 +38,7 @@ _BASE = (
     / "01-1.정식개방데이터/Validation/01.원천데이터"
 )
 AUDIO_DIRS = [_BASE / "VS_강원", _BASE / "VS_경상"]
+CACHE_DIR = REPO_ROOT / "evaluation" / "e2e" / ".transcription_cache"
 
 
 def find_clips(pair: str) -> list[Path]:
@@ -57,25 +60,39 @@ def main() -> int:
     parser.add_argument("--pair", default="speakergw3139_speakergw3140")
     parser.add_argument("--fixture", type=Path, default=None,
                         help="저작 페르소나 fixture(subjectContext+intakeContext). 없으면 기본 '어르신'")
+    parser.add_argument("--no-cache", action="store_true", help="전사 캐시 무시하고 재전사")
     args = parser.parse_args()
     load_dotenv(REPO_ROOT / ".env")
     settings = load_settings(REPO_ROOT / ".env")
     client = OpenAI(api_key=settings.openai_api_key.get_secret_value())
-    stt = ElevenLabsScribeProvider(api_key=os.environ["ELEVENLABS_API_KEY"])
 
     clips = find_clips(args.pair)
     print(f"통화 재료: {len(clips)}개 클립 ({args.pair})\n")
 
-    # 1) 전사·화자분리 (우리 Scribe)
-    all_segments, offset = [], 0
-    for clip in clips:
-        result = stt.transcribe(clip, language="ko", speaker_diarization=True)
-        for seg in result.segments:
-            seg.segment_index += offset
-            all_segments.append(seg)
-        offset = len(all_segments)
+    # 1) 전사·화자분리 (우리 Scribe) — 같은 클립셋은 캐시해 재전사 비용·시간을 아낀다
+    #    (클립 파일명 해시가 키 — 클립이 바뀌면 자동 무효화). 캐시 히트 시 ElevenLabs 불필요.
+    key = hashlib.sha1("|".join(sorted(c.name for c in clips)).encode()).hexdigest()[:16]
+    cache_path = CACHE_DIR / f"{args.pair}_{key}.json"
+    if cache_path.exists() and not args.no_cache:
+        all_segments = [TranscriptSegment(**s) for s in json.loads(cache_path.read_text(encoding="utf-8"))]
+        print(f"[1 전사] 캐시 사용({cache_path.name}): 세그 {len(all_segments)}개")
+    else:
+        stt = ElevenLabsScribeProvider(api_key=os.environ["ELEVENLABS_API_KEY"])
+        all_segments, offset = [], 0
+        for clip in clips:
+            result = stt.transcribe(clip, language="ko", speaker_diarization=True)
+            for seg in result.segments:
+                seg.segment_index += offset
+                all_segments.append(seg)
+            offset = len(all_segments)
+        CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        cache_path.write_text(
+            json.dumps([s.model_dump(by_alias=True) for s in all_segments], ensure_ascii=False),
+            encoding="utf-8",
+        )
+        print(f"[1 전사] 세그 {len(all_segments)}개 (캐시 저장)")
     speakers = sorted({s.speaker_label for s in all_segments})
-    print(f"[1 전사] 세그 {len(all_segments)}개, 화자 {len(speakers)}명 {speakers}")
+    print(f"  화자 {len(speakers)}명 {speakers}")
 
     # 2) 보정 (외부라 용어집 없음 → 스킵되는 게 정상)
     correct_segments(all_segments, glossary=[], settings=settings)

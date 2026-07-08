@@ -31,3 +31,5 @@ evaluation/persona/results/*singeumja*
 evaluation/persona/results/*_sg.*
 # audio + external datasets; never commit
 data/
+# e2e 전사 캐시(외부 오디오 파생, 재전사 방지용 로컬 캐시)
+evaluation/e2e/.transcription_cache/
