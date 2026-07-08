@@ -11,14 +11,53 @@ Usage:
 import argparse
 import importlib
 import json
+import math
 from pathlib import Path
 
 from openai import OpenAI
 
 from app.core.config import load_settings
+from app.pipeline.embeddings.service import embed_texts
 from evaluation.common import REPO_ROOT, RESULTS_DIR
 
 DEFAULT_PERSONA = RESULTS_DIR / "persona_singeumja.txt"
+
+
+def _cosine(a, b):
+    dot = sum(x * y for x, y in zip(a, b))
+    na = math.sqrt(sum(x * x for x in a))
+    nb = math.sqrt(sum(y * y for y in b))
+    return dot / (na * nb) if na and nb else 0.0
+
+
+class MemoryRetriever:
+    """픽스처 memoryCards를 임베딩해두고, 시나리오 질의로 top-k를 뽑아 주입 블록 생성.
+
+    실제 서빙(/responses)의 런타임 RAG를 평가에서 재현 — 정확성을 '기억 주입 상태'로 잰다.
+    """
+
+    def __init__(self, fixture_path: Path, settings, k: int = 3):
+        payload = json.loads(fixture_path.read_text(encoding="utf-8"))
+        cards = (payload.get("intakeContext") or {}).get("memoryCards") or []
+        self.cards = [c for c in cards if c.get("content")]
+        self.settings = settings
+        self.k = k
+        self.vectors = (
+            embed_texts([c["content"] for c in self.cards], settings=settings)
+            if self.cards else []
+        )
+
+    def block_for(self, query: str) -> str:
+        if not self.cards:
+            return ""
+        qvec = embed_texts([query], settings=self.settings)[0]
+        scored = sorted(
+            zip(self.cards, self.vectors), key=lambda cv: _cosine(qvec, cv[1]), reverse=True
+        )
+        picked = [c for c, _ in scored[: self.k]]
+        lines = [f"- [{c.get('title', '')}] {c['content']}" for c in picked]
+        return ("참고 기억(질문이 이 내용을 물을 때만 자연스럽게 녹이고, 인사·짧은 안부엔 "
+                "억지로 꺼내지 않는다):\n" + "\n".join(lines))
 
 SETS = {
     "A": ("REPRODUCTION_SET", "전사본 재현"),
@@ -91,6 +130,9 @@ def main() -> int:
                         help="시나리오당 반복 샘플 수(judge 변동성 확인용)")
     parser.add_argument("--judge-model", type=str, default=None,
                         help="채점 모델 교체(예: 평소 gpt-4.1-mini, 최종만 gpt-5.5). 미지정 시 .env 기본값")
+    parser.add_argument("--fixture", type=Path, default=None,
+                        help="지정 시 픽스처 memoryCards를 시나리오별 top-k로 주입(서빙 재현)")
+    parser.add_argument("--memory-k", type=int, default=3)
     args = parser.parse_args()
 
     scenarios = importlib.import_module(args.scenarios)
@@ -99,8 +141,10 @@ def main() -> int:
     system = args.persona.read_text(encoding="utf-8")
     gen_model = settings.openai_analysis_model
     judge_model = args.judge_model or settings.openai_judge_model
+    retriever = MemoryRetriever(args.fixture, settings, args.memory_k) if args.fixture else None
     usage = {"gen_in": 0, "gen_out": 0, "judge_in": 0, "judge_out": 0}
-    print(f"모델 — 생성: {gen_model} · 채점: {judge_model}")
+    print(f"모델 — 생성: {gen_model} · 채점: {judge_model} · 기억주입: "
+          f"{'ON(k=%d, %d cards)' % (args.memory_k, len(retriever.cards)) if retriever else 'OFF'}")
 
     selected = [args.set.upper()] if args.set else list(SETS)
     fail_gate = False
@@ -111,10 +155,16 @@ def main() -> int:
         items = getattr(scenarios, attr, [])
         print(f"\n===== {key}. {label} ({len(items)}개) =====")
         for idx, item in enumerate(items, 1):
+            sys_prompt = system
+            if retriever:  # 서빙처럼 이 시나리오 질의로 관련 기억 top-k 주입
+                query = " ".join(t["user"] for t in item["dialogue"] if "user" in t)
+                block = retriever.block_for(query)
+                if block:
+                    sys_prompt = f"{system}\n\n# 주입된 기억\n{block}"
             samples = []  # (acc, tone, safety, note) × repeat
             for _ in range(args.repeat):
                 turn_scores = run_scenario(
-                    client, gen_model, judge_model, system, item["dialogue"], usage)
+                    client, gen_model, judge_model, sys_prompt, item["dialogue"], usage)
                 if not turn_scores:
                     continue
                 acc = min(s[0] for s in turn_scores)
