@@ -4,7 +4,7 @@ lab.py가 쓰는 미리 조립된 persona .txt를 어느 인물이든 재현 가
 말투 예시는 픽스처의 `_speechExamples`(실오디오 근거 발화)를 세그먼트로 넣어 주입.
 
 Usage:
-    python -m evaluation.persona.build --fixture data/fixtures/subject_context_choiyoungja_gangwon.json
+    python -m evaluation.persona.build --fixture evaluation/persona/fixtures/subject_context_choiyoungja_gangwon.json
 """
 
 import argparse

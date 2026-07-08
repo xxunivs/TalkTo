@@ -47,7 +47,7 @@ authoritative 재실행·저장 필요.
 
 - `data/fixtures/subject_context_singeumja.json` — 신금자(우리 데이터). subjectContext
   (가족·용어집) + intakeContext(사망맥락·가족별톤·성격·상황스크립트·금기·memoryCards).
-- `data/fixtures/subject_context_choiyoungja_gangwon.json` — **가상 최영자**(강원, 외부
+- `evaluation/persona/fixtures/subject_context_choiyoungja_gangwon.json` — **가상 최영자**(강원, 외부
   화자 speakergw712 실발화 근거 + 가족·이름·사망맥락 임의 저작). 정답(기대답변) 있어
   정확성까지 잰다. 우리 가족 비의존 일반화용. → EXTERNAL_CASES.md.
 - 저작 파이프라인: 픽스처 → `persona/build.py`로 프롬프트 조립 → `persona/lab.py

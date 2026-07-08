@@ -60,7 +60,7 @@
 써서 정확성까지 채점한다. 우리 데이터 비의존 일반화의 정밀 축.
 
 **케이스 최영자 (가상, speakergw712 근거) — 강원 1954년생 여성:**
-- 픽스처: `data/fixtures/subject_context_choiyoungja_gangwon.json`
+- 픽스처: `evaluation/persona/fixtures/subject_context_choiyoungja_gangwon.json`
 - 근거(실오디오): 평생 강원 시골·단독주택·한골 이사, 텃밭·직접 김치(배추·알타리·
   깍두기·총각김치)·중국산 거부, 허리 아파 병원 후 걷기 회복·준비운동, 산 선호하나
   '다 있어야' 포용, 손주 봐주다 열병 고생, 제사 간소화 지론, 낙천·중용·되묻는 말투.
@@ -100,7 +100,7 @@
 
 재현:
 ```
-python -m evaluation.persona.build --fixture data/fixtures/subject_context_choiyoungja_gangwon.json
+python -m evaluation.persona.build --fixture evaluation/persona/fixtures/subject_context_choiyoungja_gangwon.json
 # 일상 점검(싼 judge) — 429·비용 절감
 python -m evaluation.persona.lab --set F --repeat 3 --judge-model gpt-4.1-mini \
   --persona evaluation/persona/results/persona_choiyoungja_gangwon.txt \
