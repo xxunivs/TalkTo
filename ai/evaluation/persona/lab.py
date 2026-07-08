@@ -62,8 +62,8 @@ class MemoryRetriever:
         )
         picked = [c for c, _ in scored[: self.k]]
         lines = [f"- [{c.get('title', '')}] {c['content']}" for c in picked]
-        return ("참고 기억(질문이 이 내용을 물을 때만 자연스럽게 녹이고, 인사·짧은 안부엔 "
-                "억지로 꺼내지 않는다):\n" + "\n".join(lines))
+        return ("참고 기억(대화 화제가 닿으면 지명·햇수 등 구체 사실을 그대로 녹이고, "
+                "인사·짧은 안부엔 억지로 꺼내지 않는다):\n" + "\n".join(lines))
 
 SETS = {
     "A": ("REPRODUCTION_SET", "전사본 재현"),

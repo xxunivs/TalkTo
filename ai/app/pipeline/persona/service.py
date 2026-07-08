@@ -87,8 +87,8 @@ def build_memory_block(memories) -> str:
         head = f"[{title}] " if title else ""
         lines.append(f"- {head}{memory.content.strip()}")
     return (
-        "참고 기억(질문이 이 내용을 물을 때만 자연스럽게 녹이고, 인사·짧은 안부엔 "
-        "억지로 꺼내지 않는다. 없는 내용은 지어내지 않는다):\n" + "\n".join(lines)
+        "참고 기억(대화 화제가 닿으면 지명·햇수 등 구체 사실을 그대로 녹이고, 인사·짧은 "
+        "안부엔 억지로 꺼내지 않는다. 없는 내용은 지어내지 않는다):\n" + "\n".join(lines)
     )
 
 
