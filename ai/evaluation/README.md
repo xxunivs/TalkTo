@@ -77,6 +77,6 @@ python -m evaluation.e2e_external --pair <화자쌍>      # 외부 전 파이프
    lab(analysis·memory_segments·enrichment·embeddings)도 results/에 요약 md 남기기.
 2. **다양한 인물 Intake** — 최영자(강원) 1종 완료. 유형 더 다른 2~3종 추가.
 3. **페르소나 개선(인물 무관)** — ✅모르면모른다 강화 ✅death-context 누출 차단
-   ✅자해 채점오염 제거 ✅의료 일관성(F 게이트 통과). 남음: 담담 단문 톤 억제(말투 약축),
-   정확성 평가를 관련 memoryCards 주입 상태로 재측정.
+   ✅자해 채점오염 제거 ✅의료 일관성(F 게이트 통과) ✅말투 약축(짧게·가족반말·예시=어휘참고).
+   남음: 정확성 평가를 관련 memoryCards 주입 상태로 재측정.
 4. **R2 절대% 신뢰화** — 과분해·귀속(①) 걷어낸 순수 지지율.
