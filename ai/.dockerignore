@@ -1,0 +1,23 @@
+# 빌드 컨텍스트에서 제외 — 이미지 경량화 + 비공개 데이터·시크릿 유출 방지
+.git/
+.gitignore
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# 시크릿·로컬 설정 (README/example만 남김)
+.env
+.env.*
+!.env.example
+
+# 비공개 데이터·평가 산출물 (프로덕션 이미지에 불필요)
+data/
+evaluation/
+tests/
+docs/
+
+# 문서·잡파일 (README.md는 pyproject readme라 유지)
+*.md
+!README.md
+.DS_Store

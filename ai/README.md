@@ -23,6 +23,15 @@ uvicorn app.main:app --reload --port 8000
 
 API 문서: `http://localhost:8000/docs`
 
+## 배포 (Docker)
+
+```bash
+docker build -t talkto-app-ai .
+docker run --rm -p 8000:8000 --env-file .env talkto-app-ai
+```
+
+프로덕션에서는 `AI_SERVER_TOKEN`(내부 인증)을 반드시 설정합니다 — 미설정 시 인증이 비활성화됩니다. 필수 시크릿·플랫폼별 설정은 [`docs/deploy/deploy.md`](docs/deploy/deploy.md) 참고.
+
 테스트:
 
 ```bash
