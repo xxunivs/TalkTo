@@ -2,7 +2,7 @@
 
 두 묶음이다. 1~3은 ver1 계약 2에서 미뤄둔 intakeContext 문항 키 확정, 4~5는 페르소나 채팅(응답 생성) 서빙 계약이다. 아래 키·필드는 AI 파이프라인이 실제로 소비하는 것 = 정본이며, BE는 저장 구조를 바꿀 필요 없이 호출 시 이 모양으로 변환·전달하면 된다.
 
-## 1. [확정] intakeContext 섹션별 키·타입·용도
+## 1. [요청] intakeContext 섹션별 키·타입·용도
 
 모든 키는 camelCase. 값은 사람이 읽는 서술 문자열이 기본(AI가 프롬프트 슬롯에 그대로 녹임) — 별도 코드화·enum 불필요.
 
@@ -58,17 +58,17 @@ AI는 아래 필드를 **있으면 모두 쓴다**(별도 등급 없음). 백엔
 | `names` | string[] | STT 인식 힌트용 이름 |
 | `voiceSampleRef` | object \| null | 화자식별 reference 등록. `documentId`·`startMs`·`endMs`(ver2 요청 2건과 동일 형태) |
 
-## 2. [정리] ver1 예시에서 빠지는 키
+## 2. [요청] ver1 예시에서 빠지는 키
 
 ver1 계약 2의 intakeContext 예시에 있던 `timeline`, `sensoryMemories`는 현재 파이프라인이 소비하지 않는다. **변환 대상에서 제외**하면 된다(보내도 무시). 새로 채워야 하는 건 위 1의 키뿐이다.
 
-## 3. [확인] 표기 일치
+## 3. [요청] 표기 일치
 
 `familyMap[].name`은 subjectContext.familyMembers[].name과 같은 표기여야 톤 매칭이 된다(서로 다른 표기면 그 가족 톤이 적용되지 않음). 두 소스가 같은 이름 필드를 공유하도록 변환해주면 된다.
 
 ## 4. [요청] 페르소나 응답 서빙 — `POST /v1/persona/responses`
 
-채팅 시점에 AI가 페르소나 응답을 생성한다. **기억 벡터 검색은 BE가 하고, AI는 넘겨받은 기억을 프롬프트에 주입해 응답**한다(AI는 stateless — DB 미접근). 요청/응답 형태:
+지금은 BE가 예전 AI(`/ai/chat`)에 `{message, history, memories}`만 보내고 페르소나는 그 서버가 자체 보관했는데, 새 AI는 **stateless**라 페르소나를 못 들고 있다. 그래서 채팅 시 **BE가 저장해둔 페르소나 프롬프트(아래 5 `/assembly` 결과)를 함께 넘겨주면, AI가 거기에 기억을 주입해 응답**한다. 기억 벡터 검색은 지금처럼 BE가 한다. 요청/응답 형태:
 
 ```json
 // 요청
@@ -96,6 +96,8 @@ BE 담당 2가지:
 - `memories[].id`로 넘긴 것 중 응답에 쓰인 것을 `retrievedMemoryIds`로 돌려준다(로깅·근거표시용).
 - 검증됨: 같은 질문에 기억을 주면 정확히 회상, 안 주면 지어내지 않고 "모르겠다"로 받는다(과공유 없음).
 
+기존 `/ai/chat`과 비교하면 기억 형태(`{id, title, content, tags}`)·벡터검색은 그대로라 손댈 것 없고, 바뀌는 건 (1) 호출 경로가 `/v1/persona/responses`로, (2) 요청에 `persona.instructions`가 추가되는 두 가지뿐이다. 잘 돌고 있는 코드니 급히 바꾸지 말고, 채팅을 새 AI로 옮기는 시점에 함께 반영해주면 된다.
+
 ## 5. [요청] 페르소나 조립본 산출·저장 — `POST /v1/persona/assembly`
 
 위 `persona.instructions`는 파이프라인 산출물 + intakeContext로 AI가 조립한 system 프롬프트 문자열이다. AI가 조립해서 돌려주는 엔드포인트를 제공한다(**LLM 미사용 · 무비용 · 즉시**). BE는 Voice Persona 신청 완료 시 1회 호출해 결과를 저장했다가, 채팅 때 `/responses`의 `persona.instructions`로 넘기면 된다.
@@ -114,16 +116,6 @@ BE 담당 2가지:
 - `speechExamples`: 대상자 **본인의 짧고 담백한 실제 발화**(말투 few-shot). BE가 전사에서 6~40자짜리로 몇 개(≤50) 추려 보낸다. 없으면 빈 배열(말투 예시만 비고 나머지는 조립됨).
 - **BE 저장**: 응답 `instructions`를 대상자 단위로 저장할 text 컬럼(대상자당 1건, 재신청·재분석 시 갱신).
 - 사후 페르소나(basicProfile.status="사망")면 사망 사인·경위는 조립본에 넣지 않는다(안전). status 플래그만으로 처리된다.
-
-### 4·5 변경 이유와 부탁
-
-4·5는 BE 기존 chat 연동을 조금 바꾸는 일이라 이유를 먼저 밝힌다.
-
-- 지금(MVP): BE는 `/ai/chat`에 `{message, history, memories}`만 보내고, 페르소나는 예전 AI 서버가 자체 보관했다.
-- 새 AI 서버(TalkTo_APP_AI)는 **stateless**라 페르소나를 자체 보관하지 못한다. 그래서 페르소나 프롬프트를 **BE가 `/assembly`로 한 번 받아 저장했다가 채팅마다 넘겨주는** 형태가 된다.
-- **그대로 재사용(손댈 것 없음)**: 기억 형태(`{id, title, content, tags}`)·벡터검색·memory-extract는 BE 기존 구현과 동일하다.
-- **바꿔주시면 되는 것 두 가지**: (1) 채팅 호출을 `/v1/persona/responses`로, (2) 요청에 저장해둔 `persona.instructions`를 함께 실어주기. 기존 chat 코드에 이 둘만 더해주면 된다.
-- 기존 코드가 잘 돌고 있으니 급히 바꿀 필요는 없다 — **채팅을 새 AI로 옮기는 시점에 함께 반영**해주면 된다(전사·분석부터 붙이고 채팅은 나중이어도 무방).
 
 ## 6. [요청] 전사 호출 타임아웃 상향 (AI_SERVER_TIMEOUT_MS)
 
