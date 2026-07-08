@@ -95,7 +95,7 @@ def build_memory_block(memories) -> str:
 def generate_persona_response(
     request: PersonaResponseRequest, *, settings: Settings
 ) -> PersonaResponseResult:
-    client = create_openai_client(settings)
+    client = create_openai_client(settings, "persona response")
 
     messages = [{"role": "system", "content": request.persona.instructions}]
     memory_block = build_memory_block(request.memories)
@@ -124,7 +124,7 @@ def extract_memory_candidates(
     request: MemoryCandidateRequest, *, settings: Settings
 ) -> MemoryCandidateResponse:
     """채팅 턴에서 앞으로 저장할 만한 새 기억 후보를 뽑는다. 저장 여부는 BE가 판단."""
-    client = create_openai_client(settings)
+    client = create_openai_client(settings, "memory candidate extraction")
 
     convo = "\n".join(f"{m.role}: {m.content}" for m in request.history)
     convo += f"\nuser: {request.user_message}\nassistant: {request.assistant_message}"

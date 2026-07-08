@@ -53,10 +53,8 @@ def extract_memory_segments(
     sensitivity_result: dict | None,
     settings: Settings,
 ) -> dict:
-    if settings.openai_api_key is None:
-        raise RuntimeError("OPENAI_API_KEY is required for memory extraction")
 
-    client = create_openai_client(settings)
+    client = create_openai_client(settings, "memory extraction")
     response = client.chat.completions.create(
         model=settings.openai_analysis_model,
         response_format={"type": "json_object"},

@@ -10,9 +10,10 @@ from openai import OpenAI
 from app.core.config import Settings
 
 
-def create_openai_client(settings: Settings) -> OpenAI:
+def create_openai_client(settings: Settings, purpose: str = "") -> OpenAI:
     if settings.openai_api_key is None:
-        raise RuntimeError("OPENAI_API_KEY is required")
+        detail = f" for {purpose}" if purpose else ""
+        raise RuntimeError(f"OPENAI_API_KEY is required{detail}")
     return OpenAI(
         api_key=settings.openai_api_key.get_secret_value(),
         timeout=settings.openai_timeout_seconds,

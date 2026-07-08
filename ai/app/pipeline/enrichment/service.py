@@ -26,9 +26,7 @@ _SENTENCE_SPLIT = re.compile(r"[.!?]+\s*")
 def summarize_recording(
     segments: list[TranscriptSegment], *, settings: Settings
 ) -> str:
-    if settings.openai_api_key is None:
-        raise RuntimeError("OPENAI_API_KEY is required for summary")
-    client = create_openai_client(settings)
+    client = create_openai_client(settings, "summary")
     response = client.chat.completions.create(
         model=settings.openai_analysis_model,
         response_format={"type": "json_object"},

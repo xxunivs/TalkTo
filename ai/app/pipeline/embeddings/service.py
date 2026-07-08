@@ -13,12 +13,10 @@ logger = logging.getLogger(__name__)
 
 
 def embed_texts(texts: list[str], *, settings: Settings) -> list[list[float]]:
-    if settings.openai_api_key is None:
-        raise RuntimeError("OPENAI_API_KEY is required for embeddings")
     if not texts:
         return []
 
-    client = create_openai_client(settings)
+    client = create_openai_client(settings, "embeddings")
     response = client.embeddings.create(
         model=settings.openai_embedding_model,
         input=texts,

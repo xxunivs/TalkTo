@@ -29,10 +29,8 @@ def run_persons_analysis(
     subject_speaker_label: str | None,
     settings: Settings,
 ) -> dict:
-    if settings.openai_api_key is None:
-        raise RuntimeError("OPENAI_API_KEY is required for persons analysis")
 
-    client = create_openai_client(settings)
+    client = create_openai_client(settings, "persons analysis")
     response = client.chat.completions.create(
         model=settings.openai_analysis_model,
         response_format={"type": "json_object"},

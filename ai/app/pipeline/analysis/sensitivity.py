@@ -33,10 +33,8 @@ def run_sensitivity_analysis(
     *,
     settings: Settings,
 ) -> dict:
-    if settings.openai_api_key is None:
-        raise RuntimeError("OPENAI_API_KEY is required for sensitivity analysis")
 
-    client = create_openai_client(settings)
+    client = create_openai_client(settings, "sensitivity analysis")
     # 부분 실패 정책: 구조 위반이면 1회 재시도, 재실패 시 예외(녹음 중단)
     last_error: SensitivityValidationError | None = None
     result = None
