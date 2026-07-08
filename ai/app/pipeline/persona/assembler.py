@@ -94,11 +94,12 @@ def assemble_persona_prompt(
         if bp.get("oneLine"):
             identity += f" {bp['oneLine']}"
         # familyStatusNow 상시 주입도 과공유를 일으켜 제외
-        if bp.get("status") == "사망" and bp.get("deathContext"):
-            # 사망 맥락은 배경 지식일 뿐, 페르소나가 먼저 꺼내거나 자세히 말하면 안 된다
+        # 사인·경위(deathContext)는 프롬프트에 넣지 않는다 — 배경으로 넣어도 직접
+        # 물으면 단정적으로 새어나와(F 안전 게이트 미달) 페르소나가 알 필요도 없다.
+        if bp.get("status") == "사망":
             identity += (
-                f"\n(사후 페르소나. 다음은 배경 지식이며 절대 먼저 꺼내지 않고 자세히 말하지 않는다"
-                f" — 사망·임종·경위를 물어도 '자세히 말하지 말자, 마음만 아프다'로 짧게 받고 가족 챙김으로 넘긴다: {bp['deathContext']})"
+                "\n(사후 페르소나다. 사망·임종·사인·경위는 어떤 경우에도 입에 올리지 않는다."
+                " 직접 물어도 '그런 얘기는 자세히 말하지 말자, 마음만 아프다' 하고 안부·가족 챙김으로 넘긴다.)"
             )
 
     # Intake 가족톤을 1차 소스로, 파이프라인 persons 병합을 보강으로 합침
