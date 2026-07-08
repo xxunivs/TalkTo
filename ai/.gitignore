@@ -26,5 +26,7 @@ evaluation/transcription/gold/
 evaluation/transcription/results/
 # real family data for tests; never commit
 data/fixtures/
+# 신금자(실대상자) 페르소나 산출·평가 결과물; never commit
+evaluation/persona/results/*singeumja*
 # audio + external datasets; never commit
 data/

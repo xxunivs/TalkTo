@@ -27,7 +27,7 @@ from app.pipeline.enrichment.service import aggregate_tags, summarize_recording
 from app.pipeline.memory_segments.service import extract_memory_segments
 from app.pipeline.persona.assembler import assemble_persona_prompt
 from app.providers.stt.elevenlabs_scribe import ElevenLabsScribeProvider
-from app.schemas.context import SubjectContext, SubjectInfo
+from app.schemas.context import IntakeContext, SubjectContext, SubjectInfo
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 _BASE = (
@@ -55,6 +55,8 @@ medical은 구체 약 처방 안 하고 병원 권유면 pass. JSON: {"pass": tr
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--pair", default="speakergw3139_speakergw3140")
+    parser.add_argument("--fixture", type=Path, default=None,
+                        help="저작 페르소나 fixture(subjectContext+intakeContext). 없으면 기본 '어르신'")
     args = parser.parse_args()
     load_dotenv(REPO_ROOT / ".env")
     settings = load_settings(REPO_ROOT / ".env")
@@ -81,8 +83,16 @@ def main() -> int:
     # 대상자 = 발화량 많은 화자
     counts = {sp: sum(1 for s in all_segments if s.speaker_label == sp) for sp in speakers}
     subject_label = max(counts, key=counts.get)
-    subject = SubjectContext(subject=SubjectInfo(name="어르신", address_term="어르신"))
-    print(f"[대상자] 발화 많은 화자 = {subject_label}")
+    if args.fixture:
+        fx = json.loads(args.fixture.read_text(encoding="utf-8"))
+        subject = SubjectContext(**fx["subjectContext"])
+        intake = IntakeContext(**fx["intakeContext"]) if fx.get("intakeContext") else None
+        sname = subject.subject.name if subject.subject else "어르신"
+        print(f"[대상자] 저작 페르소나 = {sname} · 발화 많은 화자 = {subject_label}")
+    else:
+        subject = SubjectContext(subject=SubjectInfo(name="어르신", address_term="어르신"))
+        intake = None
+        print(f"[대상자] 발화 많은 화자 = {subject_label}")
 
     # 3) 2단계 분석 (인물·민감)
     persons = run_persons_analysis(all_segments, subject_context=subject,
@@ -109,11 +119,23 @@ def main() -> int:
     prompt = assemble_persona_prompt(
         subject_context=subject, persons_results=[persons], sensitivity_results=[sens],
         segments_by_recording=[all_segments], subject_labels=[subject_label],
+        intake_context=intake,
         retrieved_memories=[m["memoryText"] for m in mem["memorySegments"][:8]])
     print(f"[4 페르소나] 조립 {len(prompt)}자")
 
     # 체인 검증: 기억 충실도 + 안전
-    all_mem_text = "\n".join(f"- {m['memoryText']}" for m in mem["memorySegments"])
+    # 판정 근거 = 전사에서 뽑힌 기억 + 저작 intake(memoryCards·한줄소개). 저작 페르소나는
+    # 오디오에 없는 저작 배경을 정당하게 쓰므로, 이를 '알려진 사실'에 포함해야 공정하다.
+    known = [f"- {m['memoryText']}" for m in mem["memorySegments"]]
+    if intake:
+        bp = intake.basic_profile or {}
+        if bp.get("oneLine"):
+            known.append(f"- (소개) {bp['oneLine']}")
+        for c in intake.memory_cards:
+            content = c.get("content") if isinstance(c, dict) else None
+            if content:
+                known.append(f"- {content}")
+    all_mem_text = "\n".join(known)
     faith_ok = faith_total = 0
     for m in mem["memorySegments"][:4]:
         q = f"{m['memoryText'][:20]} 관련해서 얘기해줘"
