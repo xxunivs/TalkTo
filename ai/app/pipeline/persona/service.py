@@ -7,6 +7,7 @@ AI가 기억을 프롬프트에 주입해 응답을 생성한다. AI는 stateles
 평가 하네스(evaluation/persona)에서 검증한 조립·기억주입·응답 흐름을 엔드포인트로 옮긴 것.
 """
 
+import json
 import logging
 
 from openai import OpenAI
@@ -14,6 +15,9 @@ from openai import OpenAI
 from app.core.config import Settings
 from app.pipeline.persona.assembler import assemble_persona_prompt
 from app.schemas.persona import (
+    MemoryCandidate,
+    MemoryCandidateRequest,
+    MemoryCandidateResponse,
     PersonaAssemblyRequest,
     PersonaAssemblyResponse,
     PersonaResponseRequest,
@@ -24,6 +28,20 @@ from app.schemas.transcript import TranscriptSegment
 logger = logging.getLogger(__name__)
 
 PROVIDER = "openai"
+
+MEMORY_CANDIDATE_PROMPT = """대화의 마지막 주고받음에서 '앞으로도 기억할 만한 새로운 사실'만 뽑는다.
+
+- 대상: 사용자가 말한 지속되는 근황·변화(취직·이사·결혼·출산·시험·건강·새 관계 등).
+- 제외: 인사·감정 표현("보고 싶어")·일시적 상태·이미 뻔한 것·페르소나(어르신) 자신의 말.
+- 없으면 빈 목록.
+
+각 후보 필드:
+- summary: 한 문장(누가 무엇). 사용자가 실제로 말한 것만, 지어내지 않는다.
+- category: 짧은 분류(예: 직장·가족·건강·경조사·이사).
+- importance: 1~10 정수(클수록 중요).
+- confidence: 0~1(사용자 발화에 얼마나 분명히 나왔는가).
+
+JSON으로만: {"candidates": [{"summary": "...", "category": "...", "importance": 5, "confidence": 0.8}]}"""
 
 
 def _speech_segments(examples: list[str]) -> list[TranscriptSegment]:
@@ -106,4 +124,62 @@ def generate_persona_response(
         retrieved_memory_ids=[memory.id for memory in request.memories],
         provider=PROVIDER,
         model=settings.openai_chat_model,
+    )
+
+
+def extract_memory_candidates(
+    request: MemoryCandidateRequest, *, settings: Settings
+) -> MemoryCandidateResponse:
+    """채팅 턴에서 앞으로 저장할 만한 새 기억 후보를 뽑는다. 저장 여부는 BE가 판단."""
+    if settings.openai_api_key is None:
+        raise RuntimeError("OPENAI_API_KEY is required for memory candidate extraction")
+    client = OpenAI(
+        api_key=settings.openai_api_key.get_secret_value(),
+        timeout=settings.openai_timeout_seconds,
+        max_retries=settings.openai_max_retries,
+    )
+
+    convo = "\n".join(f"{m.role}: {m.content}" for m in request.history)
+    convo += f"\nuser: {request.user_message}\nassistant: {request.assistant_message}"
+
+    response = client.chat.completions.create(
+        model=settings.openai_analysis_model,
+        response_format={"type": "json_object"},
+        messages=[
+            {"role": "system", "content": MEMORY_CANDIDATE_PROMPT},
+            {"role": "user", "content": convo},
+        ],
+    )
+    payload = json.loads(response.choices[0].message.content or "{}")
+
+    candidates = []
+    for item in payload.get("candidates") or []:
+        summary = str(item.get("summary") or "").strip()
+        if not summary:
+            continue
+        # 코드가 범위를 강제(LLM이 벗어난 값을 줘도 스키마 검증에서 터지지 않게)
+        try:
+            importance = int(item.get("importance", 5))
+        except (TypeError, ValueError):
+            importance = 5
+        importance = max(1, min(10, importance))
+        try:
+            confidence = float(item.get("confidence", 0.5))
+        except (TypeError, ValueError):
+            confidence = 0.5
+        confidence = max(0.0, min(1.0, confidence))
+        category = (str(item.get("category")).strip() or None) if item.get("category") else None
+        candidates.append(
+            MemoryCandidate(
+                summary=summary,
+                category=category,
+                importance=importance,
+                confidence=confidence,
+            )
+        )
+
+    return MemoryCandidateResponse(
+        candidates=candidates,
+        provider=PROVIDER,
+        model=settings.openai_analysis_model,
     )

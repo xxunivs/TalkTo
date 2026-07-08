@@ -29,13 +29,22 @@ class HealthEndpointTest(unittest.TestCase):
         self.assertEqual(body["checks"]["tts"]["status"], "not_checked")
 
     def test_feature_endpoint_is_an_explicit_placeholder(self) -> None:
-        # memory-candidates는 아직 미구현 스텁 — 명시적 501을 반환해야 한다.
+        # enrichments는 아직 미구현 스텁 — 요청이 검증을 통과하면 명시적 501을 반환해야 한다.
         response = self.client.post(
-            "/v1/persona/memory-candidates",
+            "/v1/analysis/enrichments",
             json={
-                "userMessage": "test",
-                "assistantMessage": "test",
-                "history": [],
+                "jobId": "00000000-0000-0000-0000-000000000001",
+                "recordingId": "00000000-0000-0000-0000-000000000002",
+                "subjectId": "00000000-0000-0000-0000-000000000003",
+                "segments": [
+                    {
+                        "id": "00000000-0000-0000-0000-000000000004",
+                        "startMs": 0,
+                        "endMs": 1000,
+                        "speakerLabel": "S",
+                        "text": "test",
+                    }
+                ],
             },
         )
 

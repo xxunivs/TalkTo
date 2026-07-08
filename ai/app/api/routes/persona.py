@@ -3,9 +3,9 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 
 from app.api.dependencies import SettingsDependency, require_internal_request
-from app.core.errors import FeatureNotImplementedError
 from app.pipeline.persona.service import (
     assemble_persona_instructions,
+    extract_memory_candidates,
     generate_persona_response,
 )
 from app.schemas.persona import (
@@ -41,7 +41,8 @@ def create_persona_response(
 
 @router.post("/memory-candidates", response_model=MemoryCandidateResponse)
 def create_memory_candidates(
-    _request: MemoryCandidateRequest,
+    request: MemoryCandidateRequest,
     _authorized: InternalRequest,
+    settings: SettingsDependency,
 ) -> MemoryCandidateResponse:
-    raise FeatureNotImplementedError("Persona memory candidate extraction")
+    return extract_memory_candidates(request, settings=settings)
