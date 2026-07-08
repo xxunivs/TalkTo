@@ -52,7 +52,11 @@ def main() -> int:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     out = args.out or (OUT_DIR / f"persona_{args.fixture.stem.replace('subject_context_', '')}.txt")
     out.write_text(prompt, encoding="utf-8")
-    print(f"조립 완료 {len(prompt)}자 → {out.relative_to(REPO_ROOT)}")
+    try:
+        shown = out.relative_to(REPO_ROOT)
+    except ValueError:  # --out이 저장소 밖(예: 임시 폴더)일 수 있다
+        shown = out
+    print(f"조립 완료 {len(prompt)}자 → {shown}")
     return 0
 
 
