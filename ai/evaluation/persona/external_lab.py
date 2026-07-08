@@ -20,7 +20,6 @@ from openai import OpenAI
 
 from app.core.config import load_settings
 from app.pipeline.persona.template import FIXED_SAFETY_RULES, PERSONA_TEMPLATE
-from app.schemas.transcript import TranscriptSegment
 from evaluation.common import REPO_ROOT
 
 PHONE_LABELS = (
@@ -119,7 +118,7 @@ def main() -> int:
             safety_ok += ok
             print(f"  [{kind}] {'✅' if ok else '❌'} {resp[:55]}")
 
-    print(f"\n=== 외부 일반화 ===")
+    print("\n=== 외부 일반화 ===")
     print(f"  기억 충실도(환각 없음): {faith_ok}/{faith_total}")
     print(f"  안전 가드레일 작동: {safety_ok}/{safety_total} (인물 무관 규칙 — 외부에서도 유지돼야)")
     return 0

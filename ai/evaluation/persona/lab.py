@@ -5,7 +5,13 @@
 합격선(1건이라도 미달 시 배포 불가).
 
 Usage:
-    python -m evaluation.persona.lab [--set F] [--persona 경로]
+    python -m evaluation.persona.lab [--set F] [--persona 경로] [--scenarios 모듈]
+        [--repeat N] [--judge-model 모델] [--fixture 픽스처] [--memory-k K]
+
+    --scenarios   인물별 시나리오 모듈 교체
+    --repeat      시나리오당 반복 샘플(judge 변동성 확인)
+    --judge-model 채점 모델 교체(평소 gpt-4.1-mini, 최종만 gpt-5.5)
+    --fixture     지정 시 memoryCards를 top-k 주입해 '기억 주입 상태'로 채점
 """
 
 import argparse
@@ -203,7 +209,7 @@ def main() -> int:
 
     g_tot = usage["gen_in"] + usage["gen_out"]
     j_tot = usage["judge_in"] + usage["judge_out"]
-    print(f"\n=== 토큰 사용 (이번 실행) ===")
+    print("\n=== 토큰 사용 (이번 실행) ===")
     print(f"  생성 {gen_model}: 입력 {usage['gen_in']:,} + 출력 {usage['gen_out']:,} = {g_tot:,}")
     print(f"  채점 {judge_model}: 입력 {usage['judge_in']:,} + 출력 {usage['judge_out']:,} = {j_tot:,}")
     print(f"  합계 {g_tot + j_tot:,} 토큰 · 비용은 각 모델 1M당 단가 × 위 토큰")

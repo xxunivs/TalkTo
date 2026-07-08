@@ -75,7 +75,7 @@ def main() -> int:
             continue
         memories = json.loads((MEMORY_DIR / f"{stem}.memory.json").read_text(encoding="utf-8"))
         mem_lines = "\n".join(f"- {m['memoryText']}" for m in memories["memorySegments"])
-        user = f"핵심 화제:\n" + "\n".join(f"- {t}" for t in topics) + f"\n\n기억 조각:\n{mem_lines}"
+        user = "핵심 화제:\n" + "\n".join(f"- {t}" for t in topics) + f"\n\n기억 조각:\n{mem_lines}"
         results = judge_json(client, model, COVERAGE_PROMPT, user).get("results", [])
         covered = sum(1 for r in results if r.get("verdict") == "covered")
         total = len(results) or len(topics)
