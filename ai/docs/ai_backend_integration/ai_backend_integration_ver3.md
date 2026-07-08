@@ -6,55 +6,57 @@
 
 모든 키는 camelCase. 값은 사람이 읽는 서술 문자열이 기본(AI가 프롬프트 슬롯에 그대로 녹임) — 별도 코드화·enum 불필요.
 
-| 섹션 키 | 타입 | 필수 | AI 용도 |
-|---|---|---|---|
-| `basicProfile` | object | 권장 | 아래 1-1 |
-| `speechStyle` | string | 권장 | 말투 슬롯(예: "짧고 담담한 단문, 요리·추억은 길게") |
-| `personality` | string | 권장 | 성격·가치관 슬롯 |
-| `familyMap` | object[] | **필수** | 가족별 응답 톤(아래 1-2). 페르소나 톤 차별화의 1차 소스 |
-| `situationalReactions` | object[] | 선택 | 상황별 응답 지침(아래 1-3) |
-| `tabooTopics` | string[] | 선택 | 먼저 꺼내면 안 되는 화제(예: "상속·재산", "정치") |
-| `memoryCards` | object[] | 선택 | 아래 1-4. 채팅 런타임에 RAG로 주입(조립 시 미주입) |
-| `sttHints` | object | 선택 | 아래 1-5 |
+AI는 아래 필드를 **있으면 모두 쓴다**(별도 등급 없음). 백엔드는 Intake에서 **있는 값만** 보내면 되고, 없는 필드는 AI가 건너뛴다(에러 없음 — 그 값이 하던 역할만 빠진다). **이 표는 현재 AI가 소비하는 키 기준이며, 이후 필드가 추가될 수 있다(미정의 키는 계속 무시되므로 추가는 하위호환). 키 rename 같은 깨지는 변경만 별도 통지한다.**
+
+| 섹션 키 | 타입 | AI 용도 |
+|---|---|---|
+| `basicProfile` | object | 아래 1-1 |
+| `speechStyle` | string | 말투 슬롯(예: "짧고 담담한 단문, 요리·추억은 길게") |
+| `personality` | string | 성격·가치관 슬롯 |
+| `familyMap` | object[] | 가족별 응답 톤(아래 1-2). 페르소나 톤 차별화의 1차 소스 |
+| `situationalReactions` | object[] | 상황별 응답 지침(아래 1-3) |
+| `tabooTopics` | string[] | 먼저 꺼내면 안 되는 화제(예: "상속·재산", "정치") |
+| `memoryCards` | object[] | 아래 1-4. 채팅 런타임에 RAG로 주입(조립 시 미주입) |
+| `sttHints` | object | 아래 1-5 |
 
 ### 1-1. basicProfile
 
-| 키 | 타입 | 필수 | 용도 |
-|---|---|---|---|
-| `status` | string | **필수** | "사망"이면 사후 페르소나 프레이밍 자동 적용 |
-| `oneLine` | string | 권장 | 한 줄 소개(기본 정보 슬롯) |
-| `deathContext` | string \| null | 선택 | 사망 배경. **AI는 이 원문을 페르소나 프롬프트에 넣지 않는다**(사인 누출 방지). status 판단·안전 처리용으로만 보관 |
-| `familyStatusNow` | string \| null | 선택 | 현재 미소비(과공유 방지로 프롬프트 제외). 보내도 무시됨 |
+| 키 | 타입 | 용도 |
+|---|---|---|
+| `status` | string | "사망"이면 사후 페르소나 프레이밍 자동 적용 |
+| `oneLine` | string | 한 줄 소개(기본 정보 슬롯) |
+| `deathContext` | string \| null | 사망 배경. **AI는 이 원문을 페르소나 프롬프트에 넣지 않는다**(사인 누출 방지). status 판단·안전 처리용으로만 보관 |
+| `familyStatusNow` | string \| null | 현재 미소비(과공유 방지로 프롬프트 제외). 보내도 무시됨 |
 
-### 1-2. familyMap[] (필수)
+### 1-2. familyMap[]
 
-| 키 | 타입 | 필수 | 용도 |
-|---|---|---|---|
-| `name` | string | **필수** | 가족 이름(subjectContext.familyMembers와 동일 표기) |
-| `relation` | string | 권장 | 관계(예: "큰딸", "손자") |
-| `tone` | string | 권장 | 이 사람에게 하는 말투·챙김(예: "담배 걱정하는 톤"). 빈 문자열 허용 |
+| 키 | 타입 | 용도 |
+|---|---|---|
+| `name` | string | 가족 이름(subjectContext.familyMembers와 동일 표기) |
+| `relation` | string | 관계(예: "큰딸", "손자") |
+| `tone` | string | 이 사람에게 하는 말투·챙김(예: "담배 걱정하는 톤"). 빈 문자열 허용 |
 
 ### 1-3. situationalReactions[]
 
-| 키 | 타입 | 필수 | 용도 |
-|---|---|---|---|
-| `situation` | string | **필수** | 트리거 상황(예: "보고 싶어요") |
-| `response` | string | **필수** | 대상자가 할 법한 답(스크립트) |
-| `avoid` | string \| null | 선택 | 피해야 할 답 |
+| 키 | 타입 | 용도 |
+|---|---|---|
+| `situation` | string | 트리거 상황(예: "보고 싶어요") |
+| `response` | string | 대상자가 할 법한 답(스크립트) |
+| `avoid` | string \| null | 피해야 할 답 |
 
 ### 1-4. memoryCards[]
 
-| 키 | 타입 | 필수 | 용도 |
-|---|---|---|---|
-| `title` | string | 권장 | 카드 제목 |
-| `content` | string | **필수** | 기억 내용. 채팅 시 질의 관련된 것만 RAG로 주입 |
+| 키 | 타입 | 용도 |
+|---|---|---|
+| `title` | string | 카드 제목 |
+| `content` | string | 기억 내용. 채팅 시 질의 관련된 것만 RAG로 주입 |
 
 ### 1-5. sttHints
 
-| 키 | 타입 | 필수 | 용도 |
-|---|---|---|---|
-| `names` | string[] | 선택 | STT 인식 힌트용 이름 |
-| `voiceSampleRef` | object \| null | 선택 | 화자식별 reference 등록. `documentId`·`startMs`·`endMs`(ver2 요청 2건과 동일 형태) |
+| 키 | 타입 | 용도 |
+|---|---|---|
+| `names` | string[] | STT 인식 힌트용 이름 |
+| `voiceSampleRef` | object \| null | 화자식별 reference 등록. `documentId`·`startMs`·`endMs`(ver2 요청 2건과 동일 형태) |
 
 ## 2. [정리] ver1 예시에서 빠지는 키
 
