@@ -72,7 +72,7 @@ class MemoryCandidateTest(unittest.TestCase):
     def _settings(self) -> Settings:
         return Settings(openai_api_key=SecretStr("test-key"))
 
-    @patch("app.pipeline.persona.service.OpenAI")
+    @patch("app.providers.llm.OpenAI")
     def test_clamps_out_of_range_and_skips_empty(self, mock_openai: MagicMock) -> None:
         canned = json.dumps({
             "candidates": [
@@ -96,7 +96,7 @@ class MemoryCandidateTest(unittest.TestCase):
         self.assertEqual(c.importance, 10)
         self.assertEqual(c.confidence, 1.0)
 
-    @patch("app.pipeline.persona.service.OpenAI")
+    @patch("app.providers.llm.OpenAI")
     def test_empty_candidates_when_nothing_to_remember(self, mock_openai: MagicMock) -> None:
         mock_openai.return_value = _mock_openai_returning('{"candidates": []}')
 

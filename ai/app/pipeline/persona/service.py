@@ -10,10 +10,9 @@ AI가 기억을 프롬프트에 주입해 응답을 생성한다. AI는 stateles
 import json
 import logging
 
-from openai import OpenAI
-
 from app.core.config import Settings
 from app.pipeline.persona.assembler import assemble_persona_prompt
+from app.providers.llm import create_openai_client
 from app.schemas.persona import (
     MemoryCandidate,
     MemoryCandidateRequest,
@@ -96,13 +95,7 @@ def build_memory_block(memories) -> str:
 def generate_persona_response(
     request: PersonaResponseRequest, *, settings: Settings
 ) -> PersonaResponseResult:
-    if settings.openai_api_key is None:
-        raise RuntimeError("OPENAI_API_KEY is required for persona response")
-    client = OpenAI(
-        api_key=settings.openai_api_key.get_secret_value(),
-        timeout=settings.openai_timeout_seconds,
-        max_retries=settings.openai_max_retries,
-    )
+    client = create_openai_client(settings)
 
     messages = [{"role": "system", "content": request.persona.instructions}]
     memory_block = build_memory_block(request.memories)
@@ -131,13 +124,7 @@ def extract_memory_candidates(
     request: MemoryCandidateRequest, *, settings: Settings
 ) -> MemoryCandidateResponse:
     """채팅 턴에서 앞으로 저장할 만한 새 기억 후보를 뽑는다. 저장 여부는 BE가 판단."""
-    if settings.openai_api_key is None:
-        raise RuntimeError("OPENAI_API_KEY is required for memory candidate extraction")
-    client = OpenAI(
-        api_key=settings.openai_api_key.get_secret_value(),
-        timeout=settings.openai_timeout_seconds,
-        max_retries=settings.openai_max_retries,
-    )
+    client = create_openai_client(settings)
 
     convo = "\n".join(f"{m.role}: {m.content}" for m in request.history)
     convo += f"\nuser: {request.user_message}\nassistant: {request.assistant_message}"

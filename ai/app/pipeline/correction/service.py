@@ -9,9 +9,10 @@ of edited.
 import json
 import logging
 
-from openai import OpenAI
+from openai import OpenAI  # 타입 힌트용
 
 from app.core.config import Settings
+from app.providers.llm import create_openai_client
 from app.schemas.transcript import TranscriptSegment
 
 logger = logging.getLogger(__name__)
@@ -55,11 +56,7 @@ def correct_segments(
         logger.warning("correction pass skipped: OPENAI_API_KEY not set")
         return segments
 
-    client = OpenAI(
-        api_key=settings.openai_api_key.get_secret_value(),
-        timeout=settings.openai_timeout_seconds,
-        max_retries=settings.openai_max_retries,
-    )
+    client = create_openai_client(settings)
     for start in range(0, len(segments), CHUNK_SIZE):
         chunk = segments[start : start + CHUNK_SIZE]
         try:

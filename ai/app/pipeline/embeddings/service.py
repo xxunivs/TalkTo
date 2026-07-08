@@ -6,9 +6,8 @@
 
 import logging
 
-from openai import OpenAI
-
 from app.core.config import Settings
+from app.providers.llm import create_openai_client
 
 logger = logging.getLogger(__name__)
 
@@ -19,11 +18,7 @@ def embed_texts(texts: list[str], *, settings: Settings) -> list[list[float]]:
     if not texts:
         return []
 
-    client = OpenAI(
-        api_key=settings.openai_api_key.get_secret_value(),
-        timeout=settings.openai_timeout_seconds,
-        max_retries=settings.openai_max_retries,
-    )
+    client = create_openai_client(settings)
     response = client.embeddings.create(
         model=settings.openai_embedding_model,
         input=texts,

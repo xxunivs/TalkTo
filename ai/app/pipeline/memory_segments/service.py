@@ -10,7 +10,7 @@ import logging
 import re
 import unicodedata
 
-from openai import OpenAI
+from app.providers.llm import create_openai_client
 
 from app.core.config import Settings
 from app.pipeline.memory_segments.prompts import (
@@ -56,11 +56,7 @@ def extract_memory_segments(
     if settings.openai_api_key is None:
         raise RuntimeError("OPENAI_API_KEY is required for memory extraction")
 
-    client = OpenAI(
-        api_key=settings.openai_api_key.get_secret_value(),
-        timeout=settings.openai_timeout_seconds,
-        max_retries=settings.openai_max_retries,
-    )
+    client = create_openai_client(settings)
     response = client.chat.completions.create(
         model=settings.openai_analysis_model,
         response_format={"type": "json_object"},

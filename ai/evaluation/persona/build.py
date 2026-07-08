@@ -12,21 +12,11 @@ import json
 from pathlib import Path
 
 from app.pipeline.persona.assembler import assemble_persona_prompt
+from app.pipeline.persona.service import _speech_segments
 from app.schemas.context import IntakeContext, SubjectContext
-from app.schemas.transcript import TranscriptSegment
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 OUT_DIR = REPO_ROOT / "evaluation" / "persona" / "results"
-
-
-def speech_segments(examples: list[str]) -> list[TranscriptSegment]:
-    return [
-        TranscriptSegment(
-            segment_index=i, start_ms=i * 1000, end_ms=i * 1000 + 500,
-            speaker_label="S", transcript_text=text,
-        )
-        for i, text in enumerate(examples)
-    ]
 
 
 def main() -> int:
@@ -44,7 +34,7 @@ def main() -> int:
         subject_context=subject,
         persons_results=[],
         sensitivity_results=[],
-        segments_by_recording=[speech_segments(examples)] if examples else [],
+        segments_by_recording=[_speech_segments(examples)] if examples else [],
         subject_labels=["S"] if examples else [],
         intake_context=intake,
     )

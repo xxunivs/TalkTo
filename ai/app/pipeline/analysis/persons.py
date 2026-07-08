@@ -7,7 +7,7 @@ LLM 산출은 그대로 믿지 않는다: 근거 세그먼트 실존(R1), confid
 import json
 import logging
 
-from openai import OpenAI
+from app.providers.llm import create_openai_client
 
 from app.core.config import Settings
 from app.pipeline.analysis.persons_prompts import (
@@ -32,11 +32,7 @@ def run_persons_analysis(
     if settings.openai_api_key is None:
         raise RuntimeError("OPENAI_API_KEY is required for persons analysis")
 
-    client = OpenAI(
-        api_key=settings.openai_api_key.get_secret_value(),
-        timeout=settings.openai_timeout_seconds,
-        max_retries=settings.openai_max_retries,
-    )
+    client = create_openai_client(settings)
     response = client.chat.completions.create(
         model=settings.openai_analysis_model,
         response_format={"type": "json_object"},

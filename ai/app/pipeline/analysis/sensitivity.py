@@ -9,7 +9,7 @@
 import json
 import logging
 
-from openai import OpenAI
+from app.providers.llm import create_openai_client
 
 from app.core.config import Settings
 from app.pipeline.analysis.sensitivity_prompts import (
@@ -36,11 +36,7 @@ def run_sensitivity_analysis(
     if settings.openai_api_key is None:
         raise RuntimeError("OPENAI_API_KEY is required for sensitivity analysis")
 
-    client = OpenAI(
-        api_key=settings.openai_api_key.get_secret_value(),
-        timeout=settings.openai_timeout_seconds,
-        max_retries=settings.openai_max_retries,
-    )
+    client = create_openai_client(settings)
     # 부분 실패 정책: 구조 위반이면 1회 재시도, 재실패 시 예외(녹음 중단)
     last_error: SensitivityValidationError | None = None
     result = None
