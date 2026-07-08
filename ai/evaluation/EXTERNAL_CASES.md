@@ -94,19 +94,26 @@
 
 ### 최종 authoritative (전수, 기억주입 ON, repeat 3, judge=gpt-5.5)
 
-두-건(우리+외부)을 실제 서빙 조건(관련 memoryCards top-k 주입)으로, 시나리오당 3회 반복해
-judge 노이즈를 걷어낸 값(안전은 행동 기준 rubric):
+전 케이스(외부 5인 + 우리)를 실제 서빙 조건(관련 memoryCards top-k 주입)으로, 시나리오당
+3회 반복해 judge 노이즈를 걷어낸 값(안전은 행동 기준 rubric). 외부 4인은 각 fixture 근거로
+사람이 기대답변을 저작(비순환)해 채점:
 
 | 인물 | 샘플 | 정확 | 말투 | 안전 | F게이트 |
 |---|---|---|---|---|---|
+| 정말순(외부, 강원) | 42 (14×3) | 4.14 | 4.05 | 5.00 | ✅ |
+| 서정숙(외부, 경상) | 42 (14×3) | 4.02 | 3.81 | 5.00 | ✅ |
+| 김분남(외부, 경상) | 42 (14×3) | 3.98 | 3.74 | 5.00 | ✅ |
+| 이순덕(외부, 강원) | 42 (14×3) | 3.93 | 3.95 | 5.00 | ✅ |
 | 최영자(외부, 강원) | 42 (14×3) | 3.81 | 3.90 | 5.00 | ✅ |
 | 신금자(우리) | 105 (35×3) | 3.48 | 4.08 | 4.80 | (노이즈 미달) |
 
 - **오늘 튜닝 누적 효과**: 최영자 정확 3.14→3.81, 말투 3.14→3.90(어미 반말전환 반영), 안전→5.00·F게이트 통과.
-- **두 인물 대비**: 정확성은 신금자(3.48)가 낮은데, 35세트가 가족별 톤·추모 등 더 까다롭고
-  기대답변이 매우 구체적이라 '맞지만 다른 표현'이 감점된다. 말투는 둘 다 3.9~4.1로 근접.
-- **안전은 둘 다 거의 만점(4.8~5.0).** 신금자 F 게이트 미달은 단일 샘플에서 judge가 올바른
-  거부를 1회 4로 깎은 노이즈 — 행동 자체는 정상(최영자 42샘플은 전부 5로 게이트 통과).
+- **6건 대비(일반화 확인)**: 외부 5인 정확 3.81~4.14·말투 3.74~4.05로 한 대역에 모임 —
+  특정 가족에 과적합이 아니라 안 본 인물·방언(강원·경상)에도 같은 수준으로 동작.
+  신금자(정확 3.48)가 낮은 건 35세트가 가족별 톤·추모 등 더 까다롭고 기대답변이 매우
+  구체적이라 '맞지만 다른 표현'이 감점되기 때문. **안전은 6건 전부 F 통과(외부 5인 5.00).**
+- **신금자 F 게이트 미달**은 단일 샘플에서 judge가 올바른 거부를 1회 4로 깎은 노이즈 —
+  행동 자체는 정상(외부 5인 각 42샘플은 전부 5로 게이트 통과).
 - **남은 갭(E2형)**: 유도형 진술("계속 시골이었잖아")엔 동의만 하고 세부를 덜 꺼낸다
   (E2 2.3→3.3). **직접 질문("어디 사셨어? 이사했어?")엔 '한골 15년'을 정확히 회상**함을
   /responses 스모크로 확인 — 즉 검색·주입·레퍼런스 문제가 아니라 **유도형 문장 추론에서
@@ -114,14 +121,15 @@ judge 노이즈를 걷어낸 값(안전은 행동 기준 rubric):
   모델을 쓰거나(비용) 향후 과제로 둔다. 알려진 한계로 수용.
 - 비용 참고: 이 두 실행 합 ~1.4M 토큰(신금자 35×3이 큼). 일상 점검은 아래 싼 judge 권장.
 
-재현:
+재현 (인물별 `<slug>`: choiyoungja_gangwon / isunduk_gangwon / jeongmalsun_gangwon /
+seojeongsuk_gyeongsang / kimbunnam_gyeongsang, 시나리오는 `scenarios_<슬러그 앞부분>`):
 ```
-python -m evaluation.persona.build --fixture evaluation/persona/fixtures/subject_context_choiyoungja_gangwon.json
-# 일상 점검(싼 judge) — 429·비용 절감
-python -m evaluation.persona.lab --set F --repeat 3 --judge-model gpt-4.1-mini \
-  --persona evaluation/persona/results/persona_choiyoungja_gangwon.txt \
-  --scenarios evaluation.persona.scenarios_choiyoungja
-# 최종 스탬프만 gpt-5.5(--judge-model 생략 시 .env 기본값)
+python -m evaluation.persona.build --fixture evaluation/persona/fixtures/subject_context_<slug>.json
+# 정확성 채점(기억주입 ON) — 최종은 gpt-5.5, 일상 점검은 --judge-model gpt-4.1-mini
+python -m evaluation.persona.lab --repeat 3 --judge-model gpt-5.5 --memory-k 8 \
+  --persona evaluation/persona/results/persona_<slug>.txt \
+  --fixture evaluation/persona/fixtures/subject_context_<slug>.json \
+  --scenarios evaluation.persona.scenarios_<이름>
 ```
 lab은 실행 끝에 생성·채점 모델별 **토큰 사용량**을 출력한다(비용 환산용).
 
