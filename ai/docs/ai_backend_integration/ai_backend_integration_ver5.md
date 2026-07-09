@@ -69,5 +69,6 @@ reflection·personaInsights는 **P2**다. ver4의 컷오버(채팅·임베딩·r
 - **STT**: BE `transcribe()`가 보내는 멀티파트 필드 `audio_file` 그대로 받는다. 응답 `text`를 읽으면 된다(옛 `stt_text`도 호환되게 BE가 `stt_text ?? text`로 읽고 있음 — `text`로 옴). OpenAI whisper 사용.
 - **TTS**: `{ text, voiceId?, speed? }`를 보내면 audio/mpeg 바이트를 돌려준다(옛 `/ai/tts`와 호환). **voiceId를 함께 보내면 그 음성으로 합성**하고, 없으면 서버의 `ELEVENLABS_DEFAULT_VOICE_ID`로 폴백한다.
   - **말하기 속도**: `speed`(0.7~1.2, 1.0=기본, 낮을수록 느림)를 요청에 넣거나, 서버 env `ELEVENLABS_SPEED`로 전역 설정한다(요청값 우선). 실측: 1.0→5.4초, 0.8→6.1초(같은 문장). 대표 피드백(조금 빠름)엔 **0.9 권장**.
-  - **대상자별 클론 음성**: 고인 목소리로 들려주려면 대상자마다 클론된 `voiceId`가 필요하다. 이미 클론이 있으면 그 voiceId를 보내면 되고, 새 대상자용 클론 자동 생성(음성 클로닝, 명세 VPA-006~009)은 별도 P2다.
-  - 서버 env: `ELEVENLABS_DEFAULT_VOICE_ID`(폴백 음성), `ELEVENLABS_SPEED`(기본 속도), `ELEVENLABS_MODEL`(기본 `eleven_multilingual_v2`) — 필요 시 Render에 설정.
+  - **대상자별 목소리(중요)**: 목소리는 대상자마다 다르다. **BE가 대상자별 클론 `voiceId`를 저장했다가 매 TTS 요청에 실어 보내야 한다** — 그래야 각자 자기 목소리로 나온다. 서버 전역 기본 voiceId(`ELEVENLABS_DEFAULT_VOICE_ID`)는 **설정하지 않는 것을 권장**한다: 설정해두면 voiceId 없는 요청이 조용히 그 목소리로 나가버린다. 비워두면 voiceId 누락 시 400(`MISSING_VOICE_ID`)으로 안전하게 실패한다(단일 대상자 데모에서만 편의로 채움).
+  - 클론 생성: 이미 클론이 있는 대상자는 그 voiceId를 쓰면 되고, 새 대상자용 클론 자동 생성(음성 클로닝, 명세 VPA-006~009)은 별도 P2다.
+  - 서버 env: `ELEVENLABS_SPEED`(기본 속도), `ELEVENLABS_MODEL`(기본 `eleven_multilingual_v2`) — 필요 시 Render에 설정. `ELEVENLABS_DEFAULT_VOICE_ID`는 위 이유로 보통 비워둔다.

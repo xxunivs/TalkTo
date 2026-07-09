@@ -24,7 +24,9 @@ services:
         sync: false
       - key: ELEVENLABS_API_KEY
         sync: false
-      # 대상자 클론 음성 id(폴백). 가족 데이터라 값은 커밋 안 하고 대시보드에서 입력.
+      # 폴백 음성 id. **대상자별로 다른 목소리를 쓰므로 보통 비워둔다** — 그래야
+      # voiceId 없는 요청이 엉뚱한 목소리 대신 400으로 실패(fail-safe). 단일 대상자
+      # 데모에서만 편의로 채운다. 정석은 BE가 대상자별 voiceId를 요청에 실어 보냄.
       - key: ELEVENLABS_DEFAULT_VOICE_ID
         sync: false
       # ── 음성/모델(기본값 있음, 조절할 때만 지정) ──
