@@ -1,7 +1,9 @@
 # AI <-> 백엔드 연동 요청 ver7 — 음성 클론 스펙 정정(ver6 §3) · BE 수정요청 4건
 
 1. **ver6 §3의 `samples[]` 스펙을 정정한다. 이미 운영 서버에 배포됐다.** `startMs`/`endMs`가 **필수**로 바뀌었다(기존: 생략 시 오디오 전체 사용). ver6의 나머지(엔드포인트·응답·`sampleAudioUrl` 단일 모드·§4 samples 채우는 법·§5 갭)는 그대로다. ver6 §3의 "둘 다 비우면 그 오디오 전체 사용" 문장은 **폐기**한다.
-   - **주의(호환성 깨짐)**: 현재 BE `targetVoiceCloneSample`은 `startMs/endMs`가 null이면 구간 없이 `{audioUrl}`만 보낸다. 그 요청은 **지금 라이브에서 422로 실패한다**(`{"loc":["body","samples",0,"startMs"],"msg":"Field required"}`). 5-2를 함께 고쳐야 한다.
+   - **호환성**: 현재 BE `targetVoiceCloneSample`은 `startMs/endMs`가 null이면 구간 없이 `{audioUrl}`만 보내는데, 그 요청은 이제 422로 거부된다(`{"loc":["body","samples",0,"startMs"],"msg":"Field required"}`). 다만 **지금 당장 깨지는 것은 없다** — 아래 "적용 시점" 참고.
+
+   **적용 시점 — 급하지 않다.** 현재 클론은 호출되지 않는다: `cloneVoice` ← `cloneApprovedVoiceSample` ← `reviewVoiceSample`(관리자 승인)이고, 승인하려면 `target_voice_samples` 행이 있어야 하는데 그 행은 `POST /voice-persona/applications/{id}/voice-samples`로만 생성되며 **앱에서 이 API를 호출하는 화면이 아직 없다**(시드·부트스트랩도 생성하지 않음). 따라서 이 문서의 5번 항목들은 **"클론 자동화를 붙이기 전에 반영할 체크리스트"**이지 지금 터지고 있는 장애가 아니다. 유일하게 시점과 무관한 것은 6번(임시 폴백 고지)이며, 그것도 수정 요청이 아니라 현재 상태 공유다.
 
 2. 왜 바꾸나
    - `samples[]`는 "대상자가 말한 구간들"을 담는 용도인데, 구간 없는 원소를 허용하면 **통화 녹음 전체**가 학습 재료가 된다. 통화에는 상대 화자(가족) 목소리가 함께 있으므로, 그 경우 **대상자가 아닌 섞인 목소리로 클론**된다.
@@ -28,7 +30,7 @@
    - 종전에는 이 경우도 `502 TTS_PROVIDER_ERROR`였다. **502는 재시도해도 같은 결과**인 입력 문제를 AI 장애로 오인하게 만들므로 분리했다. 이제 502는 프로바이더/서버 문제일 때만 나온다.
    - BE는 422를 **재시도하지 말고** 샘플 구간을 고쳐서 다시 호출해야 한다.
 
-5. [요청] BE 수정 4건 (현행 코드 기준)
+5. [요청] BE 수정 4건 — **클론 자동화를 켜기 전에** 반영 (현행 코드 기준). 클론이 호출되기 시작하는 순간 아래가 모두 발현된다.
 
    5-1. **클론한 목소리가 일반 채팅 TTS에 반영되지 않는다 (치명)**
    - `cloneApprovedVoiceSample`(`voice-persona.service.ts:423`)이 `voiceId`를 `voice_provider_assets.externalAssetId`에만 저장한다.
