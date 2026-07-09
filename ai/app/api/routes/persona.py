@@ -3,6 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 
 from app.api.dependencies import SettingsDependency, require_internal_request
+from app.pipeline.persona.reflection import run_reflection
 from app.pipeline.persona.service import (
     assemble_persona_instructions,
     extract_memory_candidates,
@@ -16,6 +17,7 @@ from app.schemas.persona import (
     PersonaResponseRequest,
     PersonaResponseResult,
 )
+from app.schemas.reflection import ReflectionRequest, ReflectionResponse
 
 
 router = APIRouter(tags=["persona"])
@@ -46,3 +48,13 @@ def create_memory_candidates(
     settings: SettingsDependency,
 ) -> MemoryCandidateResponse:
     return extract_memory_candidates(request, settings=settings)
+
+
+@router.post("/reflection", response_model=ReflectionResponse)
+def create_reflection(
+    request: ReflectionRequest,
+    _authorized: InternalRequest,
+    settings: SettingsDependency,
+) -> ReflectionResponse:
+    """누적 기억에서 상위 통찰(성향·가치관·반복주제)을 도출 — 페르소나 프로필 재료."""
+    return run_reflection(request, settings=settings)
