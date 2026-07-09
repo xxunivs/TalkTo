@@ -8,7 +8,7 @@ BE 배포 환경변수에 설정:
 
 | 변수 | 값 |
 |---|---|
-| `AI_SERVER_URL` | `https://talkto-app-ai.onrender.com` (Render 대시보드의 실제 서비스 URL로 확정 — 이 값은 예상 기본형) |
+| `AI_SERVER_URL` | `https://talkto-app-ai.onrender.com` |
 | `AI_SERVER_TOKEN` | `78287caad778adcdb4656dd2546a76f6b3ad00f94564ab8bb35e3b76cab55b43` |
 | `AI_SERVER_TIMEOUT_MS` | `120000` (ver3 §6. 코드 기본값이 45000이라 env로 상향 확인 필요) |
 
@@ -47,13 +47,39 @@ BE 배포 환경변수에 설정:
 
 - 모델 `text-embedding-3-small`(1536차원, 기존과 동일). 채팅 시 사용자 메시지도 같은 방식으로 임베딩해 top-k(5~8) 검색 → `/responses`의 `memories`에 싣는다(ver3 §4).
 
-## 4. [요청] conversationPartnerName — 전사 요청에 통화 상대 이름 추가
+## 4. [요청] 녹음 기억추출 — `POST /v1/analysis/memory-segments` (구현 완료)
 
-우리가 계속 요청해온 "통화 상대 입력"(상대 화자 귀속 미해결 이슈)의 해법. 전사 요청에 필드 하나 추가한다.
+녹음 1건의 저장된 전사 세그먼트를 받아 3-A 기억 조각을 만들어 돌려준다. AI가 인물·민감 분석을 내부에서 함께 돌려 기억문 파생·민감플래그 조인에 쓰고, **최종 기억 목록만** 반환한다(인물·민감 자체는 stateless라 안 돌려줌). **엔드포인트는 구현·배포 완료**, BE는 녹음 분석 파이프라인에서 호출하면 된다.
 
-- `POST /v1/analysis/transcriptions` 요청 본문에 `conversationPartnerName` (string, optional) 추가.
-- 값: 그 녹음에서 대상자와 통화한 상대의 이름/호칭(업로드 시 사용자가 선택). 미선택이면 생략(또는 null).
-- AI 용도: 이 값이 오면 **대상자가 아닌 화자 = 그 상대로 확정**해 기억·인물 분석에서 발화를 정확히 귀속한다(지금은 이름 근거가 없으면 "상대"로만 남아 R2 지지율이 깎였다). 없으면 종전대로 "상대" 처리라 하위호환.
+```json
+// 요청
+{
+  "jobId": "uuid", "recordingId": "uuid",
+  "transcriptSegments": [
+    { "id": "seg-uuid", "segmentIndex": 0, "startMs": 0, "endMs": 1000,
+      "speakerLabel": "SPK_1", "transcriptText": "회 좋아하지." }
+  ],
+  "subjectContext": { …ver1 계약 2 형태(대상자·가족·용어집)… },
+  "subjectSpeakerLabel": "SPK_0",
+  "conversationPartnerName": "지영"
+}
+// 응답
+{
+  "segments": [
+    { "segmentIndex": 0, "sourceTranscriptSegmentIds": ["seg-uuid"],
+      "startMs": 0, "endMs": 1000, "speakerLabel": "SPK_1",
+      "memoryText": "지영은 회를 좋아한다.", "confidence": "confirmed",
+      "importanceScore": 7, "tags": ["음식요리"], "relatedPeople": ["지영"],
+      "sensitivityFlags": [] }
+  ],
+  "provider": "openai", "model": "gpt-5.4-mini"
+}
+```
+
+- `subjectContext`: 인물·기억 분석에 대상자 이름·가족 정보가 필요하다. transcription과 같은 형태로 함께 보낸다. (없어도 동작하나 지칭 해소·상대 확정 정확도가 떨어진다.)
+- `subjectSpeakerLabel` (optional): 녹음에서 대상자가 어느 화자인지. **미지정 시 AI가 발화량 최다 화자로 자동 판정**한다(음성ID 서빙 연결 전까지의 기본).
+- `conversationPartnerName` (optional): 대상자와 통화한 상대 이름(업로드 시 사용자 선택). **우리가 계속 요청해온 "통화 상대 입력" 이슈의 해법.** 값이 오면 대상자 아닌 화자를 이 이름으로 확정해 그 발화를 정확히 귀속한다(없으면 "상대" 처리, 하위호환). — 이 값은 STT만 하는 전사 요청이 아니라 **이 분석 호출에 실어야** 쓰인다.
+- 응답 필드: `sourceTranscriptSegmentIds`는 요청 세그먼트 `id`(UUID)로 매핑돼 돌아온다(원본 재생·근거). `importanceScore`(1~10)·`tags`(통제 어휘)·`relatedPeople`·`sensitivityFlags`·`confidence`(confirmed|inferred)는 명세 ANL-006·3-B 필드 계약대로.
 
 ```json
 {
