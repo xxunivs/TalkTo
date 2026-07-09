@@ -32,6 +32,11 @@ from app.schemas.voice import (
 _CLONE_SAMPLE_MAX_SECONDS = 180.0  # 이어붙인 샘플 총 길이 상한
 _CLONE_MIN_SEGMENT_MS = 800  # 이보다 짧은 구간은 버림(잡음·토막 방지)
 
+# BE가 persona.voiceId 초기값으로 넣는 자리표시자. 실제 음성 id가 아니라서 그대로
+# 프로바이더에 넘기면 실패한다. 값이 없는 것으로 보고 서버 기본 voiceId로 폴백한다.
+# (BE가 클론 voiceId를 persona.voiceId에 저장하기 시작하면 이 처리는 무해해진다.)
+_PLACEHOLDER_VOICE_IDS = frozenset({"default-voice"})
+
 
 def transcribe_voice_message(
     audio: bytes,
@@ -58,7 +63,10 @@ def transcribe_voice_message(
 def synthesize_speech(
     request: SpeechSynthesisRequest, *, settings: Settings
 ) -> TTSResult:
-    voice_id = request.voice_id or settings.elevenlabs_default_voice_id
+    requested = (request.voice_id or "").strip()
+    if requested in _PLACEHOLDER_VOICE_IDS:
+        requested = ""
+    voice_id = requested or settings.elevenlabs_default_voice_id
     if not voice_id:
         raise MissingVoiceError(
             "voiceId가 필요합니다 (요청의 voiceId 또는 ELEVENLABS_DEFAULT_VOICE_ID)."
