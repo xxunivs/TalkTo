@@ -73,8 +73,22 @@ reflection·personaInsights는 **P2**다. ver4의 컷오버(채팅·임베딩·r
   - **말하기 속도**: `speed`(0.7~1.2, 낮을수록 느림)를 요청에 넣거나 서버 env `ELEVENLABS_SPEED`로 전역 설정한다(요청값 우선, 둘 다 없으면 파라미터 중립값 1.0). **현재 서버 기본은 0.9**(대표 피드백 "조금 빠름" 반영). 실측(같은 문장, 한 실행): 1.2→약 4.0초, 1.0→약 5.4초, 0.8→약 6.1초로 단조롭게 느려짐(생성마다 길이 변동은 있음). 속도는 대상자와 무관한 전역 취향이라 BE가 매번 보낼 필요 없다.
   - **대상자별 목소리(중요)**: 목소리는 대상자마다 다르다. BE엔 **이미 `persona.voiceId` 필드가 있으므로**(update DTO로 설정 가능, 현재 기본값 `'default-voice'` 플레이스홀더) 저장소를 새로 만들 필요는 없다. 필요한 건 두 가지다: **① `persona.voiceId`에 실제 클론 id를 채우고**(신금자 = `lTmcD2Kp43w1lHsMQmq7`), **② TTS 호출 시 그 값을 요청에 싣기** — 현재 `synthesizeSpeech`가 `{ text }`만 보내므로(ai-client.service.ts) `{ text, voiceId: persona.voiceId }`로 추가하면 된다.
   - 서버 전역 기본 voiceId(`ELEVENLABS_DEFAULT_VOICE_ID`)는 **설정하지 않는 것을 권장**한다: 설정해두면 voiceId 없는 요청이 조용히 그 목소리로 나가버린다. 비워두면 voiceId 누락 시 400(`MISSING_VOICE_ID`)으로 안전하게 실패한다(단일 대상자 데모에서만 편의로 채움).
-  - 클론 생성: 이미 클론이 있는 대상자는 그 voiceId를 쓰면 되고, 새 대상자용 클론 자동 생성(음성 클로닝, 명세 VPA-006~009)은 별도 P2다.
   - 서버 env: `ELEVENLABS_SPEED`(기본 속도), `ELEVENLABS_MODEL`(기본 `eleven_multilingual_v2`) — 필요 시 Render에 설정. `ELEVENLABS_DEFAULT_VOICE_ID`는 위 이유로 보통 비워둔다.
+
+### 4-1. [요청] 음성 클론 생성 — `POST /v1/voice/clone` (구현 완료)
+
+대상자별 `voiceId`를 만드는 자동화. 고인 목소리가 잘 들리는 샘플 클립을 받아 클론 음성을 등록하고 `voiceId`를 돌려준다. BE는 이 값을 `persona.voiceId`에 저장했다가 이후 TTS 요청에 실어 보낸다.
+
+```json
+// 요청
+{ "name": "외할머니 신금자", "sampleAudioUrl": "https://... (presigned GET, 샘플 클립)" }
+// 응답
+{ "voiceId": "xxxxxxxxxxxxxxxxxxxx", "provider": "elevenlabs" }
+```
+
+- `sampleAudioUrl`: BE가 `TargetVoiceSample`(recordingId + storageKey + startMs/endMs — FE의 "고인 목소리 구간 선택" 결과)에서 **그 구간을 잘라낸 오디오 클립**의 presigned URL. BE는 이미 녹음+구간으로 클립을 뽑는 로직이 있다(memory-segments 재생용). AI 쪽 구간 슬라이싱은 불필요 — 잘린 클립만 주면 된다.
+- `name`: 클론 음성 라벨(대상자 식별용).
+- 호출 시점: VP 신청의 voice sample 승인(`reviewStatus`) 후 1회. 결과 `voiceId`를 저장하면 그 대상자 TTS가 그 목소리로 나온다.
 
 ## 5. 컷오버 공통 주의 (ver4 포함, 모든 새 `/v1/*` 엔드포인트)
 
