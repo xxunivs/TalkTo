@@ -13,7 +13,7 @@ from pathlib import Path
 from docx import Document
 
 REPO = Path(__file__).resolve().parents[2]
-OUT = REPO / "data" / "personas"
+OUT = REPO / "data"
 
 # (이름, fixture 경로, 오디오 소스, 실제 docx(있으면))
 PERSONS = [
