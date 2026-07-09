@@ -25,7 +25,10 @@ services:
       - key: ELEVENLABS_API_KEY
         sync: false
       # ── 모델(기본값 있음, 교체할 때만 지정) ──
+      # 페르소나 응답 생성 모델. 정확성 평가(3.8~4.1)를 gpt-5.4-mini로 검증했으므로
+      # 서빙도 동일 모델로 맞춤(config 기본값 gpt-4.1-mini보다 우선). 배포 후 대시보드
+      # Environment에서 값만 바꿔 교체 가능(재빌드 불필요).
       - key: OPENAI_CHAT_MODEL
-        value: gpt-4.1-mini
+        value: gpt-5.4-mini
       # OPENAI_ANALYSIS_MODEL / OPENAI_JUDGE_MODEL 등은 config 기본값 사용,
       # 바꿀 때만 여기에 추가.
