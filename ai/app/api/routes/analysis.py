@@ -3,16 +3,11 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 
 from app.api.dependencies import SettingsDependency, require_internal_request
-from app.core.errors import FeatureNotImplementedError
-from app.providers.stt import create_stt_provider
-from app.schemas.analysis import EnrichmentRequest, EnrichmentResponse
-from app.schemas.memory import (
-    MemorySegmentExtractionRequest,
-    MemorySegmentExtractionResponse,
-)
-from app.schemas.transcript import TranscriptionRequest, TranscriptionResponse
-from app.pipeline.memory_segments.service import run_recording_memory_extraction
+from app.pipeline.analysis.recording import run_recording_analysis
 from app.pipeline.transcription.service import transcribe_recording
+from app.schemas.recording import RecordingAnalysisRequest, RecordingAnalysisResponse
+from app.schemas.transcript import TranscriptionRequest, TranscriptionResponse
+from app.providers.stt import create_stt_provider
 
 
 router = APIRouter(tags=["analysis"])
@@ -29,18 +24,11 @@ def create_analysis_transcription(
     return transcribe_recording(request, settings=settings, provider=provider)
 
 
-@router.post("/memory-segments", response_model=MemorySegmentExtractionResponse)
-def create_memory_segments(
-    request: MemorySegmentExtractionRequest,
+@router.post("/recording", response_model=RecordingAnalysisResponse)
+def create_recording_analysis(
+    request: RecordingAnalysisRequest,
     _authorized: InternalRequest,
     settings: SettingsDependency,
-) -> MemorySegmentExtractionResponse:
-    return run_recording_memory_extraction(request, settings=settings)
-
-
-@router.post("/enrichments", response_model=EnrichmentResponse)
-def create_enrichments(
-    _request: EnrichmentRequest,
-    _authorized: InternalRequest,
-) -> EnrichmentResponse:
-    raise FeatureNotImplementedError("Recording enrichment analysis")
+) -> RecordingAnalysisResponse:
+    """녹음 1건 통합 분석 — 3-A 기억 + 요약 + 태그 + 말투(④) + 안전플래그를 한 번에."""
+    return run_recording_analysis(request, settings=settings)
