@@ -75,3 +75,10 @@ reflection·personaInsights는 **P2**다. ver4의 컷오버(채팅·임베딩·r
   - 서버 전역 기본 voiceId(`ELEVENLABS_DEFAULT_VOICE_ID`)는 **설정하지 않는 것을 권장**한다: 설정해두면 voiceId 없는 요청이 조용히 그 목소리로 나가버린다. 비워두면 voiceId 누락 시 400(`MISSING_VOICE_ID`)으로 안전하게 실패한다(단일 대상자 데모에서만 편의로 채움).
   - 클론 생성: 이미 클론이 있는 대상자는 그 voiceId를 쓰면 되고, 새 대상자용 클론 자동 생성(음성 클로닝, 명세 VPA-006~009)은 별도 P2다.
   - 서버 env: `ELEVENLABS_SPEED`(기본 속도), `ELEVENLABS_MODEL`(기본 `eleven_multilingual_v2`) — 필요 시 Render에 설정. `ELEVENLABS_DEFAULT_VOICE_ID`는 위 이유로 보통 비워둔다.
+
+## 5. 컷오버 공통 주의 (ver4 포함, 모든 새 `/v1/*` 엔드포인트)
+
+옛 `/ai/*`와 새 `/v1/*`는 계약 스타일이 두 가지 다르다 — BE가 경로만 바꾸면 되는 대부분과 달리 이 두 가지는 코드 수정이 필요하다.
+
+1. **필드는 camelCase**: 새 엔드포인트는 응답을 camelCase로 낸다(요청은 camel/snake 둘 다 받음). 옛 응답의 snake_case를 그대로 읽으면 안 된다 — 특히 **채팅 응답 `retrieved_memory_ids` → `retrievedMemoryIds`**. 임베딩·기억추출 응답은 형태 자체가 바뀌므로(ver4 §3·§5) 이미 새로 읽어야 한다.
+2. **정의되지 않은 필드 거부(엄격 검증)**: 스키마에 없는 필드를 요청에 넣으면 422다. 필요한 필드만 보낸다. 특히 **`/v1/persona/responses`는 옛 채팅과 달리 `persona`(instructions 포함)가 필수** — 현재 BE `AiChatRequest`엔 없으니 추가해야 한다(ver3 §4). redaction으로 값만 마스킹하는 건 무방(필드 구조는 그대로면 됨).
