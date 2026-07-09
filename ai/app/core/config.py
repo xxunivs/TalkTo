@@ -33,6 +33,9 @@ class Settings(BaseModel):
     elevenlabs_api_key: SecretStr | None = None
     elevenlabs_model: str | None = None
     elevenlabs_default_voice_id: str | None = None
+    # 말하는 속도(ElevenLabs speed). 1.0=기본, <1 느리게(대표 피드백: 조금 느리게).
+    # 0.7~1.2 권장. 요청에서 speed로 오버라이드 가능.
+    elevenlabs_speed: float = Field(default=1.0, ge=0.7, le=1.2)
 
     # 화자 식별(ECAPA) 유사도 임계값 — 실통화 13건 캘리브레이션(대상자 0.605~0.948
     # vs 타화자 0.258~0.417, 중간점 0.511). 외부 데이터 테스트에서 재검증 대상
@@ -101,6 +104,7 @@ def load_settings(env_file: str | Path | None = ".env") -> Settings:
         elevenlabs_api_key=os.getenv("ELEVENLABS_API_KEY"),
         elevenlabs_model=os.getenv("ELEVENLABS_MODEL"),
         elevenlabs_default_voice_id=os.getenv("ELEVENLABS_DEFAULT_VOICE_ID"),
+        elevenlabs_speed=os.getenv("ELEVENLABS_SPEED", "1.0"),
         speaker_id_threshold=os.getenv("SPEAKER_ID_THRESHOLD", "0.5"),
         stt_provider=os.getenv("STT_PROVIDER", "elevenlabs"),
         elevenlabs_stt_model=os.getenv("ELEVENLABS_STT_MODEL", "scribe_v1"),

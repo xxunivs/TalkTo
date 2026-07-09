@@ -21,7 +21,7 @@ class ElevenLabsTTSProvider:
         self.model_id = model_id or _DEFAULT_MODEL
         self.timeout_seconds = timeout_seconds
 
-    def synthesize(self, text: str, *, voice_id: str) -> TTSResult:
+    def synthesize(self, text: str, *, voice_id: str, speed: float = 1.0) -> TTSResult:
         url = f"{ELEVENLABS_BASE}/v1/text-to-speech/{voice_id}"
         try:
             response = httpx.post(
@@ -30,7 +30,11 @@ class ElevenLabsTTSProvider:
                 json={
                     "text": text,
                     "model_id": self.model_id,
-                    "voice_settings": {"stability": 0.5, "similarity_boost": 0.75},
+                    "voice_settings": {
+                        "stability": 0.5,
+                        "similarity_boost": 0.75,
+                        "speed": speed,
+                    },
                 },
                 timeout=self.timeout_seconds,
             )

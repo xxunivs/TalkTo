@@ -44,5 +44,6 @@ def synthesize_speech(
         raise MissingVoiceError(
             "voiceId가 필요합니다 (요청의 voiceId 또는 ELEVENLABS_DEFAULT_VOICE_ID)."
         )
+    speed = request.speed if request.speed is not None else settings.elevenlabs_speed
     provider = create_tts_provider(settings)
-    return provider.synthesize(request.text, voice_id=voice_id)
+    return provider.synthesize(request.text, voice_id=voice_id, speed=speed)
