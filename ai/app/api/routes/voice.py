@@ -3,8 +3,17 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, File, Form, Response, UploadFile
 
 from app.api.dependencies import SettingsDependency, require_internal_request
-from app.pipeline.voice.service import synthesize_speech, transcribe_voice_message
-from app.schemas.voice import SpeechSynthesisRequest, VoiceTranscriptionResponse
+from app.pipeline.voice.service import (
+    clone_voice_from_sample,
+    synthesize_speech,
+    transcribe_voice_message,
+)
+from app.schemas.voice import (
+    SpeechSynthesisRequest,
+    VoiceCloneRequest,
+    VoiceCloneResponse,
+    VoiceTranscriptionResponse,
+)
 
 
 router = APIRouter(tags=["voice"])
@@ -34,3 +43,13 @@ def create_speech(
     """페르소나 답변 음성 합성 — text(+voiceId) → 고인 목소리 audio/mpeg."""
     result = synthesize_speech(request, settings=settings)
     return Response(content=result.audio, media_type=result.content_type)
+
+
+@router.post("/clone", response_model=VoiceCloneResponse)
+def create_voice_clone(
+    request: VoiceCloneRequest,
+    _authorized: InternalRequest,
+    settings: SettingsDependency,
+) -> VoiceCloneResponse:
+    """고인 목소리 샘플 클립 → 클론 음성 등록 → voiceId(대상자별 TTS 음성)."""
+    return clone_voice_from_sample(request, settings=settings)

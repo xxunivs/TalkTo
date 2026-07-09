@@ -49,6 +49,30 @@ class VoiceTest(unittest.TestCase):
         self.assertEqual(response.headers["content-type"], "audio/mpeg")
         self.assertEqual(response.content, b"ID3fakemp3")
 
+    @patch("app.providers.tts.elevenlabs_tts.httpx.post")
+    @patch("app.pipeline.voice.service.download_audio")
+    def test_voice_clone_returns_voice_id(
+        self, mock_download: MagicMock, mock_post: MagicMock
+    ) -> None:
+        import tempfile
+        from pathlib import Path
+
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
+        tmp.write(b"RIFFfakeaudio")
+        tmp.close()
+        mock_download.return_value = Path(tmp.name)
+        mock_post.return_value = MagicMock(
+            status_code=200, json=lambda: {"voice_id": "cloned-voice-123"}
+        )
+
+        response = self.client.post(
+            "/v1/voice/clone",
+            json={"name": "할머니", "sampleAudioUrl": "https://storage/sample.mp3"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["voiceId"], "cloned-voice-123")
+
     def test_speech_without_voice_id_returns_400(self) -> None:
         # 요청 voiceId 없고 ELEVENLABS_DEFAULT_VOICE_ID도 없으면 명시적 400.
         with patch("app.pipeline.voice.service.create_tts_provider") as provider:

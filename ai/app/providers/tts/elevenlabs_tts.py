@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import httpx
 
 from app.core.errors import TTSProviderError
@@ -50,3 +52,25 @@ class ElevenLabsTTSProvider:
             provider="elevenlabs",
             model=self.model_id,
         )
+
+    def clone_voice(self, name: str, audio_path: Path) -> str:
+        """음성 샘플로 클론 음성을 등록하고 voice_id를 돌려준다(ElevenLabs add-voice)."""
+        try:
+            with audio_path.open("rb") as audio_file:
+                response = httpx.post(
+                    f"{ELEVENLABS_BASE}/v1/voices/add",
+                    headers={"xi-api-key": self.api_key},
+                    data={"name": name},
+                    files={"files": (audio_path.name, audio_file)},
+                    timeout=self.timeout_seconds,
+                )
+        except httpx.HTTPError as error:
+            raise TTSProviderError(f"음성 클론 요청 실패: {error}") from error
+        if response.status_code != 200:
+            raise TTSProviderError(
+                f"ElevenLabs 클론 오류 {response.status_code}: {response.text[:200]}"
+            )
+        voice_id = response.json().get("voice_id")
+        if not voice_id:
+            raise TTSProviderError("클론 응답에 voice_id가 없다.")
+        return str(voice_id)

@@ -8,10 +8,16 @@ import io
 
 from app.core.config import Settings
 from app.core.errors import MissingVoiceError
+from app.pipeline.transcription.audio import download_audio
 from app.providers.llm import create_openai_client
 from app.providers.tts import create_tts_provider
 from app.providers.tts.interface import TTSResult
-from app.schemas.voice import SpeechSynthesisRequest, VoiceTranscriptionResponse
+from app.schemas.voice import (
+    SpeechSynthesisRequest,
+    VoiceCloneRequest,
+    VoiceCloneResponse,
+    VoiceTranscriptionResponse,
+)
 
 
 def transcribe_voice_message(
@@ -47,3 +53,20 @@ def synthesize_speech(
     speed = request.speed if request.speed is not None else settings.elevenlabs_speed
     provider = create_tts_provider(settings)
     return provider.synthesize(request.text, voice_id=voice_id, speed=speed)
+
+
+def clone_voice_from_sample(
+    request: VoiceCloneRequest, *, settings: Settings
+) -> VoiceCloneResponse:
+    """고인 목소리 샘플 클립 → 클론 음성 등록 → voiceId. BE는 이 값을 persona.voiceId에 저장."""
+    provider = create_tts_provider(settings)
+    audio_path = download_audio(
+        str(request.sample_audio_url),
+        timeout_seconds=settings.audio_download_timeout_seconds,
+        max_bytes=settings.max_audio_bytes,
+    )
+    try:
+        voice_id = provider.clone_voice(request.name, audio_path)
+    finally:
+        audio_path.unlink(missing_ok=True)
+    return VoiceCloneResponse(voice_id=voice_id, provider="elevenlabs")

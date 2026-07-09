@@ -1,4 +1,4 @@
-from pydantic import Field
+from pydantic import Field, HttpUrl
 
 from app.schemas.common import ApiModel
 
@@ -7,6 +7,18 @@ class VoiceTranscriptionResponse(ApiModel):
     text: str
     provider: str
     model: str
+
+
+class VoiceCloneRequest(ApiModel):
+    # 클론 음성 이름(대상자 식별용). 고인 목소리 잘 들리는 구간 샘플로 등록.
+    name: str = Field(min_length=1, max_length=200)
+    # BE가 TargetVoiceSample(recording+구간)에서 잘라 만든 샘플 클립의 presigned URL.
+    sample_audio_url: HttpUrl
+
+
+class VoiceCloneResponse(ApiModel):
+    voice_id: str
+    provider: str
 
 
 class SpeechSynthesisRequest(ApiModel):
