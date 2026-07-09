@@ -24,6 +24,13 @@ services:
         sync: false
       - key: ELEVENLABS_API_KEY
         sync: false
+      # 대상자 클론 음성 id(폴백). 가족 데이터라 값은 커밋 안 하고 대시보드에서 입력.
+      - key: ELEVENLABS_DEFAULT_VOICE_ID
+        sync: false
+      # ── 음성/모델(기본값 있음, 조절할 때만 지정) ──
+      # TTS 말하기 속도(0.7~1.2, 낮을수록 느림). 대표 피드백 반영 0.9.
+      - key: ELEVENLABS_SPEED
+        value: "0.9"
       # ── 모델(기본값 있음, 교체할 때만 지정) ──
       # 페르소나 응답 생성 모델. 정확성 평가(3.8~4.1)를 gpt-5.4-mini로 검증했으므로
       # 서빙도 동일 모델로 맞춤(config 기본값 gpt-4.1-mini보다 우선). 배포 후 대시보드
