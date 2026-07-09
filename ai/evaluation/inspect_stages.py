@@ -59,6 +59,7 @@ def main() -> int:
     parser.add_argument("--pair", required=True)
     parser.add_argument("--fixture", type=Path, required=True)
     parser.add_argument("--no-cache", action="store_true")
+    parser.add_argument("--partner", default=None, help="통화 상대 이름(conversationPartnerName) 확정 주입")
     args = parser.parse_args()
 
     load_dotenv(REPO_ROOT / ".env")
@@ -80,7 +81,8 @@ def main() -> int:
         print(f"  #{s.segment_index}: {s.transcript_text}")
 
     persons = run_persons_analysis(
-        segs, subject_context=subject, subject_speaker_label=subj_label, settings=settings)
+        segs, subject_context=subject, subject_speaker_label=subj_label, settings=settings,
+        conversation_partner_name=args.partner)
     sens = run_sensitivity_analysis(segs, settings=settings)
     print(f"\n===== 2) 인물 {len(persons['persons'])} · 민감 {len(sens['sensitivityFlags'])} =====")
     for p in persons["persons"]:
@@ -90,7 +92,8 @@ def main() -> int:
 
     mem = extract_memory_segments(
         segs, subject_context=subject, subject_speaker_label=subj_label,
-        persons_result=persons, sensitivity_result=sens, settings=settings)
+        persons_result=persons, sensitivity_result=sens, settings=settings,
+        conversation_partner_name=args.partner)
     print(f"\n===== 3-A) 기억 {len(mem['memorySegments'])}건 =====")
     for m in mem["memorySegments"]:
         print(f"  · [{','.join(m.get('tags', []))}|중{m.get('importanceScore')}] {m['memoryText']}")

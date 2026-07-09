@@ -28,6 +28,7 @@ def run_persons_analysis(
     subject_context: SubjectContext | None,
     subject_speaker_label: str | None,
     settings: Settings,
+    conversation_partner_name: str | None = None,
 ) -> dict:
 
     client = create_openai_client(settings, "persons analysis")
@@ -39,7 +40,8 @@ def run_persons_analysis(
             {
                 "role": "user",
                 "content": build_persons_user_prompt(
-                    segments, subject_context, subject_speaker_label
+                    segments, subject_context, subject_speaker_label,
+                    conversation_partner_name,
                 ),
             },
         ],

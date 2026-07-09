@@ -52,6 +52,7 @@ def extract_memory_segments(
     persons_result: dict | None,
     sensitivity_result: dict | None,
     settings: Settings,
+    conversation_partner_name: str | None = None,
 ) -> dict:
 
     client = create_openai_client(settings, "memory extraction")
@@ -63,7 +64,8 @@ def extract_memory_segments(
             {
                 "role": "user",
                 "content": build_memory_user_prompt(
-                    segments, subject_context, subject_speaker_label, persons_result
+                    segments, subject_context, subject_speaker_label, persons_result,
+                    conversation_partner_name,
                 ),
             },
         ],

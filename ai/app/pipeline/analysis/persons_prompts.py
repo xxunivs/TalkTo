@@ -56,6 +56,7 @@ def build_persons_user_prompt(
     segments: list[TranscriptSegment],
     subject_context: SubjectContext | None,
     subject_speaker_label: str | None,
+    conversation_partner_name: str | None = None,
 ) -> str:
     parts: list[str] = []
 
@@ -66,6 +67,12 @@ def build_persons_user_prompt(
         )
     if subject_speaker_label:
         parts.append(f"전사문에서 대상자의 화자 라벨: {subject_speaker_label}")
+    if conversation_partner_name:
+        parts.append(
+            f"통화 상대(확정): 이 녹음에서 대상자와 통화한 상대는 '{conversation_partner_name}'이다. "
+            f"대상자가 아닌 화자를 이 사람으로 확정해 persons에 포함하고(호격 근거가 없어도 이 값이 주어졌으므로 확정), "
+            f"그 화자의 발화를 이 상대에게 귀속한다. 단, 전사문에서 제3자로만 언급되는 다른 이름을 이 상대에 갖다 붙이지 않는다."
+        )
 
     if subject_context is not None and subject_context.family_members:
         lines = [

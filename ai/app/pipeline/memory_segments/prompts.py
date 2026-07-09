@@ -62,6 +62,7 @@ def build_memory_user_prompt(
     subject_context: SubjectContext | None,
     subject_speaker_label: str | None,
     persons_result: dict | None,
+    conversation_partner_name: str | None = None,
 ) -> str:
     parts: list[str] = []
 
@@ -72,6 +73,13 @@ def build_memory_user_prompt(
         )
     if subject_speaker_label:
         parts.append(f"전사문에서 대상자의 화자 라벨: {subject_speaker_label}")
+    if conversation_partner_name:
+        parts.append(
+            f"통화 상대(확정): 이 녹음에서 대상자와 통화한 상대는 '{conversation_partner_name}'이다. "
+            f"규칙 9~11에서 '상대'로만 남기던 통화 상대를 이 이름으로 확정해, 그 상대의 발화·경험은 "
+            f"'{conversation_partner_name}은(는) …'으로 귀속하고 relatedPeople에도 이 이름을 넣는다. "
+            f"전사문에서 제3자로만 언급되는 다른 이름은 이 상대에 갖다 붙이지 않는다."
+        )
 
     if persons_result and persons_result.get("persons"):
         lines = [
