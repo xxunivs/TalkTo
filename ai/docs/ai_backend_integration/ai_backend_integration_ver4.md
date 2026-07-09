@@ -47,9 +47,9 @@ BE 배포 환경변수에 설정:
 
 - 모델 `text-embedding-3-small`(1536차원, 기존과 동일). 채팅 시 사용자 메시지도 같은 방식으로 임베딩해 top-k(5~8) 검색 → `/responses`의 `memories`에 싣는다(ver3 §4).
 
-## 4. [요청] 녹음 기억추출 — `POST /v1/analysis/memory-segments` (구현 완료)
+## 4. [요청] 녹음 분석(통합) — `POST /v1/analysis/recording` (구현 완료)
 
-녹음 1건의 저장된 전사 세그먼트를 받아 3-A 기억 조각을 만들어 돌려준다. AI가 인물·민감 분석을 내부에서 함께 돌려 기억문 파생·민감플래그 조인에 쓰고, **최종 기억 목록만** 반환한다(인물·민감 자체는 stateless라 안 돌려줌). **엔드포인트는 구현·배포 완료**, BE는 녹음 분석 파이프라인에서 호출하면 된다.
+녹음 1건의 저장된 전사 세그먼트를 받아 **한 번의 호출로** 3-A 기억 + 요약 + 태그 + 말투(언어스타일) + 안전플래그를 만들어 돌려준다. 인물·민감·3-A 분석은 내부에서 한 번만 돌려 공유하므로(엔드포인트를 쪼개 각각 부르는 것보다 LLM 비용이 낮다), **녹음당 이 1콜**이면 Archive(요약)·Memories(기억·태그)·Voice Persona(말투·금기) 재료가 다 나온다. **구현·배포 완료.**
 
 ```json
 // 요청
@@ -65,21 +65,39 @@ BE 배포 환경변수에 설정:
 }
 // 응답
 {
-  "segments": [
+  "memorySegments": [
     { "segmentIndex": 0, "sourceTranscriptSegmentIds": ["seg-uuid"],
       "startMs": 0, "endMs": 1000, "speakerLabel": "SPK_1",
       "memoryText": "지영은 회를 좋아한다.", "confidence": "confirmed",
       "importanceScore": 7, "tags": ["음식요리"], "relatedPeople": ["지영"],
       "sensitivityFlags": [] }
   ],
+  "summary": "자리 양보와 음식 취향에 대해 이야기를 나눴다.",
+  "tags": ["음식요리", "가족안부"],
+  "speechStyle": {
+    "recurringPhrases": [{ "phrase": "그러니까", "sourceTranscriptSegmentIds": ["seg-uuid"] }],
+    "addressTerms": [{ "person": "지영", "term": "지영아", "sourceTranscriptSegmentIds": ["seg-uuid"] }],
+    "sentencePatterns": ["이유를 덧붙이는 설명형 화법"],
+    "emotionalExpressions": [{ "emotion": "애정", "expression": "밥은 먹었냐", "sourceTranscriptSegmentIds": ["seg-uuid"] }]
+  },
+  "safetyFlags": [
+    { "type": "health", "description": "허리 통증 언급", "sourceTranscriptSegmentIds": ["seg-uuid"] }
+  ],
   "provider": "openai", "model": "gpt-5.4-mini"
 }
 ```
 
-- `subjectContext`: 인물·기억 분석에 대상자 이름·가족 정보가 필요하다. transcription과 같은 형태로 함께 보낸다. (없어도 동작하나 지칭 해소·상대 확정 정확도가 떨어진다.)
-- `subjectSpeakerLabel` (optional): 녹음에서 대상자가 어느 화자인지. **미지정 시 AI가 발화량 최다 화자로 자동 판정**한다(음성ID 서빙 연결 전까지의 기본).
-- `conversationPartnerName` (optional): 대상자와 통화한 상대 이름(업로드 시 사용자 선택). **우리가 계속 요청해온 "통화 상대 입력" 이슈의 해법.** 값이 오면 대상자 아닌 화자를 이 이름으로 확정해 그 발화를 정확히 귀속한다(없으면 "상대" 처리, 하위호환). — 이 값은 STT만 하는 전사 요청이 아니라 **이 분석 호출에 실어야** 쓰인다.
-- 응답 필드: `sourceTranscriptSegmentIds`는 요청 세그먼트 `id`(UUID)로 매핑돼 돌아온다(원본 재생·근거). `importanceScore`(1~10)·`tags`(통제 어휘)·`relatedPeople`·`sensitivityFlags`·`confidence`(confirmed|inferred)는 명세 ANL-006·3-B 필드 계약대로.
+요청 필드:
+- `subjectContext`: 인물·기억 분석에 대상자 이름·가족 정보가 필요하다. transcription과 같은 형태로 함께 보낸다(없어도 동작하나 지칭 해소·상대 확정 정확도가 떨어짐).
+- `subjectSpeakerLabel` (optional): 녹음에서 대상자가 어느 화자인지. **미지정 시 AI가 발화량 최다 화자로 자동 판정**(음성ID 서빙 연결 전까지의 기본).
+- `conversationPartnerName` (optional): 대상자와 통화한 상대 이름(업로드 시 사용자 선택). **우리가 계속 요청해온 "통화 상대 입력" 이슈의 해법.** 값이 오면 대상자 아닌 화자를 이 이름으로 확정해 발화를 정확히 귀속한다(없으면 "상대" 처리, 하위호환). — STT만 하는 전사 요청이 아니라 **이 분석 호출에 실어야** 쓰인다.
+
+응답 필드:
+- `memorySegments` (3-A → Memories): `sourceTranscriptSegmentIds`는 요청 세그먼트 `id`(UUID)로 매핑(원본 재생·근거). `importanceScore`(1~10)·`tags`(통제 어휘)·`relatedPeople`·`sensitivityFlags`·`confidence`(confirmed|inferred)는 명세 ANL-006·3-B 계약대로.
+- `summary` (3-C → Archive 목록/상세), `tags` (녹음 대표 주제 상위 → Memories 필터).
+- `speechStyle` (2단계 ④ → Voice Persona 말투): 반복 말버릇·호칭·문장패턴·감정표현. `sentencePatterns`만 근거 없음(관찰 일반화).
+- `safetyFlags` (민감플래그 → 금기·가족검수 안전노트): `type`은 health/familyConflict/asset/death/thirdParty.
+- **미포함**: `personaMaterials`(reflection)는 녹음 여러 건 누적이 필요한 P2라 이 응답에 없음(추후 별도).
 
 ```json
 {
