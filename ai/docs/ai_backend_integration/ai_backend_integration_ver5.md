@@ -1,6 +1,6 @@
-# AI <-> 백엔드 연동 요청 ver5 — 4단계 reflection (누적 기억 → 페르소나 프로필)
+# AI <-> 백엔드 연동 요청 ver5 — 4단계 reflection + voice STT/TTS
 
-ver4에 없던 신규 항목이다. 녹음이 여러 건 쌓이면 개별 기억을 가로질러 대상자의 성향·가치관을 요약하는 통찰(reflection)을 만들고, 그걸 페르소나에 반영한다. **ver4와 충돌 없음**: 아래 1은 새 엔드포인트, 2는 기존 `/assembly` 요청에 옵션 필드 하나 추가(안 보내면 종전과 동일)다. 녹음 누적이 있어야 의미 있는 P2라 급하지 않다.
+ver4에 없던 신규·이식 항목이다. **§1~2 reflection**: 녹음이 여러 건 쌓이면 개별 기억을 가로질러 대상자의 성향·가치관을 요약하는 통찰을 만들고 페르소나에 반영한다(P2, 누적 필요). **§4 voice**: 옛 MVP의 음성 STT/TTS를 새 서버로 이식한 컷오버(경로만 교체). **ver4와 충돌 없음**: §1은 새 엔드포인트, §2는 기존 `/assembly`에 옵션 필드 추가(안 보내면 종전과 동일), §4는 옛 `/ai/*` 음성 경로를 새 `/v1/voice/*`로 옮기는 것이다.
 
 ## 1. [요청] 통찰 도출 — `POST /v1/persona/reflection` (구현 완료)
 
@@ -11,15 +11,17 @@ ver4에 없던 신규 항목이다. 녹음이 여러 건 쌓이면 개별 기억
 {
   "subjectContext": { …ver1 계약 2 형태(대상자·가족)… },
   "memories": [
-    { "id": "mem-uuid", "memoryText": "명절마다 가족이 다 모였다.",
-      "tags": ["가족안부"], "importanceScore": 7 }
+    { "id": "mem-1", "memoryText": "명절마다 가족이 다 모였다.",
+      "tags": ["가족안부"], "importanceScore": 7 },
+    { "id": "mem-2", "memoryText": "가족과 함께 밥 먹는 걸 좋아했다.",
+      "tags": ["가족안부"], "importanceScore": 6 }
   ]
 }
 // 응답
 {
   "reflections": [
     { "insight": "가족이 함께 모여 식사하는 시간을 중요하게 여긴다.",
-      "category": "가치관", "evidenceMemoryIds": ["mem-uuid-1", "mem-uuid-2"],
+      "category": "가치관", "evidenceMemoryIds": ["mem-1", "mem-2"],
       "importance": 8 }
   ],
   "provider": "openai", "model": "gpt-5.4-mini"
@@ -67,8 +69,8 @@ reflection·personaInsights는 **P2**다. ver4의 컷오버(채팅·임베딩·r
 | 페르소나 답변 TTS | `/ai/tts` | `POST /v1/voice/speech` | `{ text, voiceId? }` → **audio/mpeg 바이트** |
 
 - **STT**: BE `transcribe()`가 보내는 멀티파트 필드 `audio_file` 그대로 받는다. 응답 `text`를 읽으면 된다(옛 `stt_text`도 호환되게 BE가 `stt_text ?? text`로 읽고 있음 — `text`로 옴). OpenAI whisper 사용.
-- **TTS**: `{ text, voiceId?, speed? }`를 보내면 audio/mpeg 바이트를 돌려준다(옛 `/ai/tts`와 호환). **voiceId를 함께 보내면 그 음성으로 합성**하고, 없으면 서버의 `ELEVENLABS_DEFAULT_VOICE_ID`로 폴백한다.
-  - **말하기 속도**: `speed`(0.7~1.2, 1.0=기본, 낮을수록 느림)를 요청에 넣거나, 서버 env `ELEVENLABS_SPEED`로 전역 설정한다(요청값 우선). 실측: 1.0→5.4초, 0.8→6.1초(같은 문장). 대표 피드백(조금 빠름)엔 **0.9 권장**.
+- **TTS**: `{ text, voiceId?, speed? }`를 보내면 audio/mpeg 바이트를 돌려준다(옛 `/ai/tts`와 호환). **voiceId를 함께 보내면 그 음성으로 합성**한다. voiceId가 없으면 서버 기본값이 설정돼 있을 때만 그걸로 폴백하고, 기본값도 없으면 400(`MISSING_VOICE_ID`)이다(대상자별 운용 권장 — 아래 참고).
+  - **말하기 속도**: `speed`(0.7~1.2, 낮을수록 느림)를 요청에 넣거나 서버 env `ELEVENLABS_SPEED`로 전역 설정한다(요청값 우선, 둘 다 없으면 파라미터 중립값 1.0). **현재 서버 기본은 0.9**(대표 피드백 "조금 빠름" 반영). 실측(같은 문장, 한 실행): 1.2→약 4.0초, 1.0→약 5.4초, 0.8→약 6.1초로 단조롭게 느려짐(생성마다 길이 변동은 있음). 속도는 대상자와 무관한 전역 취향이라 BE가 매번 보낼 필요 없다.
   - **대상자별 목소리(중요)**: 목소리는 대상자마다 다르다. **BE가 대상자별 클론 `voiceId`를 저장했다가 매 TTS 요청에 실어 보내야 한다** — 그래야 각자 자기 목소리로 나온다. 서버 전역 기본 voiceId(`ELEVENLABS_DEFAULT_VOICE_ID`)는 **설정하지 않는 것을 권장**한다: 설정해두면 voiceId 없는 요청이 조용히 그 목소리로 나가버린다. 비워두면 voiceId 누락 시 400(`MISSING_VOICE_ID`)으로 안전하게 실패한다(단일 대상자 데모에서만 편의로 채움).
   - 클론 생성: 이미 클론이 있는 대상자는 그 voiceId를 쓰면 되고, 새 대상자용 클론 자동 생성(음성 클로닝, 명세 VPA-006~009)은 별도 P2다.
   - 서버 env: `ELEVENLABS_SPEED`(기본 속도), `ELEVENLABS_MODEL`(기본 `eleven_multilingual_v2`) — 필요 시 Render에 설정. `ELEVENLABS_DEFAULT_VOICE_ID`는 위 이유로 보통 비워둔다.
