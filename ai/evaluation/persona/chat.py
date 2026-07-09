@@ -42,6 +42,8 @@ def main() -> int:
     parser.add_argument("--fixture", type=Path, required=True)
     parser.add_argument("--persona", type=Path, default=None,
                         help="미리 조립된 프롬프트 파일(주면 fresh 조립 대신 이걸 사용)")
+    parser.add_argument("--memories", type=Path, default=None,
+                        help="누적 기억 파일(build_from_recordings 산출). 주면 fixture 카드 대신 사용")
     parser.add_argument("--memory-k", type=int, default=6)
     parser.add_argument("--speech-examples", type=int, default=0,
                         help="fixture _speechExamples 중 앞 N개를 말투 few-shot으로")
@@ -68,7 +70,10 @@ def main() -> int:
         instructions = assembled.instructions
         name = assembled.subject_name
 
-    cards = [c for c in (intake_raw or {}).get("memoryCards", []) if c.get("content")]
+    if args.memories:
+        cards = [c for c in json.loads(args.memories.read_text(encoding="utf-8")) if c.get("content")]
+    else:
+        cards = [c for c in (intake_raw or {}).get("memoryCards", []) if c.get("content")]
     vectors = embed_texts([c["content"] for c in cards], settings=settings) if cards else []
     persona = PersonaContext(subject_id="local-chat", instructions=instructions, voice_id=None)
 
