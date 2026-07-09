@@ -125,32 +125,23 @@ def cosine_similarity(left: list[float], right: list[float]) -> float:
 def load_mono_16k(audio_path: Path):
     """오디오 → mono 16kHz 텐서(1, samples).
 
-    torchaudio 백엔드는 m4a/aac 디코딩을 못 하는 경우가 있어(실측 확인), ffmpeg CLI로
-    16kHz mono wav로 먼저 디코딩한 뒤 로드한다 — 어떤 입력 포맷이든 안전.
+    torchaudio.load는 버전에 따라 torchcodec을 요구해 컨테이너에서 실패한다(실측:
+    "TorchCodec is required for load_with_torchcodec"). 그래서 ffmpeg으로 16kHz mono
+    float32 PCM으로 디코딩해 numpy→torch로 직접 읽는다 — torchaudio 백엔드/torchcodec
+    의존 없이 m4a/mp3/wav 등 어떤 포맷이든 안전.
     """
     import subprocess
-    import tempfile
 
-    import torchaudio
+    import torch
 
-    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
-        wav_path = tmp.name
-    try:
-        subprocess.run(
-            ["ffmpeg", "-y", "-i", str(audio_path), "-ac", "1", "-ar",
-             str(SAMPLE_RATE), "-f", "wav", wav_path],
-            check=True,
-            capture_output=True,
-        )
-        waveform, sample_rate = torchaudio.load(wav_path)
-    finally:
-        Path(wav_path).unlink(missing_ok=True)
-
-    if waveform.shape[0] > 1:
-        waveform = waveform.mean(dim=0, keepdim=True)
-    if sample_rate != SAMPLE_RATE:
-        waveform = torchaudio.functional.resample(waveform, sample_rate, SAMPLE_RATE)
-    return waveform
+    result = subprocess.run(
+        ["ffmpeg", "-nostdin", "-i", str(audio_path), "-ac", "1", "-ar",
+         str(SAMPLE_RATE), "-f", "f32le", "-"],
+        check=True,
+        capture_output=True,
+    )
+    # numpy 브릿지를 피해 바이트에서 바로 텐서 생성(numpy 버전 이슈 무관).
+    return torch.frombuffer(bytearray(result.stdout), dtype=torch.float32).unsqueeze(0)
 
 
 def slice_ms(waveform, start_ms: int, end_ms: int | None):
