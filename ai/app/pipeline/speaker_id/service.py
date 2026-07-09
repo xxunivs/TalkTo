@@ -123,10 +123,29 @@ def cosine_similarity(left: list[float], right: list[float]) -> float:
 
 
 def load_mono_16k(audio_path: Path):
-    """오디오 → mono 16kHz 텐서(1, samples)."""
+    """오디오 → mono 16kHz 텐서(1, samples).
+
+    torchaudio 백엔드는 m4a/aac 디코딩을 못 하는 경우가 있어(실측 확인), ffmpeg CLI로
+    16kHz mono wav로 먼저 디코딩한 뒤 로드한다 — 어떤 입력 포맷이든 안전.
+    """
+    import subprocess
+    import tempfile
+
     import torchaudio
 
-    waveform, sample_rate = torchaudio.load(str(audio_path))
+    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+        wav_path = tmp.name
+    try:
+        subprocess.run(
+            ["ffmpeg", "-y", "-i", str(audio_path), "-ac", "1", "-ar",
+             str(SAMPLE_RATE), "-f", "wav", wav_path],
+            check=True,
+            capture_output=True,
+        )
+        waveform, sample_rate = torchaudio.load(wav_path)
+    finally:
+        Path(wav_path).unlink(missing_ok=True)
+
     if waveform.shape[0] > 1:
         waveform = waveform.mean(dim=0, keepdim=True)
     if sample_rate != SAMPLE_RATE:

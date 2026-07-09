@@ -19,8 +19,10 @@ RUN apt-get update \
 COPY pyproject.toml README.md ./
 COPY app ./app
 
-# CPU 전용 torch/torchaudio를 먼저 설치(기본 PyPI는 CUDA 빌드라 용량 큼) → 그다음 앱+speaker extra
-RUN pip install --no-cache-dir torch torchaudio --index-url https://download.pytorch.org/whl/cpu \
+# numpy<2 먼저 핀(torch 2.2가 numpy 1.x 기대) → CPU 전용 torch/torchaudio(기본 PyPI는
+# CUDA 빌드라 큼) → 앱+speaker extra
+RUN pip install --no-cache-dir "numpy<2" \
+ && pip install --no-cache-dir torch torchaudio --index-url https://download.pytorch.org/whl/cpu \
  && pip install --no-cache-dir ".[speaker]"
 
 # 비루트 실행
