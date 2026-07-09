@@ -53,6 +53,20 @@ ver4에 없던 신규 항목이다. 녹음이 여러 건 쌓이면 개별 기억
 - **하위호환**: 안 보내면(빈 배열) 종전 assembly와 동일하다 — Intake만으로 조립. 통찰이 쌓이면 프로필이 파이프라인 산출로 풍부해진다.
 - 응답은 ver3 §5 그대로(`instructions`, `subjectName`).
 
-## 3. 반영 시점
+## 3. 반영 시점 (reflection)
 
 reflection·personaInsights는 **P2**다. ver4의 컷오버(채팅·임베딩·recording)를 먼저 붙이고, 녹음이 실제로 여러 건 쌓여 통찰이 의미 있어지는 시점에 반영하면 된다. 지금 당장 BE가 할 일은 없고, 계약만 확정해둔다.
+
+## 4. [요청] voice STT/TTS 컷오버 — `/ai/stt`·`/ai/tts` → `/v1/voice/*`
+
+옛 MVP AI의 음성 STT/TTS를 새 서버로 이식 완료했다. BE의 `transcribe()`·`synthesizeSpeech()`가 부르던 경로만 바꾸면 된다(요청/응답 형태는 거의 그대로 — 드롭인에 가깝다).
+
+| 기능 | 옛(현재 BE) | 새 경로 | 요청/응답 |
+|---|---|---|---|
+| 음성 메시지 STT | `/ai/stt` | `POST /v1/voice/transcriptions` | 멀티파트 `audio_file` → `{ text, provider, model }` |
+| 페르소나 답변 TTS | `/ai/tts` | `POST /v1/voice/speech` | `{ text, voiceId? }` → **audio/mpeg 바이트** |
+
+- **STT**: BE `transcribe()`가 보내는 멀티파트 필드 `audio_file` 그대로 받는다. 응답 `text`를 읽으면 된다(옛 `stt_text`도 호환되게 BE가 `stt_text ?? text`로 읽고 있음 — `text`로 옴). OpenAI whisper 사용.
+- **TTS**: `{ text }`를 보내면 audio/mpeg 바이트를 돌려준다(옛 `/ai/tts`와 동일). **voiceId를 함께 보내면 그 음성으로 합성**하고, 없으면 서버의 `ELEVENLABS_DEFAULT_VOICE_ID`로 폴백한다.
+  - ⚠️ **대상자별 클론 음성**: 실제로 고인 목소리로 들려주려면 대상자마다 클론된 `voiceId`가 필요하다. 그 **voiceId를 만드는 음성 클로닝(명세 VPA-006~009)은 아직 별도 P2 작업**이다. TTS 엔드포인트 자체는 voiceId만 받으면 동작하므로, 클로닝이 붙기 전까지는 BE가 기본 voiceId(또는 대상자별로 수동 등록한 voiceId)를 보내면 된다.
+  - 서버 env: `ELEVENLABS_DEFAULT_VOICE_ID`(폴백용), `ELEVENLABS_MODEL`(기본 `eleven_multilingual_v2`) — 필요 시 Render에 설정.
