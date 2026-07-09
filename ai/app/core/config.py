@@ -40,6 +40,8 @@ class Settings(BaseModel):
     # 화자 식별(ECAPA) 유사도 임계값 — 실통화 13건 캘리브레이션(대상자 0.605~0.948
     # vs 타화자 0.258~0.417, 중간점 0.511). 외부 데이터 테스트에서 재검증 대상
     speaker_id_threshold: float = Field(default=0.5, gt=0, lt=1)
+    # ECAPA 모델 캐시 경로(이미지에 베이크한 위치). None이면 speechbrain 기본 캐시.
+    speaker_model_dir: str | None = None
 
     stt_provider: str = "elevenlabs"
     elevenlabs_stt_model: str = "scribe_v1"
@@ -106,6 +108,7 @@ def load_settings(env_file: str | Path | None = ".env") -> Settings:
         elevenlabs_default_voice_id=os.getenv("ELEVENLABS_DEFAULT_VOICE_ID"),
         elevenlabs_speed=os.getenv("ELEVENLABS_SPEED", "1.0"),
         speaker_id_threshold=os.getenv("SPEAKER_ID_THRESHOLD", "0.5"),
+        speaker_model_dir=os.getenv("SPEAKER_MODEL_DIR"),
         stt_provider=os.getenv("STT_PROVIDER", "elevenlabs"),
         elevenlabs_stt_model=os.getenv("ELEVENLABS_STT_MODEL", "scribe_v1"),
         stt_timeout_seconds=os.getenv("STT_TIMEOUT_SECONDS", "1800"),
