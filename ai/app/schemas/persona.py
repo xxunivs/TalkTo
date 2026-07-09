@@ -64,6 +64,8 @@ class PersonaAssemblyRequest(ApiModel):
     intake_context: IntakeContext | None = None
     # 대상자 본인의 짧고 담백한 실제 발화 (말투 few-shot). BE가 전사에서 추려 보냄.
     speech_examples: list[str] = Field(default_factory=list, max_length=50)
+    # 4단계 reflection 통찰(insight 문자열). 성향·가치관 슬롯에 합쳐진다. BE가 저장했다 전달.
+    persona_insights: list[str] = Field(default_factory=list, max_length=50)
 
 
 class PersonaAssemblyResponse(ApiModel):

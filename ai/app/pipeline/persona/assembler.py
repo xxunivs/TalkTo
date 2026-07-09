@@ -80,6 +80,7 @@ def assemble_persona_prompt(
     subject_labels: list[str | None],
     intake_context: IntakeContext | None = None,
     retrieved_memories: list[str] | None = None,
+    persona_insights: list[str] | None = None,
 ) -> str:
     subject_name = (
         subject_context.subject.name if subject_context.subject else "대상자"
@@ -139,8 +140,14 @@ def assemble_persona_prompt(
     personality = (
         intake_context.personality
         if intake_context and intake_context.personality
-        else "(파악된 성격 정보 없음)"
+        else ""
     )
+    # 4단계 reflection 통찰을 성향·가치관에 합침 (누적 기억에서 파생된 프로필)
+    if persona_insights:
+        insight_block = "\n".join(f"- {s}" for s in persona_insights)
+        personality = f"{personality}\n{insight_block}".strip() if personality else insight_block
+    if not personality:
+        personality = "(파악된 성격 정보 없음)"
     if intake_context and intake_context.situational_reactions:
         sit_lines = []
         for r in intake_context.situational_reactions:

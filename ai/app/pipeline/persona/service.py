@@ -71,6 +71,7 @@ def assemble_persona_instructions(
         segments_by_recording=[segments] if segments else [],
         subject_labels=["S"] if segments else [],
         intake_context=request.intake_context,
+        persona_insights=request.persona_insights,
     )
     subject = request.subject_context.subject
     name = (subject.name if subject and subject.name else "대상자")
