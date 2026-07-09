@@ -11,6 +11,7 @@ from app.schemas.memory import (
     MemorySegmentExtractionResponse,
 )
 from app.schemas.transcript import TranscriptionRequest, TranscriptionResponse
+from app.pipeline.memory_segments.service import run_recording_memory_extraction
 from app.pipeline.transcription.service import transcribe_recording
 
 
@@ -30,10 +31,11 @@ def create_analysis_transcription(
 
 @router.post("/memory-segments", response_model=MemorySegmentExtractionResponse)
 def create_memory_segments(
-    _request: MemorySegmentExtractionRequest,
+    request: MemorySegmentExtractionRequest,
     _authorized: InternalRequest,
+    settings: SettingsDependency,
 ) -> MemorySegmentExtractionResponse:
-    raise FeatureNotImplementedError("Recording memory segment extraction")
+    return run_recording_memory_extraction(request, settings=settings)
 
 
 @router.post("/enrichments", response_model=EnrichmentResponse)

@@ -13,11 +13,18 @@ import unicodedata
 from app.providers.llm import create_openai_client
 
 from app.core.config import Settings
+from app.pipeline.analysis.persons import run_persons_analysis
+from app.pipeline.analysis.sensitivity import run_sensitivity_analysis
 from app.pipeline.memory_segments.prompts import (
     MEMORY_SYSTEM_PROMPT,
     build_memory_user_prompt,
 )
 from app.schemas.context import SubjectContext
+from app.schemas.memory import (
+    MemorySegment,
+    MemorySegmentExtractionRequest,
+    MemorySegmentExtractionResponse,
+)
 from app.schemas.transcript import TranscriptSegment
 
 logger = logging.getLogger(__name__)
@@ -177,3 +184,87 @@ def validate_memory_payload(
     if any(dropped.values()):
         logger.warning("memory validation dropped items: %s", dropped)
     return {"memorySegments": memories, "validationDropped": dropped}
+
+
+def _pick_subject_speaker_label(
+    segments: list[TranscriptSegment], provided: str | None
+) -> str | None:
+    """대상자 화자 라벨: 요청에 있으면 그대로, 없으면 발화량 최다 화자로 자동 판정."""
+    if provided:
+        return provided
+    counts: dict[str, int] = {}
+    for segment in segments:
+        counts[segment.speaker_label] = counts.get(segment.speaker_label, 0) + 1
+    return max(counts, key=counts.get) if counts else None
+
+
+def run_recording_memory_extraction(
+    request: MemorySegmentExtractionRequest,
+    *,
+    settings: Settings,
+) -> MemorySegmentExtractionResponse:
+    """녹음 1건의 전사 세그먼트 → 인물·민감·3-A 기억을 연결해 서빙 응답으로 조립.
+
+    stateless: 인물/민감 결과는 memoryText 파생·민감플래그 조인에만 쓰고 돌려주지 않는다.
+    통화 상대(conversationPartnerName)가 오면 상대 화자를 그 이름으로 확정 귀속한다.
+    """
+    segments = [
+        TranscriptSegment(
+            segment_index=item.segment_index,
+            start_ms=item.start_ms,
+            end_ms=item.end_ms,
+            speaker_label=item.speaker_label,
+            transcript_text=item.transcript_text,
+        )
+        for item in request.transcript_segments
+    ]
+    id_by_index = {item.segment_index: item.id for item in request.transcript_segments}
+    subject_label = _pick_subject_speaker_label(segments, request.subject_speaker_label)
+    partner = request.conversation_partner_name
+
+    persons = run_persons_analysis(
+        segments,
+        subject_context=request.subject_context,
+        subject_speaker_label=subject_label,
+        settings=settings,
+        conversation_partner_name=partner,
+    )
+    sensitivity = run_sensitivity_analysis(segments, settings=settings)
+    result = extract_memory_segments(
+        segments,
+        subject_context=request.subject_context,
+        subject_speaker_label=subject_label,
+        persons_result=persons,
+        sensitivity_result=sensitivity,
+        settings=settings,
+        conversation_partner_name=partner,
+    )
+
+    out: list[MemorySegment] = []
+    for memory in result["memorySegments"]:
+        source_ids = [
+            id_by_index[i] for i in memory["sourceSegmentIds"] if i in id_by_index
+        ]
+        if not source_ids:  # 근거 세그먼트가 요청에 없으면(방어) 그 기억은 버린다
+            continue
+        out.append(
+            MemorySegment(
+                segment_index=memory["segmentIndex"],
+                source_transcript_segment_ids=source_ids,
+                start_ms=memory["startMs"],
+                end_ms=memory["endMs"],
+                speaker_label=memory["speakerLabel"],
+                memory_text=memory["memoryText"],
+                confidence=memory["confidence"],
+                importance_score=memory["importanceScore"],
+                tags=memory["tags"],
+                related_people=memory["relatedPeople"],
+                sensitivity_flags=memory["sensitivityFlags"],
+            )
+        )
+
+    return MemorySegmentExtractionResponse(
+        segments=out,
+        provider="openai",
+        model=settings.openai_analysis_model,
+    )
