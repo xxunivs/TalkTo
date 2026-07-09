@@ -83,6 +83,24 @@ class STTProviderError(AppError):
         )
 
 
+class TTSProviderError(AppError):
+    def __init__(self, message: str) -> None:
+        super().__init__(
+            code="TTS_PROVIDER_ERROR",
+            message=message,
+            status_code=502,
+        )
+
+
+class MissingVoiceError(AppError):
+    def __init__(self, detail: str) -> None:
+        super().__init__(
+            code="MISSING_VOICE_ID",
+            message=detail,
+            status_code=400,
+        )
+
+
 async def app_error_handler(_request: Request, error: AppError) -> JSONResponse:
     body: dict[str, Any] = {
         "error": {
