@@ -36,8 +36,12 @@ docker run --rm -p 8000:8000 --env-file .env talkto-app-ai
 
 ## 5. 이미지 특성
 
-- Python 3.11-slim + base 의존성만. **torch/speechbrain 미포함**(화자식별은 현재 서빙
-  경로에 미연결이라 제외 — 필요해지면 `.[speaker]`로 별도 이미지 구성).
+- Python 3.11-slim + base 의존성 + **화자식별 스택**(CPU `torch`/`torchaudio` +
+  `speechbrain` + `ffmpeg`). ECAPA 성문 매칭으로 대상자 화자를 확정하기 위해 포함 —
+  이미지가 커지고(수 GB) 메모리를 더 쓰므로 **Render는 starter(512MB)보다 상위 플랜 권장**.
+- ECAPA 모델은 첫 화자식별 호출 때 `SPEAKER_MODEL_DIR`(기본 `/tmp/ecapa_model`)로
+  1회 다운로드된다(콜드스타트 후 첫 호출만 느림). torch 미설치/실패 시 화자식별은
+  건너뛰고 전사는 정상 동작(graceful).
 - 비루트(uid 10001) 실행. stateless라 수평 확장 가능(워커·레플리카 자유).
 - 비공개 데이터(`data/`)·평가(`evaluation/`)는 `.dockerignore`로 이미지에서 제외.
 

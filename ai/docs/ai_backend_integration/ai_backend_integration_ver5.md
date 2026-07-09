@@ -96,3 +96,13 @@ reflection·personaInsights는 **P2**다. ver4의 컷오버(채팅·임베딩·r
 
 1. **필드는 camelCase**: 새 엔드포인트는 응답을 camelCase로 낸다(요청은 camel/snake 둘 다 받음). 옛 응답의 snake_case를 그대로 읽으면 안 된다 — 특히 **채팅 응답 `retrieved_memory_ids` → `retrievedMemoryIds`**. 임베딩·기억추출 응답은 형태 자체가 바뀌므로(ver4 §3·§5) 이미 새로 읽어야 한다.
 2. **정의되지 않은 필드 거부(엄격 검증)**: 스키마에 없는 필드를 요청에 넣으면 422다. 필요한 필드만 보낸다. 특히 **`/v1/persona/responses`는 옛 채팅과 달리 `persona`(instructions 포함)가 필수** — 현재 BE `AiChatRequest`엔 없으니 추가해야 한다(ver3 §4). redaction으로 값만 마스킹하는 건 무방(필드 구조는 그대로면 됨).
+
+## 6. [요청] 대상자 화자 자동 식별 — 전사에 `referenceVoiceSampleUrl` 추가 (구현 완료)
+
+녹음에서 "어느 화자가 고인인지"를 성문 매칭(ECAPA)으로 확정한다. §4-1과 **같은 고인 목소리 샘플**을 전사 요청에 함께 주면, 응답에 `subjectSpeakerLabel`이 담긴다. BE는 그걸 `/v1/analysis/recording`의 `subjectSpeakerLabel`로 넘긴다 — "발화량 최다" 휴리스틱을 대체하는 정확한 근거다.
+
+- `POST /v1/analysis/transcriptions` 요청에 `referenceVoiceSampleUrl`(샘플 클립 presigned URL, §4-1과 동일 소스) 추가.
+- 응답에 `subjectSpeakerLabel`(확정된 대상자 화자 라벨). 참조 미제공·임계값 미달이면 `null`.
+- BE 흐름: 전사 응답의 `subjectSpeakerLabel`을 저장했다가 `/recording` 요청의 `subjectSpeakerLabel`로 전달 → 인물·기억 분석이 정확한 대상자 기준으로 동작. `null`이면 `/recording`이 발화량 최다로 폴백.
+- **하나의 목소리 샘플, 두 용도**: FE의 "고인 목소리 구간 선택" 1회 결과가 **§4-1 클론(voiceId 발급)**과 **§6 화자 식별(성문 매칭)** 양쪽에 쓰인다. BE는 그 샘플 클립 URL을 두 호출에 실어 보내면 된다.
+- 서버: 첫 호출 때 ECAPA 모델 1회 다운로드로 지연이 있을 수 있음(이후 캐시). torch 미설치·매칭 실패 시 `subjectSpeakerLabel=null`로 graceful(전사는 정상).
