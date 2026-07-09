@@ -1,6 +1,7 @@
 # AI <-> 백엔드 연동 요청 ver7 — 음성 클론 스펙 정정(ver6 §3) · BE 수정요청 4건
 
-1. **ver6 §3의 `samples[]` 스펙을 정정한다.** `startMs`/`endMs`가 **필수**로 바뀌었다(기존: 생략 시 오디오 전체 사용). ver6의 나머지(엔드포인트·응답·`sampleAudioUrl` 단일 모드·§4 samples 채우는 법·§5 갭)는 그대로다. ver6 §3의 "둘 다 비우면 그 오디오 전체 사용" 문장은 **폐기**한다.
+1. **ver6 §3의 `samples[]` 스펙을 정정한다. 이미 운영 서버에 배포됐다.** `startMs`/`endMs`가 **필수**로 바뀌었다(기존: 생략 시 오디오 전체 사용). ver6의 나머지(엔드포인트·응답·`sampleAudioUrl` 단일 모드·§4 samples 채우는 법·§5 갭)는 그대로다. ver6 §3의 "둘 다 비우면 그 오디오 전체 사용" 문장은 **폐기**한다.
+   - **주의(호환성 깨짐)**: 현재 BE `targetVoiceCloneSample`은 `startMs/endMs`가 null이면 구간 없이 `{audioUrl}`만 보낸다. 그 요청은 **지금 라이브에서 422로 실패한다**(`{"loc":["body","samples",0,"startMs"],"msg":"Field required"}`). 5-2를 함께 고쳐야 한다.
 
 2. 왜 바꾸나
    - `samples[]`는 "대상자가 말한 구간들"을 담는 용도인데, 구간 없는 원소를 허용하면 **통화 녹음 전체**가 학습 재료가 된다. 통화에는 상대 화자(가족) 목소리가 함께 있으므로, 그 경우 **대상자가 아닌 섞인 목소리로 클론**된다.
@@ -51,7 +52,13 @@
    - 그 직전에 `sample.reviewStatus`·`application.voiceSampleStatus`는 이미 저장됐고 감사로그(`auditVoicePersonaAdminAction`)는 아직 남기지 않은 상태다 → **승인은 반영됐는데 API는 500, 감사로그 누락**. 재시도하면 5-3대로 중복 클론된다.
    - 요청: 클론 실패를 catch해 승인 트랜잭션과 분리하고(빌드 상태를 `failed`류로 표시), 감사로그는 남길 것.
 
-6. 확인된 정상 동작 (수정 불필요)
+6. AI 서버 임시 조치 — `'default-voice'`를 자리표시자로 처리 (데모용, 곧 해제)
+   - BE는 TTS 요청에 `voiceId: persona.voiceId`를 항상 싣는데 그 값이 `'default-voice'`다. 이는 ElevenLabs에 없는 id라 종전에는 합성이 실패하고 텍스트로 폴백됐다.
+   - 데모를 위해 AI 서버가 **`'default-voice'`를 "voiceId 미지정"으로 간주**하고, 서버 기본 음성(`ELEVENLABS_DEFAULT_VOICE_ID`, 현재 신금자 클론)으로 폴백하도록 임시 조치했다. 그래서 **지금은 목소리가 나온다.**
+   - **이건 정상 동작이 아니다.** 서버 전역 폴백이라 **어떤 대상자로 대화해도 같은(신금자) 목소리**가 나온다. 5-1을 고쳐 `persona.voiceId`에 실제 클론 `voiceId`를 저장해야 대상자별 목소리가 된다.
+   - 실제 `voiceId`를 보내면 **그 값이 항상 우선**하므로, 5-1을 고치는 순간 이 폴백은 자동으로 비활성화된다(AI 쪽 추가 작업 불필요). 이후 AI는 `ELEVENLABS_DEFAULT_VOICE_ID`를 비워 fail-safe로 되돌린다.
+
+7. 확인된 정상 동작 (수정 불필요)
    - `samples[]` camelCase 전송, `sampleAudioUrl` XOR `samples` union 타입 강제, `take: 100`(AI 상한과 일치), `endMs > startMs` 검증.
    - `provider-call-gateway`가 배열·중첩 객체까지 재귀하며 `voice_clone`에서 `audioUrl` 키를 허용하도록 처리한 부분.
    - TTS 호출에 `voiceId` 동봉(ver5 §4), reflection·`personaInsights`·`referenceVoiceSampleUrl`·`subjectSpeakerLabel` 배선.
