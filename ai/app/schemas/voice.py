@@ -10,18 +10,20 @@ class VoiceTranscriptionResponse(ApiModel):
 
 
 class VoiceSampleSegment(ApiModel):
-    """대상자 화자 구간 하나. 통화 오디오 URL + (선택) 구간 [startMs, endMs)."""
+    """대상자 화자 구간 하나. 녹음 오디오 URL + 구간 [startMs, endMs).
 
-    # 녹음 오디오 presigned URL. startMs/endMs를 주면 AI가 그 구간만 잘라 쓴다.
+    구간은 필수다. samples[]는 "대상자가 말한 구간들"을 담는 용도라, 구간 없이 녹음을
+    통째로 넣으면 상대 화자 목소리가 섞여 엉뚱한 목소리로 학습된다. 이미 잘라놓은 클립
+    하나를 쓰려면 VoiceCloneRequest.sample_audio_url(단일 모드)로 보낸다.
+    """
+
     audio_url: HttpUrl
-    start_ms: int | None = Field(default=None, ge=0)
-    end_ms: int | None = Field(default=None, ge=0)
+    start_ms: int = Field(ge=0)
+    end_ms: int = Field(ge=0)
 
     @model_validator(mode="after")
     def _check_range(self) -> "VoiceSampleSegment":
-        if (self.start_ms is None) != (self.end_ms is None):
-            raise ValueError("startMs와 endMs는 함께 주거나 함께 비워야 합니다.")
-        if self.start_ms is not None and self.end_ms <= self.start_ms:
+        if self.end_ms <= self.start_ms:
             raise ValueError("endMs는 startMs보다 커야 합니다.")
         return self
 

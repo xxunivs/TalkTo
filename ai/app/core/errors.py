@@ -74,6 +74,17 @@ class AudioTooShortError(AppError):
         )
 
 
+class InvalidVoiceSampleError(AppError):
+    """클론 샘플 입력 문제(구간이 오디오 밖·너무 짧음·컷 실패). 재시도해도 같은 결과."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__(
+            code="INVALID_VOICE_SAMPLE",
+            message=message,
+            status_code=422,
+        )
+
+
 class STTProviderError(AppError):
     def __init__(self, message: str) -> None:
         super().__init__(

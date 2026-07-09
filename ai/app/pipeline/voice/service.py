@@ -11,7 +11,11 @@ import tempfile
 from pathlib import Path
 
 from app.core.config import Settings
-from app.core.errors import MissingVoiceError, TTSProviderError
+from app.core.errors import (
+    InvalidVoiceSampleError,
+    MissingVoiceError,
+    TTSProviderError,
+)
 from app.pipeline.transcription.audio import download_audio
 from app.providers.llm import create_openai_client
 from app.providers.tts import create_tts_provider
@@ -64,18 +68,31 @@ def synthesize_speech(
     return provider.synthesize(request.text, voice_id=voice_id, speed=speed)
 
 
-def _ffmpeg_normalize(src: Path, dst: Path, start_ms: int | None, end_ms: int | None) -> None:
-    """구간(있으면)만 잘라 mono 22050 pcm_s16le wav로 정규화(concat -c copy용 통일 파라미터)."""
-    cmd = ["ffmpeg", "-nostdin", "-y"]
-    if start_ms is not None:
-        cmd += ["-ss", str(start_ms / 1000), "-to", str(end_ms / 1000)]
-    cmd += ["-i", str(src), "-ac", "1", "-ar", "22050", "-c:a", "pcm_s16le", str(dst)]
-    subprocess.run(cmd, check=True, capture_output=True)
+def _ffmpeg_normalize(src: Path, dst: Path, start_ms: int, end_ms: int) -> None:
+    """구간만 잘라 mono 22050 pcm_s16le wav로 정규화(concat -c copy용 통일 파라미터)."""
+    subprocess.run(
+        ["ffmpeg", "-nostdin", "-y", "-ss", str(start_ms / 1000), "-to", str(end_ms / 1000),
+         "-i", str(src), "-ac", "1", "-ar", "22050", "-c:a", "pcm_s16le", str(dst)],
+        check=True, capture_output=True,
+    )
+
+
+def _audio_seconds(path: Path) -> float:
+    """자른 뒤 실제 길이. 구간이 오디오 밖이면 ffmpeg가 0초 파일을 만들므로 여기서 걸러낸다."""
+    out = subprocess.run(
+        ["ffprobe", "-v", "quiet", "-show_entries", "format=duration", "-of", "csv=p=0",
+         str(path)],
+        capture_output=True, text=True,
+    ).stdout.strip()
+    try:
+        return float(out)
+    except ValueError:
+        return 0.0
 
 
 def _build_multi_sample(segments: list[VoiceSampleSegment], *, settings: Settings) -> Path:
     """대상자 구간들을 내려받아 잘라 이어붙인 단일 wav(≤_CLONE_SAMPLE_MAX_SECONDS)."""
-    if shutil.which("ffmpeg") is None:  # 배포엔 설치돼 있음(Dockerfile). 로컬 방어.
+    if shutil.which("ffmpeg") is None:  # 배포엔 설치돼 있음(Dockerfile). 로컬/설정 문제.
         raise TTSProviderError("ffmpeg가 필요합니다(다구간 샘플 이어붙이기).")
     workdir = Path(tempfile.mkdtemp(prefix="voice_clone_"))
     parts: list[Path] = []
@@ -84,8 +101,6 @@ def _build_multi_sample(segments: list[VoiceSampleSegment], *, settings: Setting
         for i, seg in enumerate(segments):
             if budget >= _CLONE_SAMPLE_MAX_SECONDS:
                 break
-            if seg.start_ms is not None and (seg.end_ms - seg.start_ms) < _CLONE_MIN_SEGMENT_MS:
-                continue
             src = download_audio(
                 str(seg.audio_url),
                 timeout_seconds=settings.audio_download_timeout_seconds,
@@ -95,17 +110,25 @@ def _build_multi_sample(segments: list[VoiceSampleSegment], *, settings: Setting
             part = workdir / f"part_{i}.wav"
             try:
                 _ffmpeg_normalize(src, part, seg.start_ms, seg.end_ms)
+            except subprocess.CalledProcessError as exc:
+                detail = (exc.stderr or b"").decode("utf-8", "ignore")[-300:]
+                raise InvalidVoiceSampleError(
+                    f"구간 {i}(startMs={seg.start_ms}, endMs={seg.end_ms}) 컷 실패: {detail}"
+                ) from exc
             finally:
                 src.unlink(missing_ok=True)
+            # 선언된 구간이 아니라 '실제로 잘린 길이'로 판단 — 오디오 밖 구간은 0초가 된다.
+            seconds = _audio_seconds(part)
+            if seconds * 1000 < _CLONE_MIN_SEGMENT_MS:
+                part.unlink(missing_ok=True)
+                continue
             parts.append(part)
-            dur = subprocess.run(
-                ["ffprobe", "-v", "quiet", "-show_entries", "format=duration",
-                 "-of", "csv=p=0", str(part)],
-                capture_output=True, text=True,
-            ).stdout.strip()
-            budget += float(dur) if dur else 0.0
+            budget += seconds
         if not parts:
-            raise TTSProviderError("유효한 대상자 구간이 없습니다(모두 너무 짧거나 비어 있음).")
+            raise InvalidVoiceSampleError(
+                f"유효한 대상자 구간이 없습니다(자른 뒤 길이가 모두 {_CLONE_MIN_SEGMENT_MS}ms 미만). "
+                "startMs/endMs가 해당 오디오 범위 안인지 확인하세요."
+            )
         listfile = workdir / "list.txt"
         listfile.write_text("".join(f"file '{p}'\n" for p in parts), encoding="utf-8")
         out = workdir / "sample.wav"
@@ -115,9 +138,13 @@ def _build_multi_sample(segments: list[VoiceSampleSegment], *, settings: Setting
             check=True, capture_output=True,
         )
         return out
-    except subprocess.CalledProcessError as exc:  # noqa: TRY302 - 컨텍스트 붙여 재발생
+    except subprocess.CalledProcessError as exc:  # concat 단계 실패
+        shutil.rmtree(workdir, ignore_errors=True)
         detail = (exc.stderr or b"").decode("utf-8", "ignore")[-500:]
-        raise TTSProviderError(f"샘플 이어붙이기 실패: {detail}") from exc
+        raise InvalidVoiceSampleError(f"샘플 이어붙이기 실패: {detail}") from exc
+    except BaseException:  # 그 외 실패(구간 무효·다운로드 등) — 임시 폴더 정리 후 재발생
+        shutil.rmtree(workdir, ignore_errors=True)
+        raise
 
 
 def clone_voice_from_sample(
