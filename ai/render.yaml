@@ -15,8 +15,10 @@ services:
         value: production
       - key: LOG_LEVEL
         value: INFO
+      # 화자식별(ECAPA/torch)이 워커당 메모리를 크게 쓰므로 1로 유지(2면 모델 2벌 →
+      # OOM). torch 로딩 탓에 Standard(2GB) 이상 인스턴스 권장.
       - key: WEB_CONCURRENCY
-        value: "2"
+        value: "1"
       # ── 시크릿: 값은 Render 대시보드에서 입력(리포에 커밋 안 함) ──
       - key: AI_SERVER_TOKEN      # 미설정 시 인증 비활성 — 반드시 설정
         sync: false
