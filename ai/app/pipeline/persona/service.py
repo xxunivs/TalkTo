@@ -120,10 +120,17 @@ def generate_persona_response(
     )
 
 
+_STORE_IMPORTANCE_THRESHOLD = 6  # 옛 MVP와 동일: importance >= 6이면 저장 추천
+
+
 def extract_memory_candidates(
     request: MemoryCandidateRequest, *, settings: Settings
 ) -> MemoryCandidateResponse:
-    """채팅 턴에서 앞으로 저장할 만한 새 기억 후보를 뽑는다. 저장 여부는 BE가 판단."""
+    """채팅 턴에서 앞으로 저장할 만한 새 기억 후보를 뽑는다.
+
+    저장 판단(shouldStore)은 AI가 importance 임계값으로 내린다(옛 MVP 동작 유지).
+    BE는 shouldStore를 따르되, stateless인 AI가 못 하는 기존 기억과의 중복 제거만 한다.
+    """
     client = create_openai_client(settings, "memory candidate extraction")
 
     convo = "\n".join(f"{m.role}: {m.content}" for m in request.history)
@@ -162,6 +169,7 @@ def extract_memory_candidates(
                 category=category,
                 importance=importance,
                 confidence=confidence,
+                should_store=importance >= _STORE_IMPORTANCE_THRESHOLD,
             )
         )
 

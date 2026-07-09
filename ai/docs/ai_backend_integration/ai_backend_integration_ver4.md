@@ -99,19 +99,9 @@ BE 배포 환경변수에 설정:
 - `safetyFlags` (민감플래그 → 금기·가족검수 안전노트): `type`은 health/familyConflict/asset/death/thirdParty.
 - **미포함**: `personaMaterials`(reflection)는 녹음 여러 건 누적이 필요한 P2라 이 응답에 없음(추후 별도).
 
-```json
-{
-  "jobId": "uuid", "recordingId": "uuid",
-  "audioUrl": "https://... (presigned GET, ≥30분)",
-  "audioMimeType": "audio/m4a", "language": "ko", "speakerDiarization": true,
-  "glossary": ["정읍", "매실청"],
-  "conversationPartnerName": "도윤"
-}
-```
-
 ## 5. [요청] 채팅 기억 추출 — `POST /v1/persona/memory-candidates`
 
-채팅 한 턴(사용자·페르소나 주고받음)에서 앞으로 기억할 만한 새 사실을 뽑아 돌려준다. 저장 여부·무엇을 저장할지는 BE가 판단한다(AI는 stateless — 저장하지 않는다).
+채팅 한 턴(사용자·페르소나 주고받음)에서 앞으로 기억할 만한 새 사실을 뽑아 돌려준다. **저장 판단은 AI가 하고(`shouldStore`), BE는 저장·중복제거만 한다** — 옛 `/ai/memory/extract`가 `saved`를 주던 판단 주체를 그대로 유지한다.
 
 ```json
 // 요청
@@ -124,7 +114,7 @@ BE 배포 환경변수에 설정:
 {
   "candidates": [
     { "summary": "사용자가 취직해 다음 주부터 회사에 다닌다.",
-      "category": "직장", "importance": 9, "confidence": 0.99 }
+      "category": "직장", "importance": 9, "confidence": 0.99, "shouldStore": true }
   ],
   "provider": "openai",
   "model": "gpt-5.4-mini"
@@ -132,5 +122,6 @@ BE 배포 환경변수에 설정:
 ```
 
 - 근황·변화(취직·이사·결혼·건강 등)만 뽑고, 인사·감정·일시적 상태는 제외한다. 없으면 빈 배열.
-- `importance`(1~10)·`confidence`(0~1)는 AI가 매기고, **저장 임계·중복 판단은 BE**가 한다.
-- 기존 `/ai/memory/extract`와의 차이: 요청은 정렬(카멜케이스만 맞춤), 응답이 단건 `{saved, ...}`이 아니라 **후보 목록** `{candidates: [...]}`이다. 한 턴에서 새 사실이 여럿 나올 수 있고 "저장할지"는 BE가 정하는 게 stateless 원칙에 맞아 AI는 `saved` 플래그를 주지 않는다. BE는 목록을 순회하며 저장 결정만 더하면 된다.
+- `shouldStore`: AI의 저장 추천(importance 임계값 기준 — 옛 MVP의 `saved = importance >= 6`과 동일). `importance`(1~10)·`confidence`(0~1)도 함께 준다.
+- **BE 역할은 저장 + 중복제거뿐**: `shouldStore=true`인 후보를 저장하되, stateless인 AI가 볼 수 없는 **기존 기억과의 중복만** 걸러낸다(같은 사실이 이미 있으면 스킵). 임계 판단은 AI가 이미 했으므로 BE가 다시 정할 필요 없다.
+- 기존 `/ai/memory/extract`와의 차이: 판단 주체는 그대로(AI). 응답이 단건 `{saved, ...}`에서 **후보 목록** `{candidates: [...]}`로 바뀐 것뿐이다 — 한 턴에 새 사실이 여럿 나올 수 있어서다. BE는 단건 처리를 목록 순회로만 바꾸면 된다.

@@ -49,6 +49,8 @@ class MemoryCandidate(ApiModel):
     category: str | None = None
     importance: int = Field(ge=1, le=10)
     confidence: float = Field(ge=0, le=1)
+    # AI의 저장 추천(importance 임계값 기준). BE는 이 값을 따르되 기존 기억과 중복만 제거.
+    should_store: bool
 
 
 class MemoryCandidateResponse(ApiModel):
