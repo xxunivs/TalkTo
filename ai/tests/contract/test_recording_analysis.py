@@ -30,8 +30,10 @@ class RecordingAnalysisTest(unittest.TestCase):
     def test_combined_analysis_maps_all_sections(self, mock_openai: MagicMock) -> None:
         seg_id = str(uuid.uuid4())
         client = MagicMock()
-        # 호출 순서: 인물 → 민감 → 3-A 기억 → ④ 언어스타일 → 요약
+        # 호출 순서: (대상자 화자 식별 폴백) → 인물 → 민감 → 3-A 기억 → ④ 언어스타일 → 요약
+        # subjectSpeakerLabel 미제공이라 전사문 호칭 기반 LLM 폴백이 먼저 돈다.
         client.chat.completions.create.side_effect = [
+            _chat_response('{"subjectSpeakerLabel": "SPK_1"}'),
             _chat_response('{"persons": [], "unresolvedMentions": []}'),
             _chat_response('{"sensitivityFlags": []}'),
             _chat_response(

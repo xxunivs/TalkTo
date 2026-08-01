@@ -20,7 +20,8 @@ class RecordingAnalysisRequest(ApiModel):
     recording_id: UUID
     transcript_segments: list[PersistedTranscriptSegment] = Field(min_length=1)
     subject_context: SubjectContext | None = None
-    # 대상자 화자 라벨. 미지정 시 발화량이 가장 많은 화자로 자동 판정.
+    # 대상자 화자 라벨(ECAPA 성문으로 확정된 값). 미지정 시 전사문 호칭·맥락 LLM 폴백으로
+    # 판정하고, 그래도 못 정하면 미확정(None)으로 진행한다(발화량 최다 추정은 폐기).
     subject_speaker_label: str | None = Field(default=None, max_length=120)
     # 통화 상대 이름(업로드 시 선택). 있으면 대상자 아닌 화자를 이 이름으로 확정 귀속.
     conversation_partner_name: str | None = Field(default=None, max_length=120)

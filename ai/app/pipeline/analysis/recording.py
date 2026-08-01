@@ -11,6 +11,7 @@ from app.core.config import Settings
 from app.pipeline.analysis.linguistic_style import run_linguistic_style_analysis
 from app.pipeline.analysis.persons import run_persons_analysis
 from app.pipeline.analysis.sensitivity import run_sensitivity_analysis
+from app.pipeline.analysis.subject_id import identify_subject_by_content
 from app.pipeline.enrichment.service import aggregate_tags, summarize_recording
 from app.pipeline.memory_segments.service import extract_memory_segments
 from app.schemas.memory import MemorySegment
@@ -23,19 +24,25 @@ from app.schemas.recording import (
     RecurringPhrase,
     SpeechStyle,
 )
+from app.schemas.context import SubjectContext
 from app.schemas.transcript import TranscriptSegment
 
 
-def _pick_subject_speaker_label(
-    segments: list[TranscriptSegment], provided: str | None
+def _resolve_subject_speaker_label(
+    segments: list[TranscriptSegment],
+    provided: str | None,
+    subject_context: SubjectContext | None,
+    *,
+    settings: Settings,
 ) -> str | None:
-    """대상자 화자 라벨: 요청에 있으면 그대로, 없으면 발화량 최다 화자로 자동 판정."""
+    """대상자 화자 라벨 확정: ECAPA 성문(provided) → LLM 의미 폴백 → 미확정(None).
+
+    발화량 최다 추정은 폐기(고인·상대 중 누가 더 말했는지는 신원 근거가 아님). 참조가
+    없어 provided가 없으면 전사문 호칭·맥락으로 판정하고, 그래도 못 정하면 None으로 둔다.
+    """
     if provided:
         return provided
-    counts: dict[str, int] = {}
-    for segment in segments:
-        counts[segment.speaker_label] = counts.get(segment.speaker_label, 0) + 1
-    return max(counts, key=counts.get) if counts else None
+    return identify_subject_by_content(segments, subject_context, settings=settings)
 
 
 def run_recording_analysis(
@@ -61,7 +68,9 @@ def run_recording_analysis(
         return [id_by_index[i] for i in int_ids if i in id_by_index]
 
     subject_context = request.subject_context
-    label = _pick_subject_speaker_label(segments, request.subject_speaker_label)
+    label = _resolve_subject_speaker_label(
+        segments, request.subject_speaker_label, subject_context, settings=settings
+    )
     partner = request.conversation_partner_name
 
     persons = run_persons_analysis(

@@ -10,6 +10,8 @@ import subprocess
 import tempfile
 from pathlib import Path
 
+from pydantic import HttpUrl
+
 from app.core.config import Settings
 from app.core.errors import (
     InvalidVoiceSampleError,
@@ -20,8 +22,10 @@ from app.pipeline.transcription.audio import download_audio
 from app.providers.llm import create_openai_client
 from app.providers.tts import create_tts_provider
 from app.providers.tts.interface import TTSResult
+from app.schemas.memory import PersistedTranscriptSegment
 from app.schemas.voice import (
     SpeechSynthesisRequest,
+    VoiceCloneFromTranscriptRequest,
     VoiceCloneRequest,
     VoiceCloneResponse,
     VoiceSampleSegment,
@@ -155,6 +159,88 @@ def _build_multi_sample(segments: list[VoiceSampleSegment], *, settings: Setting
         raise
 
 
+def collect_subject_samples(
+    segments: list[PersistedTranscriptSegment],
+    subject_speaker_label: str,
+    audio_url: HttpUrl,
+) -> list[VoiceSampleSegment]:
+    """전사 구간 중 대상자 화자 구간만 골라 클론 샘플 구간으로 변환(시간순).
+
+    상대 화자가 섞이면 엉뚱한 목소리로 학습되므로 라벨이 정확히 일치하는 구간만 취한다.
+    실제 컷·길이 상한(_CLONE_SAMPLE_MAX_SECONDS)·짧은 토막 버림(_CLONE_MIN_SEGMENT_MS)은
+    다운스트림(_build_multi_sample)이 처리하므로 여기선 필터·매핑만 한다.
+    """
+    samples: list[VoiceSampleSegment] = []
+    for seg in sorted(segments, key=lambda s: s.start_ms):
+        if seg.speaker_label != subject_speaker_label:
+            continue
+        if seg.end_ms <= seg.start_ms:  # 무효 구간 방어
+            continue
+        samples.append(
+            VoiceSampleSegment(
+                audio_url=audio_url, start_ms=seg.start_ms, end_ms=seg.end_ms
+            )
+        )
+    return samples
+
+
+def select_clone_samples(
+    samples: list[VoiceSampleSegment], *, max_seconds: float
+) -> list[VoiceSampleSegment]:
+    """누적 풀이 상한을 넘으면 통화 간 고르게 + 긴 구간 우선으로 예산 안에서 선별한다.
+
+    긴 구간 우선만 쓰면 말 많은 한 통화가 예산을 독식해 목소리 다양성이 준다. 그래서
+    녹음(audio_url)별로 묶어 각자 긴 구간 우선 정렬 후, 녹음들을 라운드로빈으로 돌며 한
+    구간씩 담아 여러 통화가 고르게 들어가게 한다. 상한 이하면 전부 반환. 실제 컷 길이
+    기준 최종 상한은 _build_multi_sample이 다시 적용한다.
+    """
+    budget_ms = int(max_seconds * 1000)
+    by_recording: dict[str, list[VoiceSampleSegment]] = {}
+    for seg in samples:
+        by_recording.setdefault(str(seg.audio_url), []).append(seg)
+    for segs in by_recording.values():
+        segs.sort(key=lambda s: s.end_ms - s.start_ms, reverse=True)
+
+    selected: list[VoiceSampleSegment] = []
+    total_ms = 0
+    queues = [segs for segs in by_recording.values()]
+    while total_ms < budget_ms and any(queues):
+        for queue in queues:
+            if total_ms >= budget_ms:
+                break
+            if queue:
+                seg = queue.pop(0)
+                selected.append(seg)
+                total_ms += seg.end_ms - seg.start_ms
+    return selected
+
+
+def clone_voice_from_transcript(
+    request: VoiceCloneFromTranscriptRequest, *, settings: Settings
+) -> VoiceCloneResponse:
+    """전사 결과 → 대상자 구간 자동 수집 → 클론(IVC) → voiceId.
+
+    화자 식별로 확정된 subjectSpeakerLabel 구간을 모아 한 목소리로 학습한다. 라벨
+    미확정(None)이면 엉뚱한 화자를 클론할 위험이 있어 진행하지 않는다(발화량 폴백 없음).
+    """
+    if not request.subject_speaker_label:
+        raise InvalidVoiceSampleError(
+            "대상자 화자 라벨(subjectSpeakerLabel)이 없어 클론 재료를 모을 수 없습니다. "
+            "참조 클립으로 화자 식별을 먼저 수행하세요."
+        )
+    samples = collect_subject_samples(
+        request.transcript_segments,
+        request.subject_speaker_label,
+        request.audio_url,
+    )
+    if not samples:
+        raise InvalidVoiceSampleError(
+            f"대상자 라벨 '{request.subject_speaker_label}'에 해당하는 구간이 없습니다."
+        )
+    clone_request = VoiceCloneRequest(name=request.name, samples=samples)
+    return clone_voice_from_sample(clone_request, settings=settings)
+
+
 def clone_voice_from_sample(
     request: VoiceCloneRequest, *, settings: Settings
 ) -> VoiceCloneResponse:
@@ -165,7 +251,11 @@ def clone_voice_from_sample(
     """
     provider = create_tts_provider(settings)
     if request.samples:
-        sample_path = _build_multi_sample(request.samples, settings=settings)
+        # 누적 풀이 상한을 넘으면 긴 구간 우선으로 선별(앞 통화 편중 방지).
+        selected = select_clone_samples(
+            request.samples, max_seconds=_CLONE_SAMPLE_MAX_SECONDS
+        )
+        sample_path = _build_multi_sample(selected, settings=settings)
         workdir = sample_path.parent
         try:
             voice_id = provider.clone_voice(request.name, sample_path)
