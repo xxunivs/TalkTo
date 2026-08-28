@@ -1,0 +1,9 @@
+.env
+venv/
+__pycache__/
+.DS_Store
+data/voice_raw/
+data/tts_test.mp3
+data/*.mp3
+data/eval_results/*.md
+evaluation/results/*.md
