@@ -3,7 +3,7 @@ from pathlib import Path
 
 from app.core.config import Settings
 from app.core.errors import AudioTooShortError, EmptyTranscriptError
-from app.providers.stt.interface import STTProvider
+from app.providers.stt import STTProvider
 from app.schemas.transcript import (
     TranscriptionRequest,
     TranscriptionResponse,

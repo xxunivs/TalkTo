@@ -1,7 +1,10 @@
 from app.core.config import Settings
 from app.core.errors import ProviderNotConfiguredError
-from app.providers.tts.elevenlabs_tts import ElevenLabsTTSProvider
-from app.providers.tts.interface import TTSProvider, TTSResult
+from app.providers.tts.elevenlabs_tts import (
+    ElevenLabsTTSProvider,
+    TTSProvider,
+    TTSResult,
+)
 
 __all__ = ["TTSProvider", "TTSResult", "create_tts_provider"]
 

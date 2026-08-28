@@ -2,13 +2,34 @@
 
 import math
 import re
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Protocol
 
 import httpx
 
 from app.core.errors import STTProviderError
-from app.providers.stt.interface import STTResult
 from app.schemas.transcript import TranscriptSegment
+
+
+@dataclass
+class STTResult:
+    provider: str
+    model: str
+    segments: list[TranscriptSegment]
+
+
+class STTProvider(Protocol):
+    """Provider boundary for speech-to-text with speaker diarization."""
+
+    def transcribe(
+        self,
+        audio_path: Path,
+        *,
+        language: str,
+        speaker_diarization: bool,
+        num_speakers: int | None = None,
+    ) -> STTResult: ...
 
 ELEVENLABS_BASE = "https://api.elevenlabs.io"
 

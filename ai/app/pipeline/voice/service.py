@@ -20,8 +20,7 @@ from app.core.errors import (
 )
 from app.pipeline.transcription.audio import download_audio
 from app.providers.llm import create_openai_client
-from app.providers.tts import create_tts_provider
-from app.providers.tts.interface import TTSResult
+from app.providers.tts import TTSResult, create_tts_provider
 from app.schemas.memory import PersistedTranscriptSegment
 from app.schemas.voice import (
     SpeechSynthesisRequest,

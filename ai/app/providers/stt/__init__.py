@@ -1,7 +1,10 @@
 from app.core.config import Settings
 from app.core.errors import ProviderNotConfiguredError
-from app.providers.stt.elevenlabs_scribe import ElevenLabsScribeProvider
-from app.providers.stt.interface import STTProvider, STTResult
+from app.providers.stt.elevenlabs_scribe import (
+    ElevenLabsScribeProvider,
+    STTProvider,
+    STTResult,
+)
 
 __all__ = ["STTProvider", "STTResult", "create_stt_provider"]
 
