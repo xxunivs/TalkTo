@@ -1,7 +1,11 @@
-# Render Blueprint — TalkTo APP AI (Docker 배포)
-# 대시보드 → Blueprints → 이 저장소 연결하면 아래대로 생성된다.
+# Render Blueprint — TalkTo (단일 레포 · 두 서비스)
+# 대시보드 → Blueprints → 이 저장소 연결하면 아래 두 서비스가 함께 생성된다.
+#   1) talkto-app-ai     : Phase 2 자동화 파이프라인 (repo 루트 / Docker / torch·ECAPA)
+#   2) talkto-persona-ai : Phase 1 신금자 페르소나 (rootDir: phase1_persona / 순수 Python)
+# 각 서비스는 자기 경로 변경에만 반응한다(app-ai는 수동 배포, persona-ai는 buildFilter로 격리).
 # 시크릿(sync:false)은 커밋하지 않고 Render 대시보드/Secret에서 입력한다.
 services:
+  # ── 1) Phase 2 자동화 파이프라인 (기존 그대로) ──
   - type: web
     name: talkto-app-ai
     runtime: docker
@@ -47,3 +51,41 @@ services:
         value: gpt-5.4-mini
       # OPENAI_ANALYSIS_MODEL / OPENAI_JUDGE_MODEL 등은 config 기본값 사용,
       # 바꿀 때만 여기에 추가.
+
+  # ── 2) Phase 1 신금자 페르소나 (구 TalkTo_PersonaAI_AI) ──
+  # rootDir로 phase1_persona/ 안에서만 빌드·실행하고, buildFilter로 그 폴더가
+  # 바뀔 때만 재배포한다(=Phase 2 커밋은 이 서비스를 건드리지 않음). free 플랜은
+  # 유휴 시 스핀다운(콜드스타트 ~1분).
+  - type: web
+    name: talkto-persona-ai
+    runtime: python
+    rootDir: phase1_persona
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    autoDeploy: true
+    buildFilter:
+      # 경로는 repo 루트 기준(rootDir와 무관). 이 폴더 변경 시에만 배포 트리거.
+      paths:
+        - phase1_persona/**
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.11
+      # ── 시크릿: 값은 Render 대시보드에서 입력(리포에 커밋 안 함) ──
+      - key: AI_SERVER_TOKEN
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ELEVENLABS_API_KEY
+        sync: false
+      # 신금자 클론 음성 id (대상자별 단일 목소리).
+      - key: ELEVENLABS_VOICE_ID
+        sync: false
+      # ── 모델(기본값 있음, 교체할 때만 지정) ──
+      # Phase 1은 파인튜닝/손 프롬프트 기준을 gpt-4.1-mini로 잡아 서빙도 동일하게 유지.
+      - key: OPENAI_CHAT_MODEL
+        value: gpt-4.1-mini
+      # 로컬 단기기억 비활성(BE가 기억 저장·검색 소유). 서버는 무상태로 동작.
+      - key: PERSONA_ENABLE_LOCAL_SHORT_TERM
+        value: "false"
