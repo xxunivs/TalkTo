@@ -5,7 +5,7 @@ Archive 목록/상세용. 요약은 전사문에서 확인되는 내용만(S1 �
 태그는 3-A 기억들의 통제 어휘 태그를 녹음 단위로 집계(코드) — LLM 불필요.
 """
 
-from app.schemas.transcript import TranscriptSegment
+from app.data_schema.transcript import TranscriptSegment
 
 SUMMARY_SYSTEM_PROMPT = """너는 가족 통화 녹음을 Archive 목록에 보여줄 짧은 요약으로 만드는 분석기다.
 

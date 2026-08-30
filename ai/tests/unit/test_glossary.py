@@ -1,6 +1,6 @@
 import unittest
 
-from app.schemas.context import IntakeContext, SubjectContext
+from app.data_schema.context import IntakeContext, SubjectContext
 from app.pipeline.correction.glossary import build_glossary
 
 

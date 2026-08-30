@@ -6,7 +6,7 @@
 별도 트랙이고, 여기서는 내용의 민감성을 다룬다.
 """
 
-from app.schemas.transcript import TranscriptSegment
+from app.data_schema.transcript import TranscriptSegment
 
 SENSITIVITY_TYPES = {"health", "familyConflict", "asset", "death", "thirdParty"}
 

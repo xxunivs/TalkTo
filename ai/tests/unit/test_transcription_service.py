@@ -5,8 +5,8 @@ from uuid import uuid4
 
 from app.core.config import Settings
 from app.core.errors import AudioTooShortError, EmptyTranscriptError
-from app.providers.stt.interface import STTResult
-from app.schemas.transcript import TranscriptionRequest, TranscriptSegment
+from app.external_service.stt import STTResult
+from app.data_schema.transcript import TranscriptionRequest, TranscriptSegment
 from app.pipeline.transcription.service import transcribe_recording
 
 

@@ -9,8 +9,8 @@ BE는 누적 importance가 임계값을 넘거나 수동 재빌드 시 이 엔�
 
 from pydantic import Field
 
-from app.schemas.common import ApiModel
-from app.schemas.context import SubjectContext
+from app.data_schema.common import ApiModel
+from app.data_schema.context import SubjectContext
 
 
 class ReflectionMemoryInput(ApiModel):

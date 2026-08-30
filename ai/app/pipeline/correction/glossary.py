@@ -7,7 +7,7 @@ Intake 이름 리스트)이고, 이 모듈은 그 구조화 데이터를 평평�
 
 import re
 
-from app.schemas.context import IntakeContext, SubjectContext
+from app.data_schema.context import IntakeContext, SubjectContext
 
 _TRIM = ".,?!~… "
 # 성+이름 형태의 한글 실명 (2~4자) — 성을 뗀 이름만으로 부르는 게 일반적이라

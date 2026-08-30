@@ -18,11 +18,11 @@ from app.core.errors import (
     MissingVoiceError,
     TTSProviderError,
 )
-from app.pipeline.transcription.audio import download_audio
-from app.providers.llm import create_openai_client
-from app.providers.tts import TTSResult, create_tts_provider
-from app.schemas.memory import PersistedTranscriptSegment
-from app.schemas.voice import (
+from app.external_service.audio import download_audio
+from app.external_service.llm import create_openai_client
+from app.external_service.tts import TTSResult, create_tts_provider
+from app.data_schema.memory import PersistedTranscriptSegment
+from app.data_schema.voice import (
     SpeechSynthesisRequest,
     VoiceCloneFromTranscriptRequest,
     VoiceCloneRequest,

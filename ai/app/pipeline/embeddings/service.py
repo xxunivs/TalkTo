@@ -7,8 +7,8 @@
 import logging
 
 from app.core.config import Settings
-from app.providers.llm import create_openai_client
-from app.schemas.embeddings import EmbeddingRequest, EmbeddingResponse, EmbeddingResult
+from app.external_service.llm import create_openai_client
+from app.data_schema.embeddings import EmbeddingRequest, EmbeddingResponse, EmbeddingResult
 
 logger = logging.getLogger(__name__)
 

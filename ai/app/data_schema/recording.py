@@ -10,9 +10,9 @@ from uuid import UUID
 
 from pydantic import Field
 
-from app.schemas.common import ApiModel
-from app.schemas.context import SubjectContext
-from app.schemas.memory import MemorySegment, PersistedTranscriptSegment
+from app.data_schema.common import ApiModel
+from app.data_schema.context import SubjectContext
+from app.data_schema.memory import MemorySegment, PersistedTranscriptSegment
 
 
 class RecordingAnalysisRequest(ApiModel):

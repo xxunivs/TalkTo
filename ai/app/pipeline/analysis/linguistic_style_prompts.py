@@ -5,8 +5,8 @@
 근거를 붙인다(sentencePatterns는 관찰 일반화라 근거 없음).
 """
 
-from app.schemas.context import SubjectContext
-from app.schemas.transcript import TranscriptSegment
+from app.data_schema.context import SubjectContext
+from app.data_schema.transcript import TranscriptSegment
 
 LINGUISTIC_STYLE_SYSTEM_PROMPT = """너는 가족 통화 전사문에서 **대상자의 말투(언어 스타일)**를 분석하는 분석기다. 목적은 대상자가 "어떻게 말하는지"를 재현할 재료를 뽑는 것이다 — 무슨 말을 했는지(내용)가 아니라 어떻게 말하는지(형식·습관·감정 표현)에 집중한다.
 

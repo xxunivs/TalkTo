@@ -3,8 +3,8 @@ from unittest.mock import MagicMock, patch
 
 from app.pipeline.analysis.recording import _resolve_subject_speaker_label
 from app.pipeline.analysis.subject_id import identify_subject_by_content
-from app.schemas.context import SubjectContext, SubjectInfo
-from app.schemas.transcript import TranscriptSegment
+from app.data_schema.context import SubjectContext, SubjectInfo
+from app.data_schema.transcript import TranscriptSegment
 
 _SEGMENTS = [
     TranscriptSegment(

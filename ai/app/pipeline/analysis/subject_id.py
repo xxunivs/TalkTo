@@ -9,9 +9,9 @@ import json
 import logging
 
 from app.core.config import Settings
-from app.providers.llm import create_openai_client
-from app.schemas.context import SubjectContext
-from app.schemas.transcript import TranscriptSegment
+from app.external_service.llm import create_openai_client
+from app.data_schema.context import SubjectContext
+from app.data_schema.transcript import TranscriptSegment
 
 logger = logging.getLogger(__name__)
 

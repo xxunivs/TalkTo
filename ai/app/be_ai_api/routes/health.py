@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 
-from app.api.dependencies import SettingsDependency
-from app.schemas.common import HealthResponse, ReadinessCheck, ReadyResponse
+from app.be_ai_api.dependencies import SettingsDependency
+from app.data_schema.common import HealthResponse, ReadinessCheck, ReadyResponse
 
 
 router = APIRouter(tags=["system"])

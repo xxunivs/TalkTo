@@ -12,7 +12,7 @@ import logging
 from dataclasses import dataclass
 from pathlib import Path
 
-from app.schemas.transcript import TranscriptSegment
+from app.data_schema.transcript import TranscriptSegment
 
 logger = logging.getLogger(__name__)
 

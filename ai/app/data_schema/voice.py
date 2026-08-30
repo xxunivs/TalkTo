@@ -1,7 +1,7 @@
 from pydantic import Field, HttpUrl, model_validator
 
-from app.schemas.common import ApiModel
-from app.schemas.memory import PersistedTranscriptSegment
+from app.data_schema.common import ApiModel
+from app.data_schema.memory import PersistedTranscriptSegment
 
 
 class VoiceTranscriptionResponse(ApiModel):

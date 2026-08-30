@@ -1,7 +1,7 @@
 import unittest
 
 from app.core.config import Settings
-from app.schemas.transcript import TranscriptSegment
+from app.data_schema.transcript import TranscriptSegment
 from app.pipeline.correction.service import apply_corrections, correct_segments
 
 

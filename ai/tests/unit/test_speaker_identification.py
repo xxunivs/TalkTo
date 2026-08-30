@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 from app.core.config import load_settings
 from app.pipeline.speaker_id.service import SpeakerMatch
 from app.pipeline.transcription.service import _identify_subject_speaker
-from app.schemas.transcript import TranscriptionRequest, TranscriptSegment
+from app.data_schema.transcript import TranscriptionRequest, TranscriptSegment
 
 _SEGMENTS = [
     TranscriptSegment(

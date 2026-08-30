@@ -12,8 +12,8 @@ import logging
 
 from app.core.config import Settings
 from app.pipeline.persona.assembler import assemble_persona_prompt
-from app.providers.llm import create_openai_client
-from app.schemas.persona import (
+from app.external_service.llm import create_openai_client
+from app.data_schema.persona import (
     MemoryCandidate,
     MemoryCandidateRequest,
     MemoryCandidateResponse,
@@ -22,7 +22,7 @@ from app.schemas.persona import (
     PersonaResponseRequest,
     PersonaResponseResult,
 )
-from app.schemas.transcript import TranscriptSegment
+from app.data_schema.transcript import TranscriptSegment
 
 logger = logging.getLogger(__name__)
 

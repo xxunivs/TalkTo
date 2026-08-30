@@ -14,8 +14,8 @@ from app.pipeline.analysis.sensitivity import run_sensitivity_analysis
 from app.pipeline.analysis.subject_id import identify_subject_by_content
 from app.pipeline.enrichment.service import aggregate_tags, summarize_recording
 from app.pipeline.memory_segments.service import extract_memory_segments
-from app.schemas.memory import MemorySegment
-from app.schemas.recording import (
+from app.data_schema.memory import MemorySegment
+from app.data_schema.recording import (
     AddressTerm,
     EmotionalExpression,
     RecordingAnalysisRequest,
@@ -24,8 +24,8 @@ from app.schemas.recording import (
     RecurringPhrase,
     SpeechStyle,
 )
-from app.schemas.context import SubjectContext
-from app.schemas.transcript import TranscriptSegment
+from app.data_schema.context import SubjectContext
+from app.data_schema.transcript import TranscriptSegment
 
 
 def _resolve_subject_speaker_label(

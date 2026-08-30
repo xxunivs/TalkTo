@@ -1,6 +1,6 @@
 import unittest
 
-from app.schemas.transcript import TranscriptSegment
+from app.data_schema.transcript import TranscriptSegment
 from app.pipeline.analysis.sensitivity import (
     SensitivityValidationError,
     apply_judge_decisions,

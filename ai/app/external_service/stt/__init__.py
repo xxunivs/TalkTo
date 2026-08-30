@@ -1,6 +1,6 @@
 from app.core.config import Settings
 from app.core.errors import ProviderNotConfiguredError
-from app.providers.stt.elevenlabs_scribe import (
+from app.external_service.stt.elevenlabs_scribe import (
     ElevenLabsScribeProvider,
     STTProvider,
     STTResult,

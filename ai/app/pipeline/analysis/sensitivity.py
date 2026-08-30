@@ -9,7 +9,7 @@
 import json
 import logging
 
-from app.providers.llm import create_openai_client
+from app.external_service.llm import create_openai_client
 
 from app.core.config import Settings
 from app.pipeline.analysis.sensitivity_prompts import (
@@ -19,7 +19,7 @@ from app.pipeline.analysis.sensitivity_prompts import (
     build_sensitivity_judge_prompt,
     build_sensitivity_user_prompt,
 )
-from app.schemas.transcript import TranscriptSegment
+from app.data_schema.transcript import TranscriptSegment
 
 logger = logging.getLogger(__name__)
 

@@ -7,8 +7,8 @@ from app.pipeline.voice.service import (
     collect_subject_samples,
     select_clone_samples,
 )
-from app.schemas.memory import PersistedTranscriptSegment
-from app.schemas.voice import VoiceCloneFromTranscriptRequest, VoiceSampleSegment
+from app.data_schema.memory import PersistedTranscriptSegment
+from app.data_schema.voice import VoiceCloneFromTranscriptRequest, VoiceSampleSegment
 
 _URL = "https://storage/recording.wav"
 

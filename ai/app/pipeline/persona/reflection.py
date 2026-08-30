@@ -9,8 +9,8 @@ import json
 import logging
 
 from app.core.config import Settings
-from app.providers.llm import create_openai_client
-from app.schemas.reflection import (
+from app.external_service.llm import create_openai_client
+from app.data_schema.reflection import (
     Reflection,
     ReflectionRequest,
     ReflectionResponse,

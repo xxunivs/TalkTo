@@ -13,9 +13,9 @@ from app.pipeline.analysis.linguistic_style_prompts import (
     LINGUISTIC_STYLE_SYSTEM_PROMPT,
     build_linguistic_style_user_prompt,
 )
-from app.providers.llm import create_openai_client
-from app.schemas.context import SubjectContext
-from app.schemas.transcript import TranscriptSegment
+from app.external_service.llm import create_openai_client
+from app.data_schema.context import SubjectContext
+from app.data_schema.transcript import TranscriptSegment
 
 logger = logging.getLogger(__name__)
 

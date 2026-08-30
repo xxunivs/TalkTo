@@ -3,7 +3,7 @@ from uuid import UUID
 
 from pydantic import Field
 
-from app.schemas.common import ApiModel
+from app.data_schema.common import ApiModel
 
 
 class PersistedTranscriptSegment(ApiModel):

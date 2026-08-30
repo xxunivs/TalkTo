@@ -2,7 +2,7 @@
 
 여러 파이프라인 서비스가 같은 설정(api_key·timeout·retries)으로 클라이언트를
 만들던 중복을 한곳으로 모은다. 테스트에서 목킹할 때는 이 모듈의 OpenAI를 patch한다
-(`patch("app.providers.llm.OpenAI")`).
+(`patch("app.external_service.llm.OpenAI")`).
 """
 
 from openai import OpenAI

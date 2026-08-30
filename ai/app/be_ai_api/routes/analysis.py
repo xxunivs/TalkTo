@@ -2,12 +2,12 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends
 
-from app.api.dependencies import SettingsDependency, require_internal_request
+from app.be_ai_api.dependencies import SettingsDependency, require_internal_request
 from app.pipeline.analysis.recording import run_recording_analysis
 from app.pipeline.transcription.service import transcribe_recording
-from app.schemas.recording import RecordingAnalysisRequest, RecordingAnalysisResponse
-from app.schemas.transcript import TranscriptionRequest, TranscriptionResponse
-from app.providers.stt import create_stt_provider
+from app.data_schema.recording import RecordingAnalysisRequest, RecordingAnalysisResponse
+from app.data_schema.transcript import TranscriptionRequest, TranscriptionResponse
+from app.external_service.stt import create_stt_provider
 
 
 router = APIRouter(tags=["analysis"])

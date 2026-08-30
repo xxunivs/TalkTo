@@ -3,13 +3,13 @@ from pathlib import Path
 
 from app.core.config import Settings
 from app.core.errors import AudioTooShortError, EmptyTranscriptError
-from app.providers.stt import STTProvider
-from app.schemas.transcript import (
+from app.external_service.stt import STTProvider
+from app.data_schema.transcript import (
     TranscriptionRequest,
     TranscriptionResponse,
     TranscriptSegment,
 )
-from app.pipeline.transcription.audio import download_audio
+from app.external_service.audio import download_audio
 from app.pipeline.correction.service import correct_segments
 from app.pipeline.correction.glossary import build_glossary
 

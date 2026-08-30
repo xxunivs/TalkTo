@@ -1,6 +1,6 @@
 from app.core.config import Settings
 from app.core.errors import ProviderNotConfiguredError
-from app.providers.tts.elevenlabs_tts import (
+from app.external_service.tts.elevenlabs_tts import (
     ElevenLabsTTSProvider,
     TTSProvider,
     TTSResult,

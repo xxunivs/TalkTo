@@ -5,7 +5,7 @@ from app.pipeline.persona.assembler import (
     collect_speech_examples,
     merge_persons,
 )
-from app.schemas.transcript import TranscriptSegment
+from app.data_schema.transcript import TranscriptSegment
 
 
 class MergePersonsTest(unittest.TestCase):

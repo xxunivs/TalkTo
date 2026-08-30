@@ -7,7 +7,7 @@ BE가 저장된 프로필·가족 용어집·Intake를 이 모양으로 변환�
 
 from pydantic import ConfigDict, Field
 
-from app.schemas.common import ApiModel
+from app.data_schema.common import ApiModel
 
 
 class ContextModel(ApiModel):

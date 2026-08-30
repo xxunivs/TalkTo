@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 
-from app.api.routes import analysis, embeddings, health, persona, voice
+from app.be_ai_api.routes import analysis, embeddings, health, persona, voice
 from app.core.config import get_settings
 from app.core.errors import AppError, app_error_handler
 from app.core.logging import configure_logging

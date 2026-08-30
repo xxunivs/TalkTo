@@ -5,8 +5,8 @@
 모든 기억은 근거 세그먼트로 역추적 가능해야 한다 (공통 품질 원칙).
 """
 
-from app.schemas.context import SubjectContext
-from app.schemas.transcript import TranscriptSegment
+from app.data_schema.context import SubjectContext
+from app.data_schema.transcript import TranscriptSegment
 
 MEMORY_SYSTEM_PROMPT = """너는 가족 통화 전사문에서 "기억 조각"을 추출하는 분석기다. 기억 조각은 나중에 가족이 검색하거나 대상자 페르소나가 회상할 재료다. **기억할 만한 내용은 빠짐없이 뽑는 것이 중요하다** — 사소해 보여도 음식·조언·근황·인사가 담기면 검색·회상의 재료가 된다.
 

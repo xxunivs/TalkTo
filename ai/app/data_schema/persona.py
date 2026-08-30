@@ -2,8 +2,8 @@ from typing import Literal
 
 from pydantic import Field
 
-from app.schemas.common import ApiModel
-from app.schemas.context import IntakeContext, SubjectContext
+from app.data_schema.common import ApiModel
+from app.data_schema.context import IntakeContext, SubjectContext
 
 
 class ConversationMessage(ApiModel):

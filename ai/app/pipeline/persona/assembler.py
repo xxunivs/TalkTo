@@ -14,8 +14,8 @@ from app.pipeline.persona.template import (
     FIXED_SAFETY_RULES,
     PERSONA_TEMPLATE,
 )
-from app.schemas.context import IntakeContext, SubjectContext
-from app.schemas.transcript import TranscriptSegment
+from app.data_schema.context import IntakeContext, SubjectContext
+from app.data_schema.transcript import TranscriptSegment
 
 _SENSITIVITY_LABELS = {
     "health": "건강·병에 대한 구체적 얘기(병명·병원비 등)",

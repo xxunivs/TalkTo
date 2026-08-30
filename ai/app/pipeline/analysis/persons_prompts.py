@@ -4,8 +4,8 @@
 않기(NO_TRAIT), 지칭 해소 실패는 persons가 아니라 unresolvedMentions로.
 """
 
-from app.schemas.context import SubjectContext
-from app.schemas.transcript import TranscriptSegment
+from app.data_schema.context import SubjectContext
+from app.data_schema.transcript import TranscriptSegment
 
 PERSONS_SYSTEM_PROMPT = """너는 가족 통화 녹음 전사문에서 인물과 관계를 추출하는 분석기다. 대상자(전사문의 주인공, 예: 할머니)의 시점에서 등장 인물을 정리한다.
 

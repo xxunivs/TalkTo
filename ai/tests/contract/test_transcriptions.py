@@ -6,8 +6,8 @@ from fastapi.testclient import TestClient
 
 from app.core.errors import AudioUrlExpiredError
 from app.main import app
-from app.providers.stt.interface import STTResult
-from app.schemas.transcript import TranscriptSegment
+from app.external_service.stt import STTResult
+from app.data_schema.transcript import TranscriptSegment
 
 
 def request_body(**overrides) -> dict:
@@ -51,7 +51,7 @@ class TranscriptionsEndpointTest(unittest.TestCase):
     def test_success_returns_camel_case_contract(self) -> None:
         with (
             patch(
-                "app.api.routes.analysis.create_stt_provider",
+                "app.be_ai_api.routes.analysis.create_stt_provider",
                 return_value=FakeProvider(SEGMENTS),
             ),
             patch(
@@ -89,7 +89,7 @@ class TranscriptionsEndpointTest(unittest.TestCase):
     def test_expired_url_maps_to_422_with_code(self) -> None:
         with (
             patch(
-                "app.api.routes.analysis.create_stt_provider",
+                "app.be_ai_api.routes.analysis.create_stt_provider",
                 return_value=FakeProvider(SEGMENTS),
             ),
             patch(

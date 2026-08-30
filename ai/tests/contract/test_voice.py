@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 
 from fastapi.testclient import TestClient
 
-from app.api.dependencies import require_internal_request
+from app.be_ai_api.dependencies import require_internal_request
 from app.main import app
 
 
@@ -19,7 +19,7 @@ class VoiceTest(unittest.TestCase):
     def tearDownClass(cls) -> None:
         app.dependency_overrides.pop(require_internal_request, None)
 
-    @patch("app.providers.llm.OpenAI")
+    @patch("app.external_service.llm.OpenAI")
     def test_voice_transcription_returns_text(self, mock_openai: MagicMock) -> None:
         client = MagicMock()
         client.audio.transcriptions.create.return_value = MagicMock(text="할머니 보고 싶어요")
@@ -36,7 +36,7 @@ class VoiceTest(unittest.TestCase):
         self.assertEqual(body["text"], "할머니 보고 싶어요")
         self.assertEqual(body["provider"], "openai")
 
-    @patch("app.providers.tts.elevenlabs_tts.httpx.post")
+    @patch("app.external_service.tts.elevenlabs_tts.httpx.post")
     def test_speech_returns_audio_bytes(self, mock_post: MagicMock) -> None:
         mock_post.return_value = MagicMock(status_code=200, content=b"ID3fakemp3")
 
@@ -49,7 +49,7 @@ class VoiceTest(unittest.TestCase):
         self.assertEqual(response.headers["content-type"], "audio/mpeg")
         self.assertEqual(response.content, b"ID3fakemp3")
 
-    @patch("app.providers.tts.elevenlabs_tts.httpx.post")
+    @patch("app.external_service.tts.elevenlabs_tts.httpx.post")
     @patch("app.pipeline.voice.service.download_audio")
     def test_voice_clone_returns_voice_id(
         self, mock_download: MagicMock, mock_post: MagicMock

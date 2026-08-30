@@ -9,7 +9,7 @@ from typing import Protocol
 import httpx
 
 from app.core.errors import STTProviderError
-from app.schemas.transcript import TranscriptSegment
+from app.data_schema.transcript import TranscriptSegment
 
 
 @dataclass

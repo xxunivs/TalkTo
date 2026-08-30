@@ -2,14 +2,14 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends
 
-from app.api.dependencies import SettingsDependency, require_internal_request
+from app.be_ai_api.dependencies import SettingsDependency, require_internal_request
 from app.pipeline.persona.reflection import run_reflection
 from app.pipeline.persona.service import (
     assemble_persona_instructions,
     extract_memory_candidates,
     generate_persona_response,
 )
-from app.schemas.persona import (
+from app.data_schema.persona import (
     MemoryCandidateRequest,
     MemoryCandidateResponse,
     PersonaAssemblyRequest,
@@ -17,7 +17,7 @@ from app.schemas.persona import (
     PersonaResponseRequest,
     PersonaResponseResult,
 )
-from app.schemas.reflection import ReflectionRequest, ReflectionResponse
+from app.data_schema.reflection import ReflectionRequest, ReflectionResponse
 
 
 router = APIRouter(tags=["persona"])

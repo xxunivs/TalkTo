@@ -7,15 +7,15 @@ LLM 산출은 그대로 믿지 않는다: 근거 세그먼트 실존(R1), confid
 import json
 import logging
 
-from app.providers.llm import create_openai_client
+from app.external_service.llm import create_openai_client
 
 from app.core.config import Settings
 from app.pipeline.analysis.persons_prompts import (
     PERSONS_SYSTEM_PROMPT,
     build_persons_user_prompt,
 )
-from app.schemas.context import SubjectContext
-from app.schemas.transcript import TranscriptSegment
+from app.data_schema.context import SubjectContext
+from app.data_schema.transcript import TranscriptSegment
 
 logger = logging.getLogger(__name__)
 

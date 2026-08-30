@@ -8,7 +8,7 @@ import json
 import logging
 import re
 
-from app.providers.llm import create_openai_client
+from app.external_service.llm import create_openai_client
 
 from app.core.config import Settings
 from app.pipeline.enrichment.prompts import (
@@ -16,7 +16,7 @@ from app.pipeline.enrichment.prompts import (
     build_summary_user_prompt,
 )
 from app.pipeline.memory_segments.service import _ALLOWED_TAGS
-from app.schemas.transcript import TranscriptSegment
+from app.data_schema.transcript import TranscriptSegment
 
 logger = logging.getLogger(__name__)
 

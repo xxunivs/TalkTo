@@ -1,7 +1,7 @@
 import unittest
 
 from app.pipeline.memory_segments.service import validate_memory_payload
-from app.schemas.transcript import TranscriptSegment
+from app.data_schema.transcript import TranscriptSegment
 
 
 def segment(index: int, speaker: str = "SPK_0") -> TranscriptSegment:
