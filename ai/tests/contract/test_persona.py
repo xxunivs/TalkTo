@@ -7,7 +7,7 @@ from pydantic import SecretStr
 
 from app.core.config import Settings
 from app.main import app
-from app.pipeline.persona.service import extract_memory_candidates
+from app.tool.s3_synthesis.b_persona import extract_memory_candidates
 from app.data_schema.persona import MemoryCandidateRequest
 
 

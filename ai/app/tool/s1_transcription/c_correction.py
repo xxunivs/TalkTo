@@ -8,11 +8,13 @@ of edited.
 
 import json
 import logging
+import re
 
 from openai import OpenAI  # 타입 힌트용
 
 from app.core.config import Settings
 from app.external_service.llm import create_openai_client
+from app.data_schema.context import IntakeContext, SubjectContext
 from app.data_schema.transcript import TranscriptSegment
 
 logger = logging.getLogger(__name__)
@@ -173,3 +175,59 @@ def _edit_distance(left: str, right: str) -> int:
             current[j] = min(previous[j] + 1, current[j - 1] + 1, previous[j - 1] + cost)
         previous = current
     return previous[-1]
+
+
+# ===== 용어집 파생 (교정·화자식별 재료) =====
+# 용어의 원천은 사용자가 앱에 입력한 데이터(프로필, 가족 구성원, 가족 용어집,
+# Intake 이름 리스트). 이 함수들은 그 구조화 데이터를 평평한 단어 목록으로
+# 조합만 한다. 특정 가족에 대한 하드코딩은 없다.
+
+_TRIM = ".,?!~… "
+# 성+이름 형태의 한글 실명 (2~4자) — 성을 뗀 이름만으로 부르는 게 일반적이라
+# 호칭 보정에는 이름 변형도 필요하다 (이종서 → 종서, 남향 → 향)
+_KOREAN_FULL_NAME = re.compile(r"^[가-힣]{2,4}$")
+
+
+def _has_batchim(char: str) -> bool:
+    code = ord(char)
+    return 0xAC00 <= code <= 0xD7A3 and (code - 0xAC00) % 28 != 0
+
+
+def _vocative(name: str) -> str:
+    """이름을 부르는 형태 (한국어 호격: 받침 있으면 '아', 없으면 '야')."""
+    return name + ("아" if _has_batchim(name[-1]) else "야")
+
+
+def _with_given_name(full_name: str) -> list[str]:
+    if _KOREAN_FULL_NAME.fullmatch(full_name):
+        given = full_name[1:]
+        return [full_name, given, _vocative(given)]
+    return [full_name]
+
+
+def build_glossary(
+    subject_context: SubjectContext | None,
+    intake_context: IntakeContext | None = None,
+) -> list[str]:
+    terms: list[str] = []
+
+    if subject_context is not None:
+        if subject_context.subject and subject_context.subject.name:
+            terms.extend(_with_given_name(subject_context.subject.name))
+        for member in subject_context.family_members:
+            terms.extend(_with_given_name(member.name))
+            terms.extend(member.address_terms)
+        terms.extend(subject_context.glossary_terms)
+
+    if intake_context is not None and intake_context.stt_hints is not None:
+        for name in intake_context.stt_hints.names:
+            terms.extend(_with_given_name(name))
+
+    seen: set[str] = set()
+    result: list[str] = []
+    for term in terms:
+        cleaned = term.strip(_TRIM)
+        if cleaned and cleaned not in seen:
+            seen.add(cleaned)
+            result.append(cleaned)
+    return result

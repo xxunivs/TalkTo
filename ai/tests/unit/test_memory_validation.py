@@ -1,6 +1,6 @@
 import unittest
 
-from app.pipeline.memory_segments.service import validate_memory_payload
+from app.tool.s2_extraction.d_memory_segments import validate_memory_payload
 from app.data_schema.transcript import TranscriptSegment
 
 

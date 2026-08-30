@@ -1,6 +1,6 @@
 import unittest
 
-from app.pipeline.persona.assembler import (
+from app.tool.s3_synthesis.b_persona import (
     aggregate_taboo,
     collect_speech_examples,
     merge_persons,

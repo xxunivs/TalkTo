@@ -7,7 +7,7 @@ from app.core.config import Settings
 from app.core.errors import AudioTooShortError, EmptyTranscriptError
 from app.external_service.stt import STTResult
 from app.data_schema.transcript import TranscriptionRequest, TranscriptSegment
-from app.pipeline.transcription.service import transcribe_recording
+from app.tool.s1_transcription.a_transcript import transcribe_recording
 
 
 def segment(index: int, start_ms: int, end_ms: int, text: str = "안녕") -> TranscriptSegment:
@@ -39,7 +39,7 @@ def request(**overrides) -> TranscriptionRequest:
 
 
 @patch(
-    "app.pipeline.transcription.service.download_audio",
+    "app.tool.s1_transcription.a_transcript.download_audio",
     return_value=Path("/nonexistent/audio.m4a"),
 )
 class TranscribeRecordingTest(unittest.TestCase):

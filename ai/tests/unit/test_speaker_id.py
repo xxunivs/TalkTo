@@ -1,6 +1,6 @@
 import unittest
 
-from app.pipeline.speaker_id.service import SpeakerMatch, cosine_similarity, identify_subject
+from app.tool.s1_transcription.b_speaker_id import SpeakerMatch, cosine_similarity, identify_subject
 
 
 class CosineSimilarityTest(unittest.TestCase):

@@ -3,8 +3,8 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from app.core.config import load_settings
-from app.pipeline.speaker_id.service import SpeakerMatch
-from app.pipeline.transcription.service import _identify_subject_speaker
+from app.tool.s1_transcription.b_speaker_id import SpeakerMatch
+from app.tool.s1_transcription.a_transcript import _identify_subject_speaker
 from app.data_schema.transcript import TranscriptionRequest, TranscriptSegment
 
 _SEGMENTS = [
@@ -40,9 +40,9 @@ class SpeakerIdentificationTest(unittest.TestCase):
         )
         self.assertIsNone(label)
 
-    @patch("app.pipeline.transcription.service.download_audio")
-    @patch("app.pipeline.speaker_id.service.identify_subject")
-    @patch("app.pipeline.speaker_id.service.SpeakerEmbedder")
+    @patch("app.tool.s1_transcription.a_transcript.download_audio")
+    @patch("app.tool.s1_transcription.b_speaker_id.identify_subject")
+    @patch("app.tool.s1_transcription.b_speaker_id.SpeakerEmbedder")
     def test_matched_speaker_returned(
         self, mock_embedder: MagicMock, mock_identify: MagicMock, mock_download: MagicMock
     ) -> None:
@@ -57,9 +57,9 @@ class SpeakerIdentificationTest(unittest.TestCase):
         )
         self.assertEqual(label, "SPK_0")
 
-    @patch("app.pipeline.transcription.service.download_audio")
-    @patch("app.pipeline.speaker_id.service.identify_subject")
-    @patch("app.pipeline.speaker_id.service.SpeakerEmbedder")
+    @patch("app.tool.s1_transcription.a_transcript.download_audio")
+    @patch("app.tool.s1_transcription.b_speaker_id.identify_subject")
+    @patch("app.tool.s1_transcription.b_speaker_id.SpeakerEmbedder")
     def test_below_threshold_returns_none(
         self, mock_embedder: MagicMock, mock_identify: MagicMock, mock_download: MagicMock
     ) -> None:

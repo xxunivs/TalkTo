@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, File, Form, Response, UploadFile
 
 from app.be_ai_api.dependencies import SettingsDependency, require_internal_request
-from app.pipeline.voice.service import (
+from app.tool.s4_voice.a_voice import (
     clone_voice_from_sample,
     clone_voice_from_transcript,
     collect_subject_samples,

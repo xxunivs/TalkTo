@@ -8,12 +8,12 @@
 from uuid import UUID
 
 from app.core.config import Settings
-from app.pipeline.analysis.linguistic_style import run_linguistic_style_analysis
-from app.pipeline.analysis.persons import run_persons_analysis
-from app.pipeline.analysis.sensitivity import run_sensitivity_analysis
-from app.pipeline.analysis.subject_id import identify_subject_by_content
-from app.pipeline.enrichment.service import aggregate_tags, summarize_recording
-from app.pipeline.memory_segments.service import extract_memory_segments
+from app.tool.s2_extraction.c_linguistic_style import run_linguistic_style_analysis
+from app.tool.s2_extraction.a_persons import run_persons_analysis
+from app.tool.s2_extraction.b_sensitivity import run_sensitivity_analysis
+from app.tool.s1_transcription.b_speaker_id import identify_subject_by_content
+from app.tool.s2_extraction.e_summary import aggregate_tags, summarize_recording
+from app.tool.s2_extraction.d_memory_segments import extract_memory_segments
 from app.data_schema.memory import MemorySegment
 from app.data_schema.recording import (
     AddressTerm,

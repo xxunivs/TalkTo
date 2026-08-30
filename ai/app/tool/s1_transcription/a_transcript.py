@@ -10,8 +10,8 @@ from app.data_schema.transcript import (
     TranscriptSegment,
 )
 from app.external_service.audio import download_audio
-from app.pipeline.correction.service import correct_segments
-from app.pipeline.correction.glossary import build_glossary
+from app.tool.s1_transcription.c_correction import correct_segments
+from app.tool.s1_transcription.c_correction import build_glossary
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +30,7 @@ def _identify_subject_speaker(
     if request.reference_voice_sample_url is None:
         return None
     try:
-        from app.pipeline.speaker_id.service import SpeakerEmbedder, identify_subject
+        from app.tool.s1_transcription.b_speaker_id import SpeakerEmbedder, identify_subject
     except ImportError:
         logger.warning("speaker_id 패키지 미설치 — 대상자 화자 식별 생략")
         return None

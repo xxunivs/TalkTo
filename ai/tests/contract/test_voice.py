@@ -50,7 +50,7 @@ class VoiceTest(unittest.TestCase):
         self.assertEqual(response.content, b"ID3fakemp3")
 
     @patch("app.external_service.tts.elevenlabs_tts.httpx.post")
-    @patch("app.pipeline.voice.service.download_audio")
+    @patch("app.tool.s4_voice.a_voice.download_audio")
     def test_voice_clone_returns_voice_id(
         self, mock_download: MagicMock, mock_post: MagicMock
     ) -> None:
@@ -75,7 +75,7 @@ class VoiceTest(unittest.TestCase):
 
     def test_speech_without_voice_id_returns_400(self) -> None:
         # 요청 voiceId 없고 ELEVENLABS_DEFAULT_VOICE_ID도 없으면 명시적 400.
-        with patch("app.pipeline.voice.service.create_tts_provider") as provider:
+        with patch("app.tool.s4_voice.a_voice.create_tts_provider") as provider:
             response = self.client.post("/v1/voice/speech", json={"text": "안녕"})
         provider.assert_not_called()
         self.assertEqual(response.status_code, 400)

@@ -2,7 +2,7 @@ import unittest
 from uuid import uuid4
 
 from app.core.errors import InvalidVoiceSampleError
-from app.pipeline.voice.service import (
+from app.tool.s4_voice.a_voice import (
     clone_voice_from_transcript,
     collect_subject_samples,
     select_clone_samples,

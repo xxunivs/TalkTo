@@ -2,7 +2,7 @@ import unittest
 
 from app.core.config import Settings
 from app.data_schema.transcript import TranscriptSegment
-from app.pipeline.correction.service import apply_corrections, correct_segments
+from app.tool.s1_transcription.c_correction import apply_corrections, correct_segments
 
 
 def segment(index: int, text: str) -> TranscriptSegment:

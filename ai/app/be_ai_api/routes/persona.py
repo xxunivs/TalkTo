@@ -3,8 +3,8 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 
 from app.be_ai_api.dependencies import SettingsDependency, require_internal_request
-from app.pipeline.persona.reflection import run_reflection
-from app.pipeline.persona.service import (
+from app.tool.s3_synthesis.a_reflection import run_reflection
+from app.tool.s3_synthesis.b_persona import (
     assemble_persona_instructions,
     extract_memory_candidates,
     generate_persona_response,

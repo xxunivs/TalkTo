@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 
 from app.be_ai_api.dependencies import SettingsDependency, require_internal_request
-from app.pipeline.embeddings.service import generate_embeddings
+from app.tool.s3_synthesis.c_embeddings import generate_embeddings
 from app.data_schema.embeddings import EmbeddingRequest, EmbeddingResponse
 
 
