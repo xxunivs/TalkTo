@@ -50,8 +50,11 @@ class ElevenLabsTTSProvider:
                     "text": text,
                     "model_id": self.model_id,
                     "voice_settings": {
-                        "stability": 0.5,
+                        # 대표 피드백 반영: 흔들림을 조금 허용해 표현을 살리고(stability 0.3),
+                        # 원본 음색 유지는 그대로(0.75), 과장 스타일은 끔(style 0.0).
+                        "stability": 0.3,
                         "similarity_boost": 0.75,
+                        "style": 0.0,
                         "speed": speed,
                     },
                 },
