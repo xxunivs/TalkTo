@@ -31,6 +31,13 @@ evaluation/persona/results/*singeumja*
 evaluation/persona/results/*_sg.*
 # audio + external datasets; never commit
 data/
+# 예외: manual 빌드(신금자 등)는 실행에 data/(기억·임베딩)가 필요해 함께 배포된다.
+# 이 레포는 private이며, 원본 음성·mp3·평가 산출물은 아래에서 다시 제외한다.
+!manual_persona/*/data/
+!manual_persona/*/data/**
+manual_persona/*/data/voice_raw/
+manual_persona/*/data/*.mp3
+manual_persona/*/data/eval_results/
 # e2e 전사 캐시(외부 오디오 파생, 재전사 방지용 로컬 캐시)
 evaluation/e2e/.transcription_cache/
 
