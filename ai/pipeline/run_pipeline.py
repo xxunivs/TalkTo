@@ -6,11 +6,10 @@
 #     python -m pipeline.run_pipeline --subject 신금자 --only s2_d    # 기억 추출만
 #     python -m pipeline.run_pipeline --subject 신금자 --from s2 --to s3
 #
-# 각 단계는 앞 단계 결과를 output/<subject>/ 에서 읽는다. 전사는 캐시가 있어
-# 다시 돌려도 유료 API 를 부르지 않는다.
+# 각 단계는 앞 단계 결과를 output/<subject>/ 에서 읽는다. 전사는 a_transcript.json 에
+# 이미 있는 녹음을 건너뛰어, 다시 돌려도 유료 API 를 부르지 않는다.
 
 import argparse
-import hashlib
 import json
 import logging
 import sys
@@ -197,33 +196,35 @@ class Ctx:
 
 # ────────────────────────── s1 전사 ──────────────────────────
 
-def _transcribe_cached(provider, audio: Path, cache_dir: Path) -> list[TranscriptSegment]:
-    """전사는 유료라 파일명 기준 캐시. 재실행 때 재전사 안 함."""
-    key = hashlib.sha1(audio.name.encode()).hexdigest()[:16]
-    cache = cache_dir / f"{key}.json"
-    if cache.exists():
-        return [TranscriptSegment(**s) for s in json.loads(cache.read_text(encoding="utf-8"))]
-    segs = provider.transcribe(audio, language="ko", speaker_diarization=True).segments
-    cache_dir.mkdir(parents=True, exist_ok=True)
-    cache.write_text(
-        json.dumps([s.model_dump(by_alias=True) for s in segs], ensure_ascii=False),
-        encoding="utf-8",
-    )
-    return segs
-
-
 def step_s1_a(ctx: Ctx) -> str:
-    # 주의: a_transcript.json 을 원문으로 덮어쓴다. s1_c 가 채운 교정문이 지워지니
-    # 이 단계를 다시 돌렸으면 s1_c 도 함께 돌릴 것.
+    """전사는 유료라, a_transcript.json 에 이미 있는 녹음은 다시 전사하지 않는다.
+
+    다시 전사하려면 그 녹음 항목을 a_transcript.json 에서 지우면 된다.
+    이미 있는 항목은 그대로 두므로 s1_c 가 채운 교정문도 보존된다.
+    """
     clips = ctx.clips()
     if not clips:
         raise NeedPriorStep(ctx.dir / "s0_input" / "통화녹음", "s1_a")
-    provider = create_stt_provider(ctx.settings)
-    cache_dir = ctx.dir / "s1_transcription" / ".transcription_cache"
-    ctx._segments = {clip.name: _transcribe_cached(provider, clip, cache_dir) for clip in clips}
+
+    done: dict[str, list[TranscriptSegment]] = {}
+    path = ctx.dir / "s1_transcription" / "a_transcript.json"
+    if path.exists():
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        done = {name: [TranscriptSegment(**s) for s in rows] for name, rows in raw.items()}
+
+    todo = [c for c in clips if c.name not in done]
+    if todo:
+        provider = create_stt_provider(ctx.settings)
+        for clip in todo:
+            done[clip.name] = provider.transcribe(
+                clip, language="ko", speaker_diarization=True).segments
+
+    ctx._segments = done
     ctx.save_segments()
-    total = sum(len(v) for v in ctx._segments.values())
-    return f"통화 {len(clips)}건, 세그먼트 {total}개"
+    total = sum(len(v) for v in done.values())
+    skipped = len(clips) - len(todo)
+    detail = f"통화 {len(done)}건, 세그먼트 {total}개"
+    return detail + (f" (이미 있던 {skipped}건은 건너뜀)" if skipped else "")
 
 
 def step_s1_b(ctx: Ctx) -> str:

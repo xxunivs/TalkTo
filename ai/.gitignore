@@ -38,11 +38,7 @@ data/
 manual_persona/*/data/voice_raw/
 manual_persona/*/data/*.mp3
 manual_persona/*/data/eval_results/
-# e2e 전사 캐시(외부 오디오 파생, 재전사 방지용 로컬 캐시)
-evaluation/e2e/.transcription_cache/
 
 # 폐기 예정 보관함 (실제 삭제 보류, git 추적 제외)
 delete/
 
-# 전사 캐시 (유료 API 재호출 방지용 로컬 파생물, 원본에서 재생성 가능)
-.transcription_cache/
