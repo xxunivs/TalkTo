@@ -2,7 +2,7 @@ import os
 import unittest
 from unittest.mock import patch
 
-from app.core.config import load_settings
+from infra.setting import load_settings
 
 
 class ConfigTest(unittest.TestCase):

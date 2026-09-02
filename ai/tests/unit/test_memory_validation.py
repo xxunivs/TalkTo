@@ -1,7 +1,7 @@
 import unittest
 
-from app.tool.s2_extraction.d_memory_segments import validate_memory_payload
-from app.data_schema.transcript import TranscriptSegment
+from pipeline.s2_extraction.d_memory_segments import validate_memory_payload
+from infra.schema.transcript import TranscriptSegment
 
 
 def segment(index: int, speaker: str = "SPK_0") -> TranscriptSegment:

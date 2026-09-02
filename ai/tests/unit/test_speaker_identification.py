@@ -2,10 +2,10 @@ import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from app.core.config import load_settings
-from app.tool.s1_transcription.b_speaker_id import SpeakerMatch
-from app.tool.s1_transcription.a_transcript import _identify_subject_speaker
-from app.data_schema.transcript import TranscriptionRequest, TranscriptSegment
+from infra.setting import load_settings
+from pipeline.s1_transcription.b_speaker_id import SpeakerMatch
+from pipeline.s1_transcription.a_transcript import _identify_subject_speaker
+from infra.schema.transcript import TranscriptionRequest, TranscriptSegment
 
 _SEGMENTS = [
     TranscriptSegment(
@@ -40,9 +40,9 @@ class SpeakerIdentificationTest(unittest.TestCase):
         )
         self.assertIsNone(label)
 
-    @patch("app.tool.s1_transcription.a_transcript.download_audio")
-    @patch("app.tool.s1_transcription.b_speaker_id.identify_subject")
-    @patch("app.tool.s1_transcription.b_speaker_id.SpeakerEmbedder")
+    @patch("pipeline.s1_transcription.a_transcript.download_audio")
+    @patch("pipeline.s1_transcription.b_speaker_id.identify_subject")
+    @patch("pipeline.s1_transcription.b_speaker_id.SpeakerEmbedder")
     def test_matched_speaker_returned(
         self, mock_embedder: MagicMock, mock_identify: MagicMock, mock_download: MagicMock
     ) -> None:
@@ -57,9 +57,9 @@ class SpeakerIdentificationTest(unittest.TestCase):
         )
         self.assertEqual(label, "SPK_0")
 
-    @patch("app.tool.s1_transcription.a_transcript.download_audio")
-    @patch("app.tool.s1_transcription.b_speaker_id.identify_subject")
-    @patch("app.tool.s1_transcription.b_speaker_id.SpeakerEmbedder")
+    @patch("pipeline.s1_transcription.a_transcript.download_audio")
+    @patch("pipeline.s1_transcription.b_speaker_id.identify_subject")
+    @patch("pipeline.s1_transcription.b_speaker_id.SpeakerEmbedder")
     def test_below_threshold_returns_none(
         self, mock_embedder: MagicMock, mock_identify: MagicMock, mock_download: MagicMock
     ) -> None:

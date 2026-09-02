@@ -4,8 +4,8 @@ from unittest.mock import MagicMock, patch
 
 from fastapi.testclient import TestClient
 
-from app.be_ai_api.dependencies import require_internal_request
-from app.main import app
+from infra.be_ai_api.dependencies import require_internal_request
+from main import app
 
 
 def _chat_response(content: str) -> MagicMock:
@@ -27,7 +27,7 @@ class ReflectionTest(unittest.TestCase):
     def tearDownClass(cls) -> None:
         app.dependency_overrides.pop(require_internal_request, None)
 
-    @patch("app.external_service.llm.OpenAI")
+    @patch("infra.external_api.openai_client.OpenAI")
     def test_maps_evidence_and_drops_unsupported(self, mock_openai: MagicMock) -> None:
         client = MagicMock()
         client.chat.completions.create.return_value = _chat_response(

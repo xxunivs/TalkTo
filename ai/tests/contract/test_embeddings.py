@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 
 from fastapi.testclient import TestClient
 
-from app.main import app
+from main import app
 
 
 class EmbeddingsTest(unittest.TestCase):
@@ -13,7 +13,7 @@ class EmbeddingsTest(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.client = TestClient(app)
 
-    @patch("app.external_service.llm.OpenAI")
+    @patch("infra.external_api.openai_client.OpenAI")
     def test_maps_each_item_to_a_vector(self, mock_openai: MagicMock) -> None:
         resp = MagicMock()
         resp.data = [MagicMock(embedding=[0.1, 0.2]), MagicMock(embedding=[0.3, 0.4])]

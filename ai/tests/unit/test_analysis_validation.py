@@ -1,7 +1,7 @@
 import unittest
 
-from app.data_schema.transcript import TranscriptSegment
-from app.tool.s2_extraction.a_persons import validate_persons_payload
+from infra.schema.transcript import TranscriptSegment
+from pipeline.s2_extraction.a_persons import validate_persons_payload
 
 
 def segment(index: int, text: str = "말") -> TranscriptSegment:

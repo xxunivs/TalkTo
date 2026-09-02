@@ -5,10 +5,10 @@ from unittest.mock import MagicMock, patch
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
 
-from app.core.config import Settings
-from app.main import app
-from app.tool.s3_synthesis.b_persona import extract_memory_candidates
-from app.data_schema.persona import MemoryCandidateRequest
+from infra.setting import Settings
+from main import app
+from pipeline.s3_synthesis.b_persona import extract_memory_candidates
+from infra.schema.persona import MemoryCandidateRequest
 
 
 def _mock_openai_returning(content: str) -> MagicMock:
@@ -72,7 +72,7 @@ class MemoryCandidateTest(unittest.TestCase):
     def _settings(self) -> Settings:
         return Settings(openai_api_key=SecretStr("test-key"))
 
-    @patch("app.external_service.llm.OpenAI")
+    @patch("infra.external_api.openai_client.OpenAI")
     def test_clamps_out_of_range_and_skips_empty(self, mock_openai: MagicMock) -> None:
         canned = json.dumps({
             "candidates": [
@@ -96,7 +96,7 @@ class MemoryCandidateTest(unittest.TestCase):
         self.assertEqual(c.importance, 10)
         self.assertEqual(c.confidence, 1.0)
 
-    @patch("app.external_service.llm.OpenAI")
+    @patch("infra.external_api.openai_client.OpenAI")
     def test_empty_candidates_when_nothing_to_remember(self, mock_openai: MagicMock) -> None:
         mock_openai.return_value = _mock_openai_returning('{"candidates": []}')
 

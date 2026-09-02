@@ -1,11 +1,11 @@
 import unittest
 
-from app.tool.s3_synthesis.b_persona import (
+from pipeline.s3_synthesis.b_persona import (
     aggregate_taboo,
     collect_speech_examples,
     merge_persons,
 )
-from app.data_schema.transcript import TranscriptSegment
+from infra.schema.transcript import TranscriptSegment
 
 
 class MergePersonsTest(unittest.TestCase):

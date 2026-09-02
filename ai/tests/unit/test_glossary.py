@@ -1,7 +1,7 @@
 import unittest
 
-from app.data_schema.context import IntakeContext, SubjectContext
-from app.tool.s1_transcription.c_correction import build_glossary
+from infra.schema.subject import IntakeContext, SubjectContext
+from pipeline.s1_transcription.c_correction import build_glossary
 
 
 class BuildGlossaryTest(unittest.TestCase):

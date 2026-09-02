@@ -4,10 +4,10 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
-from app.core.errors import AudioUrlExpiredError
-from app.main import app
-from app.external_service.stt import STTResult
-from app.data_schema.transcript import TranscriptSegment
+from infra.error import AudioUrlExpiredError
+from main import app
+from infra.external_api.stt import STTResult
+from infra.schema.transcript import TranscriptSegment
 
 
 def request_body(**overrides) -> dict:
@@ -51,15 +51,15 @@ class TranscriptionsEndpointTest(unittest.TestCase):
     def test_success_returns_camel_case_contract(self) -> None:
         with (
             patch(
-                "app.be_ai_api.routes.analysis.create_stt_provider",
+                "infra.be_ai_api.routes.analysis.create_stt_provider",
                 return_value=FakeProvider(SEGMENTS),
             ),
             patch(
-                "app.tool.s1_transcription.a_transcript.download_audio",
+                "pipeline.s1_transcription.a_transcript.download_audio",
                 return_value=Path("/nonexistent/audio.m4a"),
             ),
             patch(
-                "app.tool.s1_transcription.a_transcript.correct_segments",
+                "pipeline.s1_transcription.a_transcript.correct_segments",
                 side_effect=lambda segments, **_kwargs: segments,
             ),
         ):
@@ -89,11 +89,11 @@ class TranscriptionsEndpointTest(unittest.TestCase):
     def test_expired_url_maps_to_422_with_code(self) -> None:
         with (
             patch(
-                "app.be_ai_api.routes.analysis.create_stt_provider",
+                "infra.be_ai_api.routes.analysis.create_stt_provider",
                 return_value=FakeProvider(SEGMENTS),
             ),
             patch(
-                "app.tool.s1_transcription.a_transcript.download_audio",
+                "pipeline.s1_transcription.a_transcript.download_audio",
                 side_effect=AudioUrlExpiredError(),
             ),
         ):

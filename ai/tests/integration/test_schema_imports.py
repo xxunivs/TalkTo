@@ -3,17 +3,17 @@ import unittest
 
 class SchemaImportTest(unittest.TestCase):
     def test_schema_and_provider_interfaces_import_without_calls(self) -> None:
-        from app.external_service.stt import STTProvider, STTResult
-        from app.data_schema.context import IntakeContext, SubjectContext
-        from app.data_schema.embeddings import EmbeddingRequest, EmbeddingResponse
-        from app.data_schema.memory import MemorySegment
-        from app.data_schema.persona import PersonaResponseRequest
-        from app.data_schema.recording import (
+        from infra.external_api.stt import STTProvider, STTResult
+        from infra.schema.subject import IntakeContext, SubjectContext
+        from infra.schema.embedding import EmbeddingRequest, EmbeddingResponse
+        from infra.schema.memory import MemorySegment
+        from infra.schema.persona import PersonaResponseRequest
+        from infra.schema.recording_analysis import (
             RecordingAnalysisRequest,
             RecordingAnalysisResponse,
         )
-        from app.data_schema.transcript import TranscriptionRequest
-        from app.data_schema.voice import SpeechSynthesisRequest
+        from infra.schema.transcript import TranscriptionRequest
+        from infra.schema.voice import SpeechSynthesisRequest
 
         imported = (
             STTProvider,

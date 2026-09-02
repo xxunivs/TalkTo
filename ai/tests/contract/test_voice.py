@@ -3,8 +3,8 @@ from unittest.mock import MagicMock, patch
 
 from fastapi.testclient import TestClient
 
-from app.be_ai_api.dependencies import require_internal_request
-from app.main import app
+from infra.be_ai_api.dependencies import require_internal_request
+from main import app
 
 
 class VoiceTest(unittest.TestCase):
@@ -19,7 +19,7 @@ class VoiceTest(unittest.TestCase):
     def tearDownClass(cls) -> None:
         app.dependency_overrides.pop(require_internal_request, None)
 
-    @patch("app.external_service.llm.OpenAI")
+    @patch("infra.external_api.openai_client.OpenAI")
     def test_voice_transcription_returns_text(self, mock_openai: MagicMock) -> None:
         client = MagicMock()
         client.audio.transcriptions.create.return_value = MagicMock(text="할머니 보고 싶어요")
@@ -36,7 +36,7 @@ class VoiceTest(unittest.TestCase):
         self.assertEqual(body["text"], "할머니 보고 싶어요")
         self.assertEqual(body["provider"], "openai")
 
-    @patch("app.external_service.tts.elevenlabs_tts.httpx.post")
+    @patch("infra.external_api.tts.elevenlabs.httpx.post")
     def test_speech_returns_audio_bytes(self, mock_post: MagicMock) -> None:
         mock_post.return_value = MagicMock(status_code=200, content=b"ID3fakemp3")
 
@@ -49,8 +49,8 @@ class VoiceTest(unittest.TestCase):
         self.assertEqual(response.headers["content-type"], "audio/mpeg")
         self.assertEqual(response.content, b"ID3fakemp3")
 
-    @patch("app.external_service.tts.elevenlabs_tts.httpx.post")
-    @patch("app.tool.s4_voice.a_voice.download_audio")
+    @patch("infra.external_api.tts.elevenlabs.httpx.post")
+    @patch("pipeline.s4_voice.a_voice.download_audio")
     def test_voice_clone_returns_voice_id(
         self, mock_download: MagicMock, mock_post: MagicMock
     ) -> None:
@@ -75,7 +75,7 @@ class VoiceTest(unittest.TestCase):
 
     def test_speech_without_voice_id_returns_400(self) -> None:
         # 요청 voiceId 없고 ELEVENLABS_DEFAULT_VOICE_ID도 없으면 명시적 400.
-        with patch("app.tool.s4_voice.a_voice.create_tts_provider") as provider:
+        with patch("pipeline.s4_voice.a_voice.create_tts_provider") as provider:
             response = self.client.post("/v1/voice/speech", json={"text": "안녕"})
         provider.assert_not_called()
         self.assertEqual(response.status_code, 400)

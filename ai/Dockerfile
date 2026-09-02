@@ -17,7 +17,9 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/*
 
 COPY pyproject.toml README.md ./
-COPY app ./app
+COPY infra ./infra
+COPY pipeline ./pipeline
+COPY main.py ./
 
 # numpy<2 먼저 핀(torch 2.2가 numpy 1.x 기대) → CPU 전용 torch/torchaudio(기본 PyPI는
 # CUDA 빌드라 큼) → 앱+speaker extra
@@ -36,4 +38,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD python -c "import os,sys,urllib.request; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:'+os.getenv('PORT','8000')+'/health').status==200 else 1)"
 
 # PORT는 호스팅(Cloud Run/Render 등)이 주입할 수 있게 환경변수로 받는다
-CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers ${WEB_CONCURRENCY:-2}"]
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000} --workers ${WEB_CONCURRENCY:-2}"]
