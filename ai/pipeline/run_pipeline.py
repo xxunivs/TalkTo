@@ -1,17 +1,13 @@
-"""파이프라인 러너 — 한 대상자의 입력을 s1~s3까지 통째로 돌려 output/sN에 저장.
-
-실서비스에선 BE가 단계별로 우리 API를 호출하지만, 로컬 테스트/평가(그리고 s5 대화
-harness)는 결과 파일이 있어야 한다. 이 스크립트가 그 역할 — BE가 하는 단계 호출을
-로컬에서 파일로 한 번에 수행한다.
-
-흐름 (통화녹음마다): 전사(캐시) → 대상자 화자 판정 → 교정 → 인물·민감·말투·기억·요약.
-전 통화 기억을 누적 → reflection(통찰) → 페르소나 조립(b_persona.txt) → 임베딩.
-
-실행:
-    python -m pipeline.run_pipeline --subject 신금자
-읽기:  output/<subject>/s0_input/{persona_intake.json, 통화녹음/*.wav}
-쓰기:  output/<subject>/{s1_transcription, s2_extraction, s3_synthesis}/…
-"""
+# 로컬 실행 (입력 -> output/sN). 전체 또는 단계만 골라 돌린다.
+# 같은 단계 순서가 infra/be_ai_api/recording_analysis.py 에도 있다. 순서를 바꾸면 둘 다 확인할 것.
+#
+#     python -m pipeline.run_pipeline --subject 신금자                # 전체
+#     python -m pipeline.run_pipeline --subject 신금자 --only s2      # s2 전체
+#     python -m pipeline.run_pipeline --subject 신금자 --only s2_d    # 기억 추출만
+#     python -m pipeline.run_pipeline --subject 신금자 --from s2 --to s3
+#
+# 각 단계는 앞 단계 결과를 output/<subject>/ 에서 읽는다. 전사는 캐시가 있어
+# 다시 돌려도 유료 API 를 부르지 않는다.
 
 import argparse
 import hashlib
@@ -41,10 +37,36 @@ logger = logging.getLogger(__name__)
 
 AUDIO_EXTS = ("*.wav", "*.m4a", "*.mp3", "*.webm", "*.ogg", "*.flac")
 
+STEP_ORDER = [
+    "s1_a", "s1_b", "s1_c",
+    "s2_a", "s2_b", "s2_c", "s2_d", "s2_e",
+    "s3_a", "s3_b", "s3_c",
+]
+STEP_LABEL = {
+    "s1_a": "전사", "s1_b": "화자 판별", "s1_c": "교정",
+    "s2_a": "인물", "s2_b": "민감도", "s2_c": "말투", "s2_d": "기억", "s2_e": "요약과 태그",
+    "s3_a": "통찰", "s3_b": "프롬프트 조립", "s3_c": "임베딩",
+}
+
+
+class NeedPriorStep(Exception):
+    """앞 단계 결과 파일이 없어 진행할 수 없을 때."""
+
+    def __init__(self, missing_file: Path, needed_by: str) -> None:
+        super().__init__(str(missing_file))
+        self.missing_file = missing_file
+        self.needed_by = needed_by
+
 
 def _write_json(path: Path, data) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _read_json(path: Path, needed_by: str):
+    if not path.exists():
+        raise NeedPriorStep(path, needed_by)
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 def _majority_label(segments: list[TranscriptSegment]) -> str | None:
@@ -54,8 +76,129 @@ def _majority_label(segments: list[TranscriptSegment]) -> str | None:
     return max(counts, key=counts.get) if counts else None
 
 
+def _mem_field(memory: dict, *keys, default=None):
+    for key in keys:
+        if key in memory and memory[key] not in (None, ""):
+            return memory[key]
+    return default
+
+
+def expand_steps(token: str) -> list[str]:
+    """s2 -> s2_a..s2_e, s2_d -> [s2_d]. 모르는 값이면 빈 목록."""
+    if token in STEP_ORDER:
+        return [token]
+    return [s for s in STEP_ORDER if s.startswith(token + "_")]
+
+
+def select_steps(only: str | None, start: str | None, end: str | None) -> list[str]:
+    known = "s1, s2, s3, " + ", ".join(STEP_ORDER)
+    if only:
+        chosen = expand_steps(only)
+        if not chosen:
+            raise SystemExit(f"모르는 단계: {only}  (가능: {known})")
+        return chosen
+    steps = list(STEP_ORDER)
+    if start:
+        first = expand_steps(start)
+        if not first:
+            raise SystemExit(f"모르는 단계: {start}  (가능: {known})")
+        steps = [s for s in steps if STEP_ORDER.index(s) >= STEP_ORDER.index(first[0])]
+    if end:
+        last = expand_steps(end)
+        if not last:
+            raise SystemExit(f"모르는 단계: {end}  (가능: {known})")
+        steps = [s for s in steps if STEP_ORDER.index(s) <= STEP_ORDER.index(last[-1])]
+    return steps
+
+
+class Ctx:
+    """단계들이 함께 쓰는 상태. 메모리에 없으면 output 파일에서 읽어온다."""
+
+    def __init__(self, subject_dir: Path, settings: Settings, limit: int | None) -> None:
+        self.dir = subject_dir
+        self.settings = settings
+        self.limit = limit
+        self._segments: dict[str, list[TranscriptSegment]] | None = None
+        self._labels: dict[str, str | None] | None = None
+        self._persons: dict[str, dict] | None = None
+        self._sensitivity: dict[str, dict] | None = None
+        self._memories: list[dict] | None = None
+        self._insights: list[str] | None = None
+
+        payload = _read_json(subject_dir / "s0_input" / "persona_intake.json", "s0_input")
+        self.subject_context = SubjectContext(**payload["subjectContext"])
+        raw = payload.get("intakeContext")
+        self.intake_context = IntakeContext(**raw) if raw else None
+        self.glossary = build_glossary(self.subject_context, self.intake_context)
+
+    def clips(self) -> list[Path]:
+        audio_dir = self.dir / "s0_input" / "통화녹음"
+        found: list[Path] = []
+        for pattern in AUDIO_EXTS:
+            found.extend(audio_dir.glob(pattern))
+        found = sorted(found)
+        return found[: self.limit] if self.limit else found
+
+    def segments(self, needed_by: str) -> dict[str, list[TranscriptSegment]]:
+        if self._segments is None:
+            raw = _read_json(self.dir / "s1_transcription" / "a_transcript.json", needed_by)
+            self._segments = {
+                name: [TranscriptSegment(**s) for s in rows] for name, rows in raw.items()
+            }
+        return self._segments
+
+    def labels(self, needed_by: str) -> dict[str, str | None]:
+        if self._labels is None:
+            self._labels = _read_json(self.dir / "s1_transcription" / "b_speaker_id.json", needed_by)
+        return self._labels
+
+    def persons(self, needed_by: str) -> dict[str, dict]:
+        if self._persons is None:
+            self._persons = _read_json(self.dir / "s2_extraction" / "a_persons.json", needed_by)
+        return self._persons
+
+    def sensitivity(self, needed_by: str) -> dict[str, dict]:
+        if self._sensitivity is None:
+            self._sensitivity = _read_json(self.dir / "s2_extraction" / "b_sensitivity.json", needed_by)
+        return self._sensitivity
+
+    def memories(self, needed_by: str) -> list[dict]:
+        if self._memories is None:
+            self._memories = _read_json(self.dir / "s2_extraction" / "d_memory_segments.json", needed_by)
+        return self._memories
+
+    def insights(self, needed_by: str) -> list[str]:
+        if self._insights is None:
+            self._insights = _read_json(self.dir / "s3_synthesis" / "a_reflection.json", needed_by)
+        return self._insights
+
+    def speech_examples(self, needed_by: str) -> list[str]:
+        """대상자가 말한 짧고 담백한 발화 (말투 few-shot)."""
+        segments = self.segments(needed_by)
+        labels = self.labels(needed_by)
+        out: list[str] = []
+        for name, segs in segments.items():
+            label = labels.get(name)
+            for seg in segs:
+                text = (seg.corrected_text or seg.transcript_text).strip()
+                if seg.speaker_label == label and 6 <= len(text) <= 40:
+                    out.append(text)
+        return out
+
+    def save_segments(self) -> None:
+        _write_json(
+            self.dir / "s1_transcription" / "a_transcript.json",
+            {
+                name: [s.model_dump(by_alias=True) for s in segs]
+                for name, segs in (self._segments or {}).items()
+            },
+        )
+
+
+# ────────────────────────── s1 전사 ──────────────────────────
+
 def _transcribe_cached(provider, audio: Path, cache_dir: Path) -> list[TranscriptSegment]:
-    """전사는 비싸니 파일명 기준 캐시. 재실행 때 재전사 안 함."""
+    """전사는 유료라 파일명 기준 캐시. 재실행 때 재전사 안 함."""
     key = hashlib.sha1(audio.name.encode()).hexdigest()[:16]
     cache = cache_dir / f"{key}.json"
     if cache.exists():
@@ -69,159 +212,226 @@ def _transcribe_cached(provider, audio: Path, cache_dir: Path) -> list[Transcrip
     return segs
 
 
-def _mem_field(memory: dict, *keys, default=None):
-    for key in keys:
-        if key in memory and memory[key] not in (None, ""):
-            return memory[key]
-    return default
-
-
-def run(subject_dir: Path, *, settings: Settings, limit: int | None) -> int:
-    s0 = subject_dir / "s0_input"
-    intake_path = s0 / "persona_intake.json"
-    if not intake_path.exists():
-        print(f"입력이 없다: {intake_path}", file=sys.stderr)
-        return 1
-    payload = json.loads(intake_path.read_text(encoding="utf-8"))
-    subject_context = SubjectContext(**payload["subjectContext"])
-    intake_raw = payload.get("intakeContext")
-    intake_context = IntakeContext(**intake_raw) if intake_raw else None
-
-    audio_dir = s0 / "통화녹음"
-    clips: list[Path] = []
-    for pattern in AUDIO_EXTS:
-        clips.extend(audio_dir.glob(pattern))
-    clips = sorted(clips)
-    if limit:
-        clips = clips[:limit]
+def step_s1_a(ctx: Ctx) -> str:
+    # 주의: a_transcript.json 을 원문으로 덮어쓴다. s1_c 가 채운 교정문이 지워지니
+    # 이 단계를 다시 돌렸으면 s1_c 도 함께 돌릴 것.
+    clips = ctx.clips()
     if not clips:
-        print(f"통화녹음이 없다: {audio_dir}", file=sys.stderr)
-        return 1
+        raise NeedPriorStep(ctx.dir / "s0_input" / "통화녹음", "s1_a")
+    provider = create_stt_provider(ctx.settings)
+    cache_dir = ctx.dir / "s1_transcription" / ".transcription_cache"
+    ctx._segments = {clip.name: _transcribe_cached(provider, clip, cache_dir) for clip in clips}
+    ctx.save_segments()
+    total = sum(len(v) for v in ctx._segments.values())
+    return f"통화 {len(clips)}건, 세그먼트 {total}개"
 
-    provider = create_stt_provider(settings)
-    glossary = build_glossary(subject_context, intake_context)
-    cache_dir = subject_dir / "s1_transcription" / ".transcription_cache"
 
-    print(f"[{subject_dir.name}] 통화 {len(clips)}건 처리 시작 (용어집 {len(glossary)}개)\n")
-
-    transcripts: dict[str, list[dict]] = {}
+def step_s1_b(ctx: Ctx) -> str:
+    segments = ctx.segments("s1_b")
     labels: dict[str, str | None] = {}
-    persons_by_rec: dict[str, dict] = {}
-    sensitivity_by_rec: dict[str, dict] = {}
-    style_by_rec: dict[str, dict] = {}
-    summary_by_rec: dict[str, dict] = {}
-    all_memories: list[dict] = []
-    speech_examples: list[str] = []
-
-    for i, clip in enumerate(clips, 1):
-        segs = _transcribe_cached(provider, clip, cache_dir)
-        # 대상자 화자: 내용 기반 판정(호칭 방향) → 실패 시 발화량 최다 폴백
-        label = identify_subject_by_content(segs, subject_context, settings=settings) \
+    for name, segs in segments.items():
+        labels[name] = (
+            identify_subject_by_content(segs, ctx.subject_context, settings=ctx.settings)
             or _majority_label(segs)
-        # 교정 (용어집 기준, 세그먼트에 corrected_text 채움)
-        if glossary:
-            segs = correct_segments(segs, glossary=glossary, settings=settings)
+        )
+    ctx._labels = labels
+    _write_json(ctx.dir / "s1_transcription" / "b_speaker_id.json", labels)
+    found = sum(1 for v in labels.values() if v)
+    return f"{found}/{len(labels)}건 대상자 화자 확정"
 
-        persons = run_persons_analysis(
-            segs, subject_context=subject_context, subject_speaker_label=label, settings=settings)
-        sens = run_sensitivity_analysis(segs, settings=settings)
-        style = run_linguistic_style_analysis(
-            segs, subject_context=subject_context, subject_speaker_label=label, settings=settings)
-        summary = summarize_recording(segs, settings=settings)
-        mem = extract_memory_segments(
-            segs, subject_context=subject_context, subject_speaker_label=label,
-            persons_result=persons, sensitivity_result=sens, settings=settings)
 
-        got = mem["memorySegments"]
-        all_memories.extend(got)
-        for seg in segs:
-            text = (seg.corrected_text or seg.transcript_text).strip()
-            if seg.speaker_label == label and 6 <= len(text) <= 40:
-                speech_examples.append(text)
+def step_s1_c(ctx: Ctx) -> str:
+    if not ctx.glossary:
+        return "용어집이 비어 건너뜀"
+    segments = ctx.segments("s1_c")
+    fixed = 0
+    for segs in segments.values():
+        correct_segments(segs, glossary=ctx.glossary, settings=ctx.settings)
+        fixed += sum(1 for s in segs if s.corrected_text)
+    ctx.save_segments()
+    return f"용어집 {len(ctx.glossary)}개 기준, 교정 {fixed}건"
 
-        transcripts[clip.name] = [s.model_dump(by_alias=True) for s in segs]
-        labels[clip.name] = label
-        persons_by_rec[clip.name] = persons
-        sensitivity_by_rec[clip.name] = sens
-        style_by_rec[clip.name] = style["linguisticStyle"]
-        summary_by_rec[clip.name] = {"summary": summary, "tags": aggregate_tags(mem)}
-        print(f"  [{i}/{len(clips)}] {clip.name}: 세그 {len(segs)} → 기억 {len(got)}건 (대상자화자 {label})")
 
-    # 기억에 안정적 id 부여 (임베딩·reflection·s5 검색이 이걸로 연결)
-    for idx, memory in enumerate(all_memories):
-        memory["id"] = str(idx)
-    print(f"\n누적 기억 {len(all_memories)}건 · 말투 예시 {len(speech_examples)}개")
+# ────────────────────────── s2 추출 ──────────────────────────
 
-    # ── s1 저장 ──
-    _write_json(subject_dir / "s1_transcription" / "a_transcript.json", transcripts)
-    _write_json(subject_dir / "s1_transcription" / "b_speaker_id.json", labels)
-    # ── s2 저장 ──
-    _write_json(subject_dir / "s2_extraction" / "a_persons.json", persons_by_rec)
-    _write_json(subject_dir / "s2_extraction" / "b_sensitivity.json", sensitivity_by_rec)
-    _write_json(subject_dir / "s2_extraction" / "c_linguistic_style.json", style_by_rec)
-    _write_json(subject_dir / "s2_extraction" / "e_summary.json", summary_by_rec)
+def step_s2_a(ctx: Ctx) -> str:
+    segments, labels = ctx.segments("s2_a"), ctx.labels("s2_a")
+    out = {
+        name: run_persons_analysis(
+            segs, subject_context=ctx.subject_context,
+            subject_speaker_label=labels.get(name), settings=ctx.settings)
+        for name, segs in segments.items()
+    }
+    ctx._persons = out
+    _write_json(ctx.dir / "s2_extraction" / "a_persons.json", out)
+    return f"{len(out)}건 분석"
+
+
+def step_s2_b(ctx: Ctx) -> str:
+    segments = ctx.segments("s2_b")
+    out = {name: run_sensitivity_analysis(segs, settings=ctx.settings) for name, segs in segments.items()}
+    ctx._sensitivity = out
+    _write_json(ctx.dir / "s2_extraction" / "b_sensitivity.json", out)
+    return f"{len(out)}건 분석"
+
+
+def step_s2_c(ctx: Ctx) -> str:
+    segments, labels = ctx.segments("s2_c"), ctx.labels("s2_c")
+    out = {
+        name: run_linguistic_style_analysis(
+            segs, subject_context=ctx.subject_context,
+            subject_speaker_label=labels.get(name), settings=ctx.settings)["linguisticStyle"]
+        for name, segs in segments.items()
+    }
+    _write_json(ctx.dir / "s2_extraction" / "c_linguistic_style.json", out)
+    return f"{len(out)}건 분석"
+
+
+def step_s2_d(ctx: Ctx) -> str:
+    segments = ctx.segments("s2_d")
+    labels = ctx.labels("s2_d")
+    persons = ctx.persons("s2_d")
+    sensitivity = ctx.sensitivity("s2_d")
+
+    collected: list[dict] = []
+    for name, segs in segments.items():
+        result = extract_memory_segments(
+            segs, subject_context=ctx.subject_context, subject_speaker_label=labels.get(name),
+            persons_result=persons.get(name, {}), sensitivity_result=sensitivity.get(name, {}),
+            settings=ctx.settings)
+        for memory in result["memorySegments"]:
+            memory["recording"] = name  # 어느 통화에서 나왔는지 (s2_e 가 녹음별 태그를 낼 때 쓴다)
+            collected.append(memory)
+
     memory_out = [
         {
-            "id": m["id"],
+            "id": str(idx),
+            "recording": m.get("recording"),
             "memoryText": _mem_field(m, "memoryText", "memory_text"),
             "tags": m.get("tags", []),
             "importanceScore": _mem_field(m, "importanceScore", "importance"),
             "relatedPeople": m.get("relatedPeople", []),
             "confidence": m.get("confidence"),
         }
-        for m in all_memories
+        for idx, m in enumerate(collected)
     ]
-    _write_json(subject_dir / "s2_extraction" / "d_memory_segments.json", memory_out)
+    ctx._memories = memory_out
+    _write_json(ctx.dir / "s2_extraction" / "d_memory_segments.json", memory_out)
+    return f"기억 {len(memory_out)}건"
 
-    # ── s3: reflection → 통찰 ──
+
+def step_s2_e(ctx: Ctx) -> str:
+    segments = ctx.segments("s2_e")
+    memories = ctx.memories("s2_e")
+    # 기억이 어느 통화에서 나왔는지는 s2_d 가 recording 필드로 남긴다. 그 필드가 없는
+    # 옛 결과라면 녹음별로 나눌 수 없어 전체 기억으로 태그를 낸다(근사).
+    tagged_by_recording = any(m.get("recording") for m in memories)
+    note = "" if tagged_by_recording else " (기억에 통화 구분이 없어 전체 기준으로 태그. s2_d 를 다시 돌리면 통화별로 나뉜다)"
+
+    out: dict[str, dict] = {}
+    for name, segs in segments.items():
+        mine = [m for m in memories if m.get("recording") == name] if tagged_by_recording else memories
+        out[name] = {
+            "summary": summarize_recording(segs, settings=ctx.settings),
+            "tags": aggregate_tags({"memorySegments": mine}),
+        }
+    _write_json(ctx.dir / "s2_extraction" / "e_summary.json", out)
+    return f"{len(out)}건 요약{note}"
+
+
+# ────────────────────────── s3 종합 ──────────────────────────
+
+def step_s3_a(ctx: Ctx) -> str:
+    memories = ctx.memories("s3_a")
     insights: list[str] = []
-    if memory_out:
-        refl = run_reflection(
+    if memories:
+        result = run_reflection(
             ReflectionRequest(
-                subject_context=subject_context,
+                subject_context=ctx.subject_context,
                 memories=[
                     ReflectionMemoryInput(
                         id=m["id"], memory_text=m["memoryText"], tags=m["tags"],
                         importance_score=m["importanceScore"])
-                    for m in memory_out
+                    for m in memories
                 ],
             ),
-            settings=settings,
+            settings=ctx.settings,
         )
-        insights = [r.insight for r in refl.reflections]
-    _write_json(subject_dir / "s3_synthesis" / "a_reflection.json", insights)
-    print(f"통찰 {len(insights)}건")
+        insights = [r.insight for r in result.reflections]
+    ctx._insights = insights
+    _write_json(ctx.dir / "s3_synthesis" / "a_reflection.json", insights)
+    return f"통찰 {len(insights)}건"
 
-    # ── s3: 페르소나 조립 ──
+
+def step_s3_b(ctx: Ctx) -> str:
+    examples = ctx.speech_examples("s3_b")
+    insights = ctx.insights("s3_b")
     assembled = assemble_persona_instructions(
         PersonaAssemblyRequest(
-            subject_context=subject_context, intake_context=intake_context,
-            speech_examples=speech_examples[:40], persona_insights=insights))
-    (subject_dir / "s3_synthesis").mkdir(parents=True, exist_ok=True)
-    (subject_dir / "s3_synthesis" / "b_persona.txt").write_text(
-        assembled.instructions, encoding="utf-8")
+            subject_context=ctx.subject_context, intake_context=ctx.intake_context,
+            speech_examples=examples[:40], persona_insights=insights))
+    path = ctx.dir / "s3_synthesis" / "b_persona.txt"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(assembled.instructions, encoding="utf-8")
+    return f"{len(assembled.instructions)}자 (말투 예시 {len(examples)}개, 통찰 {len(insights)}건)"
 
-    # ── s3: 임베딩 (기억 텍스트 → 벡터, id 매칭) ──
-    embeddings = []
-    if memory_out:
-        vectors = embed_texts([m["memoryText"] for m in memory_out], settings=settings)
-        embeddings = [
-            {"id": m["id"], "embedding": vec} for m, vec in zip(memory_out, vectors)
-        ]
-    _write_json(subject_dir / "s3_synthesis" / "c_embeddings.json", {"embeddings": embeddings})
 
-    print(f"\n저장 완료: {subject_dir}/  (b_persona.txt, 기억 {len(memory_out)}건, 임베딩 {len(embeddings)}건)")
+def step_s3_c(ctx: Ctx) -> str:
+    memories = ctx.memories("s3_c")
+    rows = []
+    if memories:
+        vectors = embed_texts([m["memoryText"] for m in memories], settings=ctx.settings)
+        rows = [{"id": m["id"], "embedding": vec} for m, vec in zip(memories, vectors)]
+    _write_json(ctx.dir / "s3_synthesis" / "c_embeddings.json", {"embeddings": rows})
+    return f"임베딩 {len(rows)}건"
+
+
+STEP_FUNC = {
+    "s1_a": step_s1_a, "s1_b": step_s1_b, "s1_c": step_s1_c,
+    "s2_a": step_s2_a, "s2_b": step_s2_b, "s2_c": step_s2_c,
+    "s2_d": step_s2_d, "s2_e": step_s2_e,
+    "s3_a": step_s3_a, "s3_b": step_s3_b, "s3_c": step_s3_c,
+}
+
+
+def run(subject_dir: Path, *, settings: Settings, limit: int | None, steps: list[str]) -> int:
+    try:
+        ctx = Ctx(subject_dir, settings, limit)
+    except NeedPriorStep as missing:
+        print(f"입력이 없다: {missing.missing_file}", file=sys.stderr)
+        return 1
+
+    print(f"[{subject_dir.name}] {len(steps)}개 단계 실행: {', '.join(steps)}\n")
+    for step in steps:
+        try:
+            detail = STEP_FUNC[step](ctx)
+        except NeedPriorStep as missing:
+            print(
+                f"\n{step}({STEP_LABEL[step]})를 돌리려면 앞 단계 결과가 필요하다.\n"
+                f"  없는 파일: {missing.missing_file}\n"
+                f"  먼저 돌릴 것: python -m pipeline.run_pipeline --subject {subject_dir.name} --to {step}",
+                file=sys.stderr,
+            )
+            return 1
+        print(f"  {step} {STEP_LABEL[step]}: {detail}")
+
+    print(f"\n저장 완료: {subject_dir}/")
     print(f"대화: python -m pipeline.s5_chat.a_chat --subject {subject_dir.name}")
     return 0
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="파이프라인 러너 (입력 → output/sN)")
+    parser = argparse.ArgumentParser(description="파이프라인 로컬 실행 (입력 -> output/sN)")
     parser.add_argument("--subject", required=True, help="대상자 폴더명 (예: 신금자)")
     parser.add_argument("--root", default="output", help="output 루트 (기본 output)")
     parser.add_argument("--limit", type=int, default=None, help="통화녹음 최대 개수(빠른 테스트용)")
+    parser.add_argument("--only", help="이 단계만 (s2 또는 s2_d)")
+    parser.add_argument("--from", dest="start", help="이 단계부터")
+    parser.add_argument("--to", dest="end", help="이 단계까지")
     args = parser.parse_args()
     logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(message)s")
+
+    steps = select_steps(args.only, args.start, args.end)
 
     settings = load_settings()
     if settings.openai_api_key is None or settings.elevenlabs_api_key is None:
@@ -231,7 +441,7 @@ def main() -> None:
     if not subject_dir.exists():
         print(f"대상자 폴더가 없다: {subject_dir}", file=sys.stderr)
         sys.exit(1)
-    sys.exit(run(subject_dir, settings=settings, limit=args.limit))
+    sys.exit(run(subject_dir, settings=settings, limit=args.limit, steps=steps))
 
 
 if __name__ == "__main__":
