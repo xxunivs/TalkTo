@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 
 from app.be_ai_api.dependencies import SettingsDependency, require_internal_request
-from app.tool.orchestrate import run_recording_analysis
+from app.be_ai_api.recording_analysis import run_recording_analysis
 from app.tool.s1_transcription.a_transcript import transcribe_recording
 from app.data_schema.recording import RecordingAnalysisRequest, RecordingAnalysisResponse
 from app.data_schema.transcript import TranscriptionRequest, TranscriptionResponse
