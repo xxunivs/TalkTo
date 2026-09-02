@@ -8,6 +8,9 @@
 #
 # 각 단계는 앞 단계 결과를 output/<subject>/ 에서 읽는다. 전사는 a_transcript.json 에
 # 이미 있는 녹음을 건너뛰어, 다시 돌려도 유료 API 를 부르지 않는다.
+#
+# s0_input 에는 파이프라인이 읽는 persona_intake.json 과 통화녹음/ 만 넣는다.
+# 사람이 보는 자료(원본 인터뷰, 손으로 쓴 분석 등)는 output/<subject>/reference/ 로.
 
 import argparse
 import json
