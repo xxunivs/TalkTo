@@ -1,0 +1,228 @@
+# 시험지(문항·선지·가이드)에 작성본의 답을 얹어 정답지 md 를 만든다.
+import re, sys, pathlib
+
+SRC=r'(?:본인|직접|전언|추정)'
+def strip_tags(s):
+    s = re.sub(r'`\[([^\]]*)\]`', r'[\1]', s)
+    s = re.sub(r'\[상태: *([^\]]*)\]', r'[\1]', s)
+    def keep(m):
+        v = m.group(1).strip()
+        if re.match(r'^(모름|확인 필요)', v): return '['+v+']'
+        if re.fullmatch(rf'{SRC}(?: *\+ *{SRC})*', v): return ''
+        if re.match(r'^(답함|건너뜀|미수집)', v): return ''
+        return m.group(0)
+    s = re.sub(r'\[([^\]]*)\]', keep, s).replace('`','')
+    return re.sub(r'\s*[—–]\s*$','',re.sub(r'  +',' ',s)).rstrip()
+
+def norm(s):
+    s = re.split(r'→|:', s)[0]
+    s = s.replace('**','').replace('`','').strip()
+    s = re.sub(r'^[■□]\s*', '', s)
+    s = re.sub(r'^[①-⑩]\s*', '', s)
+    s = re.sub(r'\(.*?\)|\s|·|,|\.', '', s)
+    return s
+
+# ── 시험지 파싱 ────────────────────────────────
+QID = re.compile(r'^\*\*([A-Za-z0-9\-]+) · (.*?)\*\*')
+def parse_sheet(p):
+    blocks, cur = [], {'id': None, 'lines': []}
+    src = pathlib.Path(p).read_text(encoding='utf-8').splitlines()
+    src = src[next((i for i,l in enumerate(src) if l.startswith('# PART')), 0):]
+    for l in src:
+        m = QID.match(l)
+        if m or l.startswith('#'):
+            blocks.append(cur); cur = {'id': m.group(1) if m else None, 'lines': [l]}
+        else:
+            cur['lines'].append(l)
+    blocks.append(cur)
+    return [b for b in blocks if b['lines']]
+
+# ── 작성본 파싱 ────────────────────────────────
+def parse_answers(p):
+    txt = pathlib.Path(p).read_text(encoding='utf-8')
+    ans, cards = {}, []
+    cur = None
+    for l in txt.splitlines():
+        m = re.match(r'^\*\*([A-Za-z0-9\-]+)\*\*\s*(.*)$', l)
+        if m:
+            cur = m.group(1); rest = m.group(2)
+            ans.setdefault(cur, [])
+            if ':' in rest: ans[cur].append(rest.split(':',1)[1].strip())
+            continue
+        m = re.match(r'^\*\*카드 \d+ — (.+?)\*\*\s*(.*)$', l)
+        if m:
+            cards.append({'name': m.group(1), 'f': {}}); cur = None; continue
+        m = re.match(r'^-\s*(M\d-[0-9a-bOE·]+)[^:]*:\s*(.*)$', l)
+        if m and cards:
+            for part in re.split(r'\s+/\s+(?=M\d-)', m.group(1) + ': ' + m.group(2)):
+                mm = re.match(r'^(M\d-[0-9a-bOE·]+)[^:]*:\s*(.*)$', part.strip())
+                if mm: cards[-1]['f'][mm.group(1)] = mm.group(2).strip()
+            continue
+        m = re.match(r'^\|\s*(M\d-\d+|T\d-\d+)\s*\|(.+)$', l)
+        if m:
+            ans.setdefault(m.group(1), []).append('|' + m.group(2)); continue
+        if cur: ans[cur].append(l)
+    return ans, cards
+
+def m8_split(lines):
+    for l in lines:
+        if not l.strip().startswith('|'): continue
+        cols=[c.strip() for c in l.strip().strip('|').split('|')]
+        sel=[c for c in cols if c.startswith('■')]
+        i=next((k for k,c in enumerate(cols) if c.startswith('■')), 0)
+        say=[c for k,c in enumerate(cols) if k>i and c.startswith('"')]
+        return sel, (say[0] if say else None)
+    return [], None
+
+def sel_texts(lines):
+    out = []
+    for l in lines:
+        for seg in re.split(r'(?=[■□])', l):
+            if seg.startswith('■'):
+                seg = re.split(r'\s+[—–]\s+|\s+·\s+|\s+\[', seg)[0]
+                out.append(norm(seg))
+    return [x for x in out if x]
+
+NOTE=re.compile(r'^(메모|주 작성자|경위는)|기준으로 고정|자동 생성|승계|합류|미기재 방침|의도된 공백')
+def free_text(lines):
+    for l in lines:
+        m = re.search(r'→\s*시기:\s*(.+)$', l)
+        if m: return m.group(1).strip()
+    for l in lines:
+        m = re.match(r'^\s*답:\s*(.+)$', l)
+        if m: return m.group(1).strip()
+    for l in lines:
+        s = re.sub(r'^[—–]\s*', '', l.strip())
+        if s and not s.startswith(('|', '>', '■', '□', '**')) and '■' not in s and '□' not in s \
+           and not NOTE.search(s):
+            return s
+    return None
+
+def cells(l): return [c.strip() for c in l.strip().strip('|').split('|')]
+ALIAS={'언제쓰는말':'상황','언제':'상황','무엇을하던곳':'무엇을하던곳','어떻게얼마나':'어떻게얼마나',
+       '얽힌기억':'얽힌기억','그분과의관계':'관계','받는사람':'받는사람','언제들려줄지':'언제'}
+def key(s):
+    s=re.sub(r'[\s·()]|하시던|하는|인가요|입니까|적어주세요','',s)
+    return ALIAS.get(s,s)
+
+def fit_rows(arows, thead):
+    """답 표를 시험지 표의 열 순서에 맞춘다."""
+    if not arows: return []
+    tcols=[key(c) for c in cells(thead)]
+    ahead=None
+    for r in arows:
+        c=cells(r)
+        if sum(1 for x in c if key(x) in tcols) >= max(2, len(tcols)//2): ahead=c; break
+    if ahead is None:
+        return [r for r in arows]
+    idx=[]
+    for tc in tcols:
+        j=next((k for k,x in enumerate(ahead) if key(x)==tc), None)
+        if j is None:
+            j=next((k for k,x in enumerate(ahead)
+                    if key(x) and (key(x) in tc or tc in key(x))), None)
+        idx.append(j)
+    out=[]
+    for r in arows:
+        c=cells(r)
+        if c==ahead: continue
+        out.append('| ' + ' | '.join((c[j] if (j is not None and j<len(c)) else '') for j in idx) + ' |')
+    return out
+
+def rows_of(lines):
+    rows = [l for l in lines if l.strip().startswith('|')
+            and not re.match(r'^\|[\s:\|]*-[\s:\-\|]*\|$', l.strip())]
+    return rows
+
+# ── 병합 ──────────────────────────────────────
+def merge(sheet, ansfile, out, title):
+    blocks = parse_sheet(sheet)
+    ans, cards = parse_answers(ansfile)
+    res, used = [], set()
+
+    def render(b, a, card_name=None):
+        lines = b['lines'][:]
+        if card_name:
+            lines = [lines[0]] + lines[1:]
+        a = [strip_tags(x) for x in a] if a else a
+        if a and b['id'] and b['id'].startswith(('M8-','T1-02b')):
+            s8, say = m8_split(a)
+            sel = [norm(x) for x in s8]; val = say; arows = []
+        else:
+            sel = sel_texts(a) if a else []
+            val = free_text(a) if a else None
+        arows = arows if (a and b['id'] and b['id'].startswith('M8-')) else (rows_of(a) if a else [])
+        arows = [r for r in arows if not re.match(r'^\|\s*(표현|음식|장소|것|규칙|지역|이름|인물|주제|받는|항목)\s*\|', r)]
+        outl, in_tbl, tbl_done, marked = [], False, False, False
+        for l in lines:
+            s = l.rstrip()
+            if s.startswith('|'):
+                if not in_tbl: in_tbl = True; outl.append(s); continue   # 머리행
+                if re.match(r'^\|[\s:\|]*-[\s:\-\|]*\|$', s.strip()): outl.append(s); continue
+                if arows and not tbl_done:
+                    outl.extend(fit_rows(arows, outl[-2] if len(outl)>=2 else s)); tbl_done = True
+                continue
+            in_tbl = False
+            if '□' in s and sel:
+                parts = re.split(r'(?=[■□])', s)
+                keys = [norm(x) if x.startswith('□') else None for x in parts]
+                hit = set()
+                for av in sel:
+                    exact = [i for i,k in enumerate(keys) if k and k == av]
+                    pre   = [i for i,k in enumerate(keys) if k and (k.startswith(av) or av.startswith(k))]
+                    if exact: hit.add(exact[0])
+                    elif len(pre) == 1: hit.add(pre[0])      # 한 곳에만 걸릴 때만 인정
+                new = ['■' + x[1:] if i in hit else x for i,x in enumerate(parts)]
+                marked = marked or bool(hit)
+                line=''.join(new)
+                marked=[x for x in new if x.startswith('■')]
+                if '____' in line and val and marked and '____' in marked[-1]:
+                    line=re.sub(r'_{3,}', val.strip().strip('"'), line); val=None
+                outl.append(line); continue
+            if '____' in s and val:
+                v = val.strip().strip('"')
+                s = re.sub(r'_{3,}', v, s); outl.append(s); val=None; continue
+            m = re.match(r'^답:\s*_*\s*$', s)
+            if m:
+                outl.append('답: ' + (val or '')); continue
+            if s.strip() == '답:':
+                outl.append('답: ' + (val or '')); continue
+            outl.append(s)
+        if val and not marked and not any(('답: ' in x and x.strip()!='답:') or val[:12] in x for x in outl):
+            outl.append('답: ' + val)
+        return outl
+
+    for b in blocks:
+        if b['id'] == 'M2-00' and cards:
+            for c in cards:
+                res.append(f"**카드 — {c['name']}**")
+                for bb in blocks:
+                    if bb['id'] and bb['id'].startswith('M2-') and bb['id']!='M2-OE':
+                        v = c['f'].get(bb['id'])
+                        res.extend(render(bb, [v] if v else None))
+                        res.append('')
+            continue
+        if b['id'] and b['id'].startswith('M2-') and b['id']!='M2-OE' and cards: continue
+        a = ans.get(b['id'])
+        if a: used.add(b['id'])
+        res.extend(render(b, a))
+    txt = title + "\n\n" + "\n".join(res) + "\n"
+    # 정답지 뒷정리: 빈 표행·안 고른 선지의 빈칸 제거, 카드 이름으로 M2-00 채우기
+    txt = re.sub(r'^\|(?:\s*\|)+\s*\n', '', txt, flags=re.M)
+    txt = re.sub(r'[ \t]*→[ \t]*_{4,}[ \t]*(\([^)]*\))?', '', txt)
+    lines, name = [], None
+    for l in txt.splitlines():
+        mm = re.match(r'^\*\*카드 — (.+?)\*\*', l)
+        if mm: name = mm.group(1)
+        if name and '이름(또는 가족 내 호칭): ____________' in l:
+            nm = re.match(r'(.+?)\s*\((.+?)\)', name)
+            who, rel = (nm.group(1), nm.group(2)) if nm else (name, '')
+            l = f"이름(또는 가족 내 호칭): {who.strip()}  관계: 이 사람은 그분의 {rel.split(',')[0].strip()}"
+        lines.append(l)
+    txt = re.sub(r'\n{3,}', '\n\n', "\n".join(lines)) + "\n"
+    pathlib.Path(out).write_text(txt, encoding='utf-8')
+    print(f"{out}: 문항 {len([b for b in blocks if b['id']])} / 답 채움 {len(used)} / 카드 {len(cards)}")
+    miss = sorted(set(ans) - used)
+    if miss: print("   시험지에 없는 답:", ", ".join(miss[:14]))
+
+merge("Persona_Intake_시험지.md", sys.argv[1], sys.argv[2], sys.argv[3])

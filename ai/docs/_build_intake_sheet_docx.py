@@ -35,7 +35,9 @@ def para(doc,text="",size=10,bold=False,color=None,before=0,after=4,indent=0):
     return p
 
 def table(doc,rows):
-    t=doc.add_table(rows=0,cols=len(rows[0])); t.style="Table Grid"
+    n=len(rows[0])
+    rows=[r[:n]+['']*(n-len(r)) for r in rows]     # 열 수를 머리행에 맞춘다
+    t=doc.add_table(rows=0,cols=n); t.style="Table Grid"
     for i,row in enumerate(rows):
         cells=t.add_row().cells
         for j,v in enumerate(row):
@@ -52,7 +54,9 @@ for s in doc.sections:
     s.left_margin=s.right_margin=Cm(2.2); s.top_margin=s.bottom_margin=Cm(1.8)
 st=doc.styles["Normal"]; st.font.name=FONT; st.font.size=Pt(10)
 st._element.rPr.rFonts.set(qn('w:eastAsia'),FONT)
-para(doc,"Persona Intake 문항",size=20,bold=True,after=2)
+_raw=open(sys.argv[1],encoding="utf-8").read().splitlines()
+_title=next((l[2:].strip() for l in _raw if l.startswith('# ') and not l.startswith('# PART')),"Persona Intake")
+para(doc,_title,size=20,bold=True,after=2)
 para(doc,"설계 원칙·형식 규격은 Persona_Intake_설계규격.md",size=9,color=GRAY,after=14)
 
 lines=open(sys.argv[1],encoding="utf-8").read().splitlines()
@@ -94,7 +98,7 @@ for b in blocks:
         global buf
         if buf:
             rows=[[c.strip() for c in r.strip().strip('|').split('|')] for r in buf
-                  if not re.match(r'^\|[\s:\-\|]+\|$',r.strip())]
+                  if not re.match(r'^\|[\s:\|]*-[\s:\-\|]*\|$',r.strip())]
             if rows: table(doc,rows)
             buf=[]
     for s in body:

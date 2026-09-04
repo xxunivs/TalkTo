@@ -114,7 +114,7 @@ def run(src,dst,title,sub):
         nonlocal buf
         if buf:
             rows=[[c.strip() for c in r.strip().strip('|').split('|')] for r in buf
-                  if not re.match(r'^\|[\s:\-\|]+\|$',r.strip())]
+                  if not re.match(r'^\|[\s:\|]*-[\s:\-\|]*\|$',r.strip())]
             if rows: table(doc,rows)
             buf=[]
     def flush_card():
