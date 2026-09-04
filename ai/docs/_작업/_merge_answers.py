@@ -7,7 +7,8 @@ def strip_tags(s):
     s = re.sub(r'\[상태: *([^\]]*)\]', r'[\1]', s)
     def keep(m):
         v = m.group(1).strip()
-        if re.match(r'^(모름|확인 필요)', v): return '['+v+']'
+        if v.startswith('모름'): return '[모름]'      # 모름은 체크박스로 표시된다
+        if v.startswith('확인 필요'): return ''         # 추적은 작성본의 결손 목록에서 한다
         if re.fullmatch(rf'{SRC}(?: *\+ *{SRC})*', v): return ''
         if re.match(r'^(답함|건너뜀|미수집)', v): return ''
         return m.group(0)
@@ -235,16 +236,26 @@ def merge(sheet, ansfile, out, title):
             skipped = not (a and any(x.strip() for x in a))   # 그 밖의 조건부
         else: skipped = False
         if card_name: skipped = False
+        # "해당 없음"(이 사용자에게 뜨지 않는 문항)만 흐리게. "건너뜀"(답을 안 한 것)은 빈칸으로 둔다
+        if a and not skipped and all(not x.strip() or re.search(r'건너뜀|해당 ?없음', x) for x in a) \
+           and any(re.search(r'해당 ?없음', x) for x in a):
+            skipped = True
         a = [drop_xref(strip_tags(x)) for x in a] if a else a
         if a and b['id'] and b['id'].startswith(('M8-','T1-02b')):
             s8, say = m8_split(a)
-            sel = [norm(x) for x in s8]; val = say; arows = []; selval = {}
+            sel, selval = [], {}
+            for x in s8:
+                head = re.split(r'\s+\(', x)[0]
+                k = norm(head); sel.append(k)
+                mm = re.search(r'직접 입력\s*[:→]\s*(.+)$', head)
+                if mm: selval[k] = mm.group(1).strip()
+            val = say; arows = []
         else:
             selval = {}
             sel = sel_texts(a, selval) if a else []
             val = free_text(a) if a else None
         arows = arows if (a and b['id'] and b['id'].startswith('M8-')) else (rows_of(a) if a else [])
-        if val: val = re.sub(r'^[가-힣A-Za-z0-9 ]{1,14}\s*\([^)]{0,20}\)\s*:\s*', '', val.strip())
+        if val: val = re.sub(r'^[가-힣A-Za-z0-9 ]{1,14}\s*(?:\([^)]{0,20}\))?\s*:\s*', '', val.strip())
         if val and EMPTYV.match(val.strip()): val = None
         # "라벨: 값" 짝은 답 전체에서 모은다 (선지와 한 줄에 섞여 있어도)
         pairs = {}
@@ -253,7 +264,16 @@ def merge(sheet, ansfile, out, title):
             for k, v in re.findall(r'([가-힣]+)\s*:\s*([^·\n|]+?)(?=\s*·|\s*$)', x):
                 pairs.setdefault(k.strip(), v.strip())
         val, card = pull_card(val)
+        # "모름"은 값이 아니라 답 — 빈칸으로 두고 옆의 □ 모름 을 체크한다
+        unknown = bool(val) and bool(re.fullmatch(r'(\(없음\)\s*)?\[?모름\]?', val.strip()))
+        if unknown: val = None
         outl, in_tbl, tbl_done, marked, wrote = [], False, False, False, False
+        fmt = re.search(r'`([^`]+)`', lines[0]); fmt = fmt.group(1) if fmt else ''
+        nblank = sum(1 for l in lines if re.fullmatch(r'_{4,}', l.strip()))
+        rest = []
+        if val and nblank > 1 and '단답' in fmt and '최대' in fmt:
+            parts = [x.strip() for x in re.split(r'\s+/\s+', val)]
+            if 1 < len(parts) <= nblank: val, rest = parts[0], parts[1:]
         if skipped: outl.append('<!--dim-->')
         first = True
         for l in lines:
@@ -270,6 +290,8 @@ def merge(sheet, ansfile, out, title):
                     tbl_done = True
                 continue
             in_tbl = False
+            if unknown and '□ 모름' in s:
+                outl.append(s.replace('□ 모름','■ 모름')); unknown = False; continue
             if card and re.match(r'^(시기|감정|확실성|사용 범위):', s.strip()):
                 def fill(mm):
                     k=mm.group(1); v=card.get(k)
@@ -320,11 +342,12 @@ def merge(sheet, ansfile, out, title):
                     it = iter(parts)
                     s = re.sub(r'_{3,}', lambda m: '<u>'+next(it)+'</u>', s)
                 else:
+                    # 첫 칸에만 넣고, 나머지 빈칸은 시험지 그대로 둔다
                     s = re.sub(r'_{3,}', '<u>'+v+'</u>', s, count=1)
-                    s = re.sub(r'_{3,}', '', s)
                 outl.append(s); val=None; continue
             if re.match(r'^_{4,}$', s.strip()):
                 if val: outl.append('<u>'+val+'</u>'); val = None; wrote = True
+                elif rest: outl.append('<u>'+rest.pop(0)+'</u>')
                 elif not wrote: outl.append(s)
                 continue
             outl.append(s)
@@ -375,7 +398,7 @@ def merge(sheet, ansfile, out, title):
     txt = re.sub(r'\n{3,}', '\n\n', "\n".join(lines)) + "\n"
     pathlib.Path(out).write_text(txt, encoding='utf-8')
     print(f"{out}: 문항 {len([b for b in blocks if b['id']])} / 답 채움 {len(used)} / 카드 {len(cards)}")
-    miss = sorted(set(ans) - used)
+    miss = sorted(i for i in set(ans) - used if any(x.strip() for x in ans[i]))
     if miss: print("   시험지에 없는 답:", ", ".join(miss[:14]))
 
 merge("Persona_Intake_시험지.md", sys.argv[1], sys.argv[2], sys.argv[3])

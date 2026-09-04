@@ -47,6 +47,7 @@ def rule(p,color='1F4E79',sz='12'):
     e.set(qn('w:space'),'4'); e.set(qn('w:color'),color); b.append(e)
 
 DIM=[False]; CURFMT=[None]; FIRST_PART=[True]; ANSWERS=[False]
+STICKY=set()    # 제목·모듈 안내 — 혼자 페이지 끝에 남지 않게 다음 것과 붙인다
 BLOCK=[]        # 한 문항이 만든 문단·표 — 쪽이 갈리지 않게 묶는다
 
 def keep_block():
@@ -54,7 +55,7 @@ def keep_block():
     ps=[x for x in BLOCK if x.__class__.__name__=='Paragraph']
     for i,x in enumerate(ps):
         x.paragraph_format.keep_together = True
-        x.paragraph_format.keep_with_next = (i < len(ps)-1)
+        x.paragraph_format.keep_with_next = (i < len(ps)-1) or (id(x._p) in STICKY)
     for x in BLOCK:
         if x.__class__.__name__=='Table':
             for r in x.rows:
@@ -129,7 +130,7 @@ def table(doc,rows):
                     r=p.add_run(sub); r.font.size=Pt(7.5)
                     r.font.color.rgb = FADE if DIM[0] else GRAY
             else:
-                m=re.fullmatch(r'(<u>.*?</u>|_{3,})\s+(□|■) 모름', v.strip())
+                m=re.fullmatch(r'(<u>.*?</u>|_{3,})\s{2,}((?:[□■][^□■]*)+)', v.strip())
                 if m:
                     # 값은 줄 위에, 체크는 그 아래 — 단독 문항과 같은 모양
                     if m.group(1).startswith('_'): p.add_run(" ").font.size=Pt(9)
@@ -137,7 +138,7 @@ def table(doc,rows):
                     ruled(p); p.paragraph_format.left_indent=Cm(0.05)
                     q=cells[j].add_paragraph()
                     q.paragraph_format.space_before=Pt(2); q.paragraph_format.space_after=Pt(2)
-                    r=q.add_run(f"{m.group(2)} 모름"); r.font.size=Pt(8.5)
+                    r=q.add_run(m.group(2).strip()); r.font.size=Pt(8.5)
                     r.font.color.rgb = FADE if DIM[0] else GRAY
                 else: rich(p,v,9)
     q=doc.add_paragraph(); BLOCK.append(q); q.paragraph_format.space_after=Pt(0)
@@ -181,7 +182,13 @@ for b in blocks:
             if FIRST_PART[0]: FIRST_PART[0]=False
             else: doc.add_page_break()
             p=para(doc,txt,size=15,bold=True,color=BLUE,before=0,after=H1_AFTER); rule(p)
-        else: para(doc,txt,size=12,bold=True,color=BLUE,before=H2_BEFORE,after=H2_AFTER)
+        else:
+            hp=para(doc,txt,size=12,bold=True,color=BLUE,before=H2_BEFORE,after=H2_AFTER)
+            STICKY.add(id(hp._p))
+        for g in guides:       # 모듈 제목 아래 안내도 제목에 붙여 둔다
+            gp=para(doc, g, size=8.5, color=(FADE if DIM[0] else GRAY), indent=0.6, after=GUIDE_AFTER)
+            STICKY.add(id(gp._p))
+        guides=[]
     elif h:
         qid,txt,fmt=QID.match(h).groups(); CURFMT[0]=fmt
         p=doc.add_paragraph(); BLOCK.append(p); f=p.paragraph_format
@@ -221,14 +228,14 @@ for b in blocks:
         if s.startswith('|'): buf.append(s); continue
         flush()
         if not s.strip(): continue
-        m=re.fullmatch(r'(<u>.*?</u>|_{3,})\s+(□|■) 모름', s.strip())
+        m=re.fullmatch(r'(<u>.*?</u>|_{3,})\s{2,}((?:[□■][^□■]*)+)', s.strip())
         if m:
             q=doc.add_paragraph(); BLOCK.append(q); f=q.paragraph_format
             f.space_before=Pt(0); f.space_after=Pt(2); f.line_spacing=1.15
             if m.group(1).startswith('_'): q.add_run(" ").font.size=Pt(10)
             else: rich(q, re.sub(r'</?u>','',m.group(1)), 10)
             ruled(q, 8.0)
-            r=para(doc, f"{m.group(2)} 모름", size=9, color=(FADE if DIM[0] else GRAY),
+            r=para(doc, m.group(2).strip(), size=9, color=(FADE if DIM[0] else GRAY),
                    indent=0.4, after=LINE_AFTER+3)
             continue
         if s.startswith('- '): para(doc,s[2:],size=10,indent=0.5,after=LINE_AFTER); continue
@@ -236,6 +243,8 @@ for b in blocks:
             para(doc,s.strip('*'),size=9,color=GRAY,after=LINE_AFTER); continue
         if s.startswith('**') and s.endswith('**'):
             para(doc,s.strip('*'),size=10.5,bold=True,before=Q_BEFORE-3,after=Q_AFTER); continue
+        if re.search(r'주세요[.)]?(\s*\([^)]*\))?(\s*`[^`]*`)?$', s.strip()):   # 문항 안의 작은 질문
+            para(doc,s,size=10,color=BLUE,indent=0.4,after=LINE_AFTER); continue
         para(doc,s,size=10,indent=0.4,after=LINE_AFTER)
     flush(); flush_box()
     for g in guides:
