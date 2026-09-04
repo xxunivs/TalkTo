@@ -242,8 +242,8 @@ def merge(sheet, ansfile, out, title):
 
     for b in blocks:
         if b['id'] == 'M2-00' and cards:
-            for c in cards:
-                res.append(f"**카드 — {c['name']}**")
+            for n, c in enumerate(cards, 1):
+                res.append(f"**카드 {n} · {c['name']}**")
                 for bb in blocks:
                     if bb['id'] and bb['id'].startswith('M2-') and bb['id']!='M2-OE':
                         v = c['f'].get(bb['id'])
@@ -260,7 +260,7 @@ def merge(sheet, ansfile, out, title):
     txt = re.sub(r'[ \t]*→[ \t]*_{4,}[ \t]*(\([^)]*\))?', '', txt)
     lines, name = [], None
     for l in txt.splitlines():
-        mm = re.match(r'^\*\*카드 — (.+?)\*\*', l)
+        mm = re.match(r'^\*\*카드 \d+ · (.+?)\*\*', l)
         if mm: name = mm.group(1)
         if name and '이름(또는 가족 내 호칭): ____________' in l:
             nm = re.match(r'(.+?)\s*\((.+?)\)', name)
