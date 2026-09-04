@@ -264,6 +264,8 @@ def merge(sheet, ansfile, out, title):
             for k, v in re.findall(r'([가-힣]+)\s*:\s*([^·\n|]+?)(?=\s*·|\s*$)', x):
                 pairs.setdefault(k.strip(), v.strip())
         val, card = pull_card(val)
+        # 답에 추정 표시가 있으면 "실제로 들은 말은 아니에요" 를 체크한다
+        guessed = bool(a) and any(re.search(r'추정|그랬을 것 같음', x) for x in a)
         # "모름"은 값이 아니라 답 — 빈칸으로 두고 옆의 □ 모름 을 체크한다
         unknown = bool(val) and bool(re.fullmatch(r'(\(없음\)\s*)?\[?모름\]?', val.strip()))
         if unknown: val = None
@@ -286,10 +288,21 @@ def merge(sheet, ansfile, out, title):
                 if re.match(r'^\|[\s:\|]*-[\s:\-\|]*\|$', s.strip()): outl.append(s); continue
                 if not tbl_done:
                     rows = fit_rows(arows, outl[-2] if len(outl)>=2 else s) if arows else []
-                    outl.extend(rows if rows else [s])   # 답이 없으면 빈 칸을 남긴다
+                    if rows:      # 답이 없는 칸은 시험지의 빈칸 모양(밑줄·모름)을 그대로 둔다
+                        tpl = cells(s)
+                        out2 = []
+                        for r in rows:
+                            cc = cells(r)
+                            cc = [(c if c.strip() else (tpl[k] if k < len(tpl) else ''))
+                                  for k, c in enumerate(cc)]
+                            out2.append('| ' + ' | '.join(cc) + ' |')
+                        rows = out2
+                    outl.extend(rows if rows else [s])
                     tbl_done = True
                 continue
             in_tbl = False
+            if '실제로 들은 말은 아니에요' in s:
+                outl.append(s.replace('□','■') if guessed else s); continue
             if unknown and '□ 모름' in s:
                 outl.append(s.replace('□ 모름','■ 모름')); unknown = False; continue
             if card and re.match(r'^(시기|감정|확실성|사용 범위):', s.strip()):
@@ -384,6 +397,8 @@ def merge(sheet, ansfile, out, title):
     txt = title + "\n\n<!--answersheet-->\n\n" + "\n".join(res) + "\n"
     # 체크박스가 같이 있는 표 칸은 값에 밑줄 (단독 문항과 같은 모양)
     txt = re.sub(r'(?<=\| )(?!_)([^|<>]+?) (□|■) 모름(?= \|)', r'<u>\1</u>  \2 모름', txt)
+    # 값·밑줄과 체크 사이 간격을 시험지와 같게 (strip_tags 가 공백을 하나로 줄인다)
+    txt = re.sub(r'(_{3,}|</u>) (□|■) 모름', r'\1  \2 모름', txt)
 
     # 정답지 뒷정리
     lines, name = [], None

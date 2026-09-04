@@ -130,7 +130,7 @@ def table(doc,rows):
                     r=p.add_run(sub); r.font.size=Pt(7.5)
                     r.font.color.rgb = FADE if DIM[0] else GRAY
             else:
-                m=re.fullmatch(r'(<u>.*?</u>|_{3,})\s{2,}((?:[□■][^□■]*)+)', v.strip())
+                m=re.fullmatch(r'(<u>.*?</u>|_{3,})\s+((?:[□■][^□■]*)+)', v.strip())
                 if m:
                     # 값은 줄 위에, 체크는 그 아래 — 단독 문항과 같은 모양
                     if m.group(1).startswith('_'): p.add_run(" ").font.size=Pt(9)
@@ -144,7 +144,7 @@ def table(doc,rows):
     q=doc.add_paragraph(); BLOCK.append(q); q.paragraph_format.space_after=Pt(0)
     q.add_run("").font.size=Pt(1)
 
-QID=re.compile(r'^\*\*([A-Za-z0-9\-]+) · (.*?)\*\*(?:\s+`(.+?)`)?\s*$')
+QID=re.compile(r'^\*\*([A-Za-z0-9\-~]+) · (.*?)\*\*(?:\s+`(.+?)`)?\s*$')
 
 doc=Document()
 for s in doc.sections:
@@ -157,7 +157,9 @@ ANSWERS[0]=any(l.strip()=='<!--answersheet-->' for l in _raw)
 para(doc,_title,size=20,bold=True,after=16)
 
 lines=open(sys.argv[1],encoding="utf-8").read().splitlines()
-_s=next((i for i,l in enumerate(lines) if l.startswith('# PART')), 0)
+_s=next((i for i,l in enumerate(lines) if l.startswith('# PART')), None)
+if _s is None:   # PART 가 없는 문서는 제목 줄 다음부터
+    _s=next((i for i,l in enumerate(lines) if l.startswith('# ')), -1)+1
 lines=[l for l in lines[_s:] if set(l.strip())!={'-'}]
 
 # 문항 단위로 끊어, 그 안의 > 안내줄을 질문 칸으로 끌어올린다
@@ -228,7 +230,7 @@ for b in blocks:
         if s.startswith('|'): buf.append(s); continue
         flush()
         if not s.strip(): continue
-        m=re.fullmatch(r'(<u>.*?</u>|_{3,})\s{2,}((?:[□■][^□■]*)+)', s.strip())
+        m=re.fullmatch(r'(<u>.*?</u>|_{3,})\s+((?:[□■][^□■]*)+)', s.strip())
         if m:
             q=doc.add_paragraph(); BLOCK.append(q); f=q.paragraph_format
             f.space_before=Pt(0); f.space_after=Pt(2); f.line_spacing=1.15
