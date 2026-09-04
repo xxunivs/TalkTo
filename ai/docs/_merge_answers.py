@@ -148,7 +148,8 @@ def fit_rows(arows, thead):
     ahead=None
     for r in arows:
         c=cells(r)
-        if sum(1 for x in c if key(x) in tcols) >= max(2, len(tcols)//2): ahead=c; break
+        need = 1 if len(tcols)==1 else max(2, len(tcols)//2)
+        if sum(1 for x in c if key(x) in tcols) >= need: ahead=c; break
     if ahead is None:
         return [r for r in arows]
     idx=[]
