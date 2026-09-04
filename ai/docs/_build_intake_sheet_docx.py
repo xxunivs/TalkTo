@@ -30,10 +30,11 @@ def box(doc, value=None, rows=1, blanks=None):
     """답 자리. 값이 있으면 줄 위에 얹고, 없으면 빈 줄만 긋는다."""
     fmt = CURFMT[0] or ''
     w = None if ('서술' in fmt or not fmt) else 8.0
-    n = 1 if value else max(1, rows)
+    # 답 영역 줄 수를 시험지와 같게 (답 한 줄 + 남은 빈 줄)
+    n = (1 + len(blanks or [])) if value else max(1, rows)
     for i in range(n):
         p=doc.add_paragraph(); f=p.paragraph_format
-        f.space_before=Pt(0); f.space_after=Pt(LINE_AFTER+3); f.line_spacing=1.35
+        f.space_before=Pt(0); f.space_after=Pt(LINE_AFTER+2); f.line_spacing=1.15
         ruled(p, w)
         if i==0 and value: rich(p, value, 10)
         else: p.add_run(" ").font.size=Pt(10)
