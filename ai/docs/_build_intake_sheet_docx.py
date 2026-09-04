@@ -28,8 +28,7 @@ def ruled(p, width_cm=None):
 
 def box(doc, value=None, rows=1, blanks=None):
     """답 자리. 값이 있으면 줄 위에 얹고, 없으면 빈 줄만 긋는다."""
-    fmt = CURFMT[0] or ''
-    w = None if ('서술' in fmt or not fmt) else 8.0
+    w = None      # 답 줄은 본문 폭 전체 — 짧게 묶으면 답이 접힌다
     # 답이 있으면 그 줄 하나만. 빈 줄을 덧붙이지 않는다
     n = 1 if (value or ANSWERS[0]) else max(1, rows)
     for i in range(n):
