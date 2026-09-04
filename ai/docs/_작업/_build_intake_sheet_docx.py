@@ -64,7 +64,7 @@ Q_BEFORE, Q_AFTER = 15, 5      # 문항 머리
 LINE_AFTER        = 4          # 선지·답·본문 한 줄
 GUIDE_AFTER       = 3          # 박스 밖 안내
 H1_BEFORE, H1_AFTER = 26, 9    # PART 제목
-H2_BEFORE, H2_AFTER = 18, 7    # 모듈 제목
+H2_BEFORE, H2_AFTER = 30, 8    # 모듈 제목
 INLINE=re.compile(r'(\*\*.+?\*\*|`[^`]+`|<u>.+?</u>)')
 def rich(p,text,size=10,base=None,bold=False):
     if DIM[0]: base = FADE
@@ -91,8 +91,21 @@ def table(doc,rows):
     rows=[r[:n]+['']*(n-len(r)) for r in rows]     # 열 수를 머리행에 맞춘다
     t=doc.add_table(rows=0,cols=n); t.style="Table Grid"; BLOCK.append(t)
     if DIM[0]: tbl_border(t, 'E4E4E4')
+    t.autofit=False
+    # 열 너비는 내용 길이에 맞춰 나눈다 (머리행의 선지 설명은 절반만 셈)
+    def wgt(j):
+        head=rows[0][j].split('<br>')
+        w=max([len(head[0])*1.6] + [len(x)*0.22 for x in head[1:]] +
+              [len(r[j])*0.9 for r in rows[1:]] + [6])
+        return min(w, 34)
+    ws=[wgt(j) for j in range(n)]
+    tot=sum(ws)
+    raw=[max(2.0, 17.4*x/tot) for x in ws]
+    scale=17.4/sum(raw)
+    widths=[Cm(round(x*scale, 2)) for x in raw]
     for i,row in enumerate(rows):
         cells=t.add_row().cells
+        for j,c in enumerate(cells): c.width=widths[j]
         for j,v in enumerate(row):
             p=cells[j].paragraphs[0]; p.paragraph_format.space_after=Pt(3)
             if i==0:
@@ -109,7 +122,7 @@ def table(doc,rows):
                 if m:
                     # 값은 줄 위에, 체크는 그 아래 — 단독 문항과 같은 모양
                     if m.group(1).startswith('_'): p.add_run(" ").font.size=Pt(9)
-                    else: rich(p, m.group(1), 9)
+                    else: rich(p, re.sub(r'</?u>','',m.group(1)), 9)
                     ruled(p); p.paragraph_format.left_indent=Cm(0.05)
                     q=cells[j].add_paragraph()
                     q.paragraph_format.space_before=Pt(2); q.paragraph_format.space_after=Pt(2)
@@ -197,6 +210,16 @@ for b in blocks:
         if s.startswith('|'): buf.append(s); continue
         flush()
         if not s.strip(): continue
+        m=re.fullmatch(r'(<u>.*?</u>|_{3,})\s+(□|■) 모름', s.strip())
+        if m:
+            q=doc.add_paragraph(); BLOCK.append(q); f=q.paragraph_format
+            f.space_before=Pt(0); f.space_after=Pt(2); f.line_spacing=1.15
+            if m.group(1).startswith('_'): q.add_run(" ").font.size=Pt(10)
+            else: rich(q, re.sub(r'</?u>','',m.group(1)), 10)
+            ruled(q, 8.0)
+            r=para(doc, f"{m.group(2)} 모름", size=9, color=(FADE if DIM[0] else GRAY),
+                   indent=0.4, after=LINE_AFTER+3)
+            continue
         if s.startswith('- '): para(doc,s[2:],size=10,indent=0.5,after=LINE_AFTER); continue
         if s.startswith('*') and s.endswith('*') and not s.startswith('**'):
             para(doc,s.strip('*'),size=9,color=GRAY,after=LINE_AFTER); continue
