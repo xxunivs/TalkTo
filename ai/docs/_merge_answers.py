@@ -298,7 +298,7 @@ def merge(sheet, ansfile, out, title):
         a = ans.get(b['id'])
         if a: used.add(b['id'])
         res.extend(render(b, a))
-    txt = title + "\n\n" + "\n".join(res) + "\n"
+    txt = title + "\n\n<!--answersheet-->\n\n" + "\n".join(res) + "\n"
     # 정답지 뒷정리: 빈 표행·안 고른 선지의 빈칸 제거, 카드 이름으로 M2-00 채우기
     txt = re.sub(r'^\|(?:\s*\|)+\s*\n', '', txt, flags=re.M)
     txt = re.sub(r'[ \t]*→[ \t]*_{4,}[ \t]*(\([^)]*\))?', '', txt)

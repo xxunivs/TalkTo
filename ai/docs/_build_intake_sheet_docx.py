@@ -30,8 +30,8 @@ def box(doc, value=None, rows=1, blanks=None):
     """답 자리. 값이 있으면 줄 위에 얹고, 없으면 빈 줄만 긋는다."""
     fmt = CURFMT[0] or ''
     w = None if ('서술' in fmt or not fmt) else 8.0
-    # 답 영역 줄 수를 시험지와 같게 (답 한 줄 + 남은 빈 줄)
-    n = (1 + len(blanks or [])) if value else max(1, rows)
+    # 답이 있으면 그 줄 하나만. 빈 줄을 덧붙이지 않는다
+    n = 1 if (value or ANSWERS[0]) else max(1, rows)
     for i in range(n):
         p=doc.add_paragraph(); BLOCK.append(p); f=p.paragraph_format
         f.space_before=Pt(0); f.space_after=Pt(LINE_AFTER+2); f.line_spacing=1.15
@@ -47,7 +47,7 @@ def rule(p,color='1F4E79',sz='12'):
     e=OxmlElement('w:bottom'); e.set(qn('w:val'),'single'); e.set(qn('w:sz'),sz)
     e.set(qn('w:space'),'4'); e.set(qn('w:color'),color); b.append(e)
 
-DIM=[False]; CURFMT=[None]; FIRST_PART=[True]
+DIM=[False]; CURFMT=[None]; FIRST_PART=[True]; ANSWERS=[False]
 BLOCK=[]        # 한 문항이 만든 문단·표 — 쪽이 갈리지 않게 묶는다
 
 def keep_block():
@@ -110,6 +110,7 @@ st=doc.styles["Normal"]; st.font.name=FONT; st.font.size=Pt(10)
 st._element.rPr.rFonts.set(qn('w:eastAsia'),FONT)
 _raw=open(sys.argv[1],encoding="utf-8").read().splitlines()
 _title=next((l[2:].strip() for l in _raw if l.startswith('# ') and not l.startswith('# PART')),"Persona Intake")
+ANSWERS[0]=any(l.strip()=='<!--answersheet-->' for l in _raw)
 para(doc,_title,size=20,bold=True,after=16)
 
 lines=open(sys.argv[1],encoding="utf-8").read().splitlines()
