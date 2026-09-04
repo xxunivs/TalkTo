@@ -47,7 +47,7 @@ def rule(p,color='1F4E79',sz='12'):
     e=OxmlElement('w:bottom'); e.set(qn('w:val'),'single'); e.set(qn('w:sz'),sz)
     e.set(qn('w:space'),'4'); e.set(qn('w:color'),color); b.append(e)
 
-DIM=[False]; CURFMT=[None]
+DIM=[False]; CURFMT=[None]; FIRST_PART=[True]
 Q_BEFORE, Q_AFTER = 15, 5      # 문항 머리
 LINE_AFTER        = 4          # 선지·답·본문 한 줄
 GUIDE_AFTER       = 3          # 박스 밖 안내
@@ -120,7 +120,10 @@ for b in blocks:
     if h and h.startswith('#'): CURFMT[0]=None
     if h and h.startswith('#'):
         lvl=len(h)-len(h.lstrip('#')); txt=h.lstrip('#').strip()
-        if lvl==1: p=para(doc,txt,size=15,bold=True,color=BLUE,before=H1_BEFORE,after=H1_AFTER); rule(p)
+        if lvl==1:
+            if FIRST_PART[0]: FIRST_PART[0]=False
+            else: doc.add_page_break()
+            p=para(doc,txt,size=15,bold=True,color=BLUE,before=0,after=H1_AFTER); rule(p)
         else: para(doc,txt,size=12,bold=True,color=BLUE,before=H2_BEFORE,after=H2_AFTER)
     elif h:
         qid,txt,fmt=QID.match(h).groups(); CURFMT[0]=fmt
