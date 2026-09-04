@@ -90,16 +90,20 @@ def table(doc,rows):
     n=len(rows[0])
     rows=[r[:n]+['']*(n-len(r)) for r in rows]     # 열 수를 머리행에 맞춘다
     t=doc.add_table(rows=0,cols=n); t.style="Table Grid"; BLOCK.append(t)
+    if DIM[0]: tbl_border(t, 'E4E4E4')
     for i,row in enumerate(rows):
         cells=t.add_row().cells
         for j,v in enumerate(row):
             p=cells[j].paragraphs[0]; p.paragraph_format.space_after=Pt(3)
             if i==0:
                 head, *subs = v.split('<br>')
-                r=p.add_run(head); r.bold=True; r.font.size=Pt(8.5); shade(p,'EFEFEF')
+                r=p.add_run(head); r.bold=True; r.font.size=Pt(8.5)
+                r.font.color.rgb = FADE if DIM[0] else DARK
+                shade(p, 'F7F7F7' if DIM[0] else 'EFEFEF')
                 for sub in subs:
                     p.add_run().add_break()
-                    r=p.add_run(sub); r.font.size=Pt(7.5); r.font.color.rgb=GRAY
+                    r=p.add_run(sub); r.font.size=Pt(7.5)
+                    r.font.color.rgb = FADE if DIM[0] else GRAY
             else: rich(p,v,9)
     q=doc.add_paragraph(); BLOCK.append(q); q.paragraph_format.space_after=Pt(0)
     q.add_run("").font.size=Pt(1)
