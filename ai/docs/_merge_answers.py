@@ -83,6 +83,12 @@ def sel_texts(lines):
                 out.append(norm(seg))
     return [x for x in out if x]
 
+# 답 뒤에 붙은 편집 주석(다른 문항 가리키기)은 잘라낸다
+XTAIL=re.compile(r'\s*[—–]\s*[^—–]*?(?:[CMPT]\d[\d\-a-b·]*\s*(?:카드|표|참조)|카드 ?\d|'
+                 r'[CMPT]\d[\d\-a-b·]*\s*(?:에서|으로|에 반영|기본값)|확인 필요)[^—–]*$')
+def drop_xref(v):
+    return XTAIL.sub('', v).strip() if v else v
+
 NOTE=re.compile(r'^(메모|주 작성자|경위는)|기준으로 고정|자동 생성|승계|합류|미기재 방침|의도된 공백')
 def free_text(lines):
     for l in lines:
@@ -144,7 +150,7 @@ def merge(sheet, ansfile, out, title):
         lines = b['lines'][:]
         if card_name:
             lines = [lines[0]] + lines[1:]
-        a = [strip_tags(x) for x in a] if a else a
+        a = [drop_xref(strip_tags(x)) for x in a] if a else a
         if a and b['id'] and b['id'].startswith(('M8-','T1-02b')):
             s8, say = m8_split(a)
             sel = [norm(x) for x in s8]; val = say; arows = []
