@@ -215,7 +215,7 @@ def merge(sheet, ansfile, out, title):
         elif i.startswith('T3-'): skipped = ax['self'] or ax['deceased']
         elif i.startswith('T4-'): skipped = not (ax['self'] and ax['period'])
         elif i in ('P1-03','P1-08'):   skipped = ax['self']
-        elif i == 'M9-03':             skipped = not ax['self']
+        elif i == 'M9-02':             skipped = not ax['self']
         elif i == 'P1-07A':            skipped = ax['public']
         elif i in ('P1-07B','P1-07C'): skipped = not ax['public']
         elif i == 'M5-07B':            skipped = not ax['tell_hard']
