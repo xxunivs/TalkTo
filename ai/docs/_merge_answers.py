@@ -236,6 +236,11 @@ def merge(sheet, ansfile, out, title):
         arows = [r for r in arows if not re.match(r'^\|\s*(표현|음식|장소|것|규칙|지역|이름|인물|주제|받는|항목)\s*\|', r)]
         if val: val = re.sub(r'^[가-힣A-Za-z0-9 ]{1,14}\s*\([^)]{0,20}\)\s*:\s*', '', val.strip())
         if val and EMPTYV.match(val.strip()): val = None
+        # "라벨: 값" 짝은 답 전체에서 모은다 (선지와 한 줄에 섞여 있어도)
+        pairs = {}
+        for x in (a or []):
+            for k, v in re.findall(r'([가-힣]+)\s*:\s*([^·\n|]+?)(?=\s*·|\s*$)', x):
+                pairs.setdefault(k.strip(), v.strip())
         val, card = pull_card(val)
         outl, in_tbl, tbl_done, marked, wrote = [], False, False, False, False
         if skipped: outl.append('<!--dim-->')
@@ -277,6 +282,12 @@ def merge(sheet, ansfile, out, title):
                 marked = marked or bool(hit)
                 line=''.join(new)
                 marked=[x for x in new if x.startswith('■')]
+                if '____' in line and pairs and re.search(r'[가-힣]+:\s*_{3,}', line):
+                    def put(mm):
+                        v=pairs.get(mm.group(1))
+                        return f"{mm.group(1)}: <u>{v.strip()}</u>" if v else mm.group(0)
+                    line2=re.sub(r'([가-힣]+)\s*:\s*_{3,}', put, line)
+                    if line2!=line: outl.append(line2); val=None; continue
                 if '____' in line and marked and '____' in marked[-1]:
                     own = selval.get(norm(marked[-1]))
                     fillv = own or (val.strip().strip('"') if val else None)
