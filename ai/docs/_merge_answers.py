@@ -108,6 +108,7 @@ def pull_card(v):
     return v, d
 
 NOTE=re.compile(r'^(메모|주 작성자|경위는)|기준으로 고정|자동 생성|승계|합류|미기재 방침|의도된 공백')
+EMPTYV=re.compile(r'^[\(（]?\s*(없음|해당 ?없음|미수집|없습니다)\s*[\)）]?\.?$')
 def free_text(lines):
     for l in lines:
         m = re.search(r'→\s*시기:\s*(.+)$', l)
@@ -210,6 +211,7 @@ def merge(sheet, ansfile, out, title):
             val = free_text(a) if a else None
         arows = arows if (a and b['id'] and b['id'].startswith('M8-')) else (rows_of(a) if a else [])
         arows = [r for r in arows if not re.match(r'^\|\s*(표현|음식|장소|것|규칙|지역|이름|인물|주제|받는|항목)\s*\|', r)]
+        if val and EMPTYV.match(val.strip()): val = None
         val, card = pull_card(val)
         outl, in_tbl, tbl_done, marked, wrote = [], False, False, False, False
         if skipped: outl.append('<!--dim-->')
