@@ -7,6 +7,18 @@ from docx.oxml import OxmlElement
 
 FONT="맑은 고딕"
 GRAY=RGBColor(0x6E,0x6E,0x6E); DARK=RGBColor(0x1a,0x1a,0x1a); BLUE=RGBColor(0x1F,0x4E,0x79)
+RED=RGBColor(0xB0,0x3A,0x2B); FADE=RGBColor(0xB4,0xB4,0xB4)
+
+def box(doc, value=None, rows=1):
+    """답 칸. 값이 있으면 칸 안에 넣고, 없으면 빈 칸을 그린다."""
+    t=doc.add_table(rows=1, cols=1); t.style="Table Grid"
+    c=t.rows[0].cells[0]
+    p=c.paragraphs[0]; p.paragraph_format.space_before=Pt(2); p.paragraph_format.space_after=Pt(2)
+    p.paragraph_format.line_spacing=1.3
+    if value: rich(p, value, 10)
+    for _ in range(max(0, rows-1)):
+        q=c.add_paragraph(); q.paragraph_format.space_after=Pt(2); q.paragraph_format.line_spacing=1.3
+    doc.add_paragraph().paragraph_format.space_after=Pt(2)
 
 def shade(p,c):
     e=OxmlElement('w:shd'); e.set(qn('w:val'),'clear'); e.set(qn('w:fill'),c)
@@ -16,8 +28,10 @@ def rule(p,color='1F4E79',sz='12'):
     e=OxmlElement('w:bottom'); e.set(qn('w:val'),'single'); e.set(qn('w:sz'),sz)
     e.set(qn('w:space'),'4'); e.set(qn('w:color'),color); b.append(e)
 
+DIM=[False]
 INLINE=re.compile(r'(\*\*.+?\*\*|`[^`]+`|<u>.+?</u>)')
 def rich(p,text,size=10,base=None,bold=False):
+    if DIM[0]: base = FADE
     for tok in INLINE.split(text):
         if not tok: continue
         if tok.startswith('**') and tok.endswith('**'):
@@ -76,8 +90,9 @@ for ln in lines:
 
 for b in blocks:
     h=b['head']
+    DIM[0] = any(l.strip()=='<!--dim-->' for l in b['body'])
     guides=[l[2:].strip() for l in b['body'] if l.startswith('> ')]
-    body=[l for l in b['body'] if not l.startswith('> ')]
+    body=[l for l in b['body'] if not l.startswith('> ') and l.strip()!='<!--dim-->']
     if h and h.startswith('#'):
         lvl=len(h)-len(h.lstrip('#')); txt=h.lstrip('#').strip()
         if lvl==1: p=para(doc,txt,size=15,bold=True,color=BLUE,before=22,after=8); rule(p)
@@ -88,12 +103,14 @@ for b in blocks:
         f.space_before=Pt(13); f.space_after=Pt(6); f.left_indent=Cm(0.2); f.right_indent=Cm(0.2)
         f.line_spacing=1.25; shade(p,'F1F5F9')
         r=p.add_run(qid+"  "); r.bold=True; r.font.size=Pt(10.5)
+        if DIM[0]: r.font.color.rgb=FADE
         rich(p,txt,10.5,bold=True)
         if fmt:
-            r=p.add_run("   "+fmt); r.font.size=Pt(8.5); r.font.color.rgb=GRAY
+            r=p.add_run("   "+fmt); r.font.size=Pt(8.5)
+            r.font.color.rgb=FADE if DIM[0] else GRAY
         for g in guides:
             p.add_run().add_break()
-            rich(p,g,8.5,base=GRAY)
+            rich(p, g, 8.5, base=(FADE if DIM[0] else (RED if g.startswith('예:') else GRAY)))
         guides=[]
     buf=[]
     def flush():
@@ -103,8 +120,18 @@ for b in blocks:
                   if not re.match(r'^\|[\s:\|]*-[\s:\-\|]*\|$',r.strip())]
             if rows: table(doc,rows)
             buf=[]
+    pend=[]
+    def flush_box():
+        global pend
+        if pend:
+            vals=[x for x in pend if not re.fullmatch(r'_{4,}', x)]
+            box(doc, " ".join(vals) if vals else None, rows=len(pend))
+            pend=[]
     for s in body:
         s=s.rstrip()
+        if re.fullmatch(r'_{4,}', s.strip()) or re.fullmatch(r'<u>.*</u>', s.strip()):
+            flush(); pend.append(s.strip()); continue
+        flush_box()
         if s.startswith('|'): buf.append(s); continue
         flush()
         if not s.strip(): continue
@@ -114,7 +141,9 @@ for b in blocks:
         if s.startswith('**') and s.endswith('**'):
             para(doc,s.strip('*'),size=10.5,bold=True,before=10,after=3); continue
         para(doc,s,size=10,indent=0.4,after=3)
-    flush()
-    for g in guides: para(doc,g,size=8.5,color=GRAY,indent=0.6,after=2)
+    flush(); flush_box()
+    for g in guides:
+        para(doc, g, size=8.5,
+             color=(FADE if DIM[0] else (RED if g.startswith('예:') else GRAY)), indent=0.6, after=2)
 
 doc.save(sys.argv[2]); print("saved:",sys.argv[2])

@@ -40,13 +40,14 @@ def parse_sheet(p):
 # ── 작성본 파싱 ────────────────────────────────
 def parse_answers(p):
     txt = pathlib.Path(p).read_text(encoding='utf-8')
-    ans, cards = {}, []
+    ans, cards, skips = {}, [], set()
     cur = None
     for l in txt.splitlines():
         m = re.match(r'^\*\*([A-Za-z0-9\-]+)\*\*\s*(.*)$', l)
         if m:
             cur = m.group(1); rest = m.group(2)
             ans.setdefault(cur, [])
+            if re.search(r'건너뜀|해당 없음|해당없음', rest): skips.add(cur)
             if ':' in rest: ans[cur].append(rest.split(':',1)[1].strip())
             continue
         m = re.match(r'^\*\*카드 \d+ — (.+?)\*\*\s*(.*)$', l)
@@ -61,8 +62,10 @@ def parse_answers(p):
         m = re.match(r'^\|\s*(M\d-\d+|T\d-\d+)\s*\|(.+)$', l)
         if m:
             ans.setdefault(m.group(1), []).append('|' + m.group(2)); continue
-        if cur: ans[cur].append(l)
-    return ans, cards
+        if cur:
+            ans[cur].append(l)
+            if re.search(r'건너뜀|해당 없음|해당없음', l): skips.add(cur)
+    return ans, cards, skips
 
 def m8_split(lines):
     for l in lines:
@@ -158,13 +161,14 @@ def rows_of(lines):
 # ── 병합 ──────────────────────────────────────
 def merge(sheet, ansfile, out, title):
     blocks = parse_sheet(sheet)
-    ans, cards = parse_answers(ansfile)
+    ans, cards, skips = parse_answers(ansfile)
     res, used = [], set()
 
     def render(b, a, card_name=None):
         lines = b['lines'][:]
         if card_name:
             lines = [lines[0]] + lines[1:]
+        skipped = (b['id'] in skips) and not card_name
         a = [drop_xref(strip_tags(x)) for x in a] if a else a
         if a and b['id'] and b['id'].startswith(('M8-','T1-02b')):
             s8, say = m8_split(a)
@@ -176,8 +180,13 @@ def merge(sheet, ansfile, out, title):
         arows = [r for r in arows if not re.match(r'^\|\s*(표현|음식|장소|것|규칙|지역|이름|인물|주제|받는|항목)\s*\|', r)]
         val, card = pull_card(val)
         outl, in_tbl, tbl_done, marked, wrote = [], False, False, False, False
+        if skipped: outl.append('<!--dim-->')
+        first = True
         for l in lines:
             s = l.rstrip()
+            if first and outl and outl[0]=='<!--dim-->':
+                outl.insert(0, s); first = False; continue
+            first = False
             if s.startswith('|'):
                 if not in_tbl: in_tbl = True; outl.append(s); continue   # 머리행
                 if re.match(r'^\|[\s:\|]*-[\s:\-\|]*\|$', s.strip()): outl.append(s); continue
