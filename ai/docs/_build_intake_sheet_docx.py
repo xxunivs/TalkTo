@@ -95,9 +95,9 @@ def table(doc,rows):
         for j,v in enumerate(row):
             p=cells[j].paragraphs[0]; p.paragraph_format.space_after=Pt(3)
             if i==0:
-                head, _, sub = v.partition('<br>')
+                head, *subs = v.split('<br>')
                 r=p.add_run(head); r.bold=True; r.font.size=Pt(8.5); shade(p,'EFEFEF')
-                if sub:
+                for sub in subs:
                     p.add_run().add_break()
                     r=p.add_run(sub); r.font.size=Pt(7.5); r.font.color.rgb=GRAY
             else: rich(p,v,9)
