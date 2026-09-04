@@ -89,6 +89,18 @@ XTAIL=re.compile(r'\s*[—–]\s*[^—–]*?(?:[CMPT]\d[\d\-a-b·]*\s*(?:카드|
 def drop_xref(v):
     return XTAIL.sub('', v).strip() if v else v
 
+CARDF=re.compile(r'(시기|감정|확실성|사용 범위|출처)\s*:\s*\**([^·\n(*]+)\**')
+def pull_card(v):
+    """답 문장 뒤에 붙은 카드 필드(시기·감정·사용 범위 등)를 떼어낸다."""
+    d={}
+    if not v: return v, d
+    for k,x in CARDF.findall(v): d.setdefault(k, x.strip(' .·'))
+    v=CARDF.sub('', v)
+    v=re.sub(r'\((?:M\d{3}[^)]*)\)','',v)                 # 인터뷰 정리본 번호
+    v=re.sub(r'(?:\s*·\s*){2,}',' ',v)
+    v=re.sub(r'\s*[·,]\s*$','',re.sub(r'\s{2,}',' ',v)).strip(' ·')
+    return v, d
+
 NOTE=re.compile(r'^(메모|주 작성자|경위는)|기준으로 고정|자동 생성|승계|합류|미기재 방침|의도된 공백')
 def free_text(lines):
     for l in lines:
@@ -159,7 +171,8 @@ def merge(sheet, ansfile, out, title):
             val = free_text(a) if a else None
         arows = arows if (a and b['id'] and b['id'].startswith('M8-')) else (rows_of(a) if a else [])
         arows = [r for r in arows if not re.match(r'^\|\s*(표현|음식|장소|것|규칙|지역|이름|인물|주제|받는|항목)\s*\|', r)]
-        outl, in_tbl, tbl_done, marked = [], False, False, False
+        val, card = pull_card(val)
+        outl, in_tbl, tbl_done, marked, wrote = [], False, False, False, False
         for l in lines:
             s = l.rstrip()
             if s.startswith('|'):
@@ -169,6 +182,15 @@ def merge(sheet, ansfile, out, title):
                     outl.extend(fit_rows(arows, outl[-2] if len(outl)>=2 else s)); tbl_done = True
                 continue
             in_tbl = False
+            if card and re.match(r'^(시기|감정|확실성|사용 범위):', s.strip()):
+                def fill(mm):
+                    k=mm.group(1); v=card.get(k)
+                    return f"{k}: <u>{v}</u>" if v else mm.group(0)
+                s = re.sub(r'(시기|감정): _{3,}', fill, s)
+                for k in ('확실성','사용 범위'):
+                    if card.get(k) and k in s:
+                        s = re.sub(r'□ ('+re.escape(card[k])+r')', r'■ \1', s)
+                outl.append(s); continue
             if '□' in s and sel:
                 parts = re.split(r'(?=[■□])', s)
                 keys = [norm(x) if x.startswith('□') else None for x in parts]
@@ -183,13 +205,22 @@ def merge(sheet, ansfile, out, title):
                 line=''.join(new)
                 marked=[x for x in new if x.startswith('■')]
                 if '____' in line and val and marked and '____' in marked[-1]:
-                    line=re.sub(r'_{3,}', val.strip().strip('"'), line); val=None
+                    line=re.sub(r'_{3,}', '<u>'+val.strip().strip('"')+'</u>', line); val=None
                 outl.append(line); continue
             if '____' in s and val:
                 v = val.strip().strip('"')
-                s = re.sub(r'_{3,}', v, s); outl.append(s); val=None; continue
+                n = len(re.findall(r'_{3,}', s))
+                parts = [x.strip() for x in re.split(r'\s*/\s*', v)] if n > 1 else [v]
+                if n > 1 and len(parts) == n:
+                    it = iter(parts)
+                    s = re.sub(r'_{3,}', lambda m: '<u>'+next(it)+'</u>', s)
+                else:
+                    s = re.sub(r'_{3,}', '<u>'+v+'</u>', s, count=1)
+                    s = re.sub(r'_{3,}', '', s)
+                outl.append(s); val=None; continue
             if re.match(r'^_{4,}$', s.strip()):
-                if val: outl.append(val); val = None
+                if val: outl.append('<u>'+val+'</u>'); val = None; wrote = True
+                elif not wrote: outl.append(s)
                 continue
             outl.append(s)
         if val and not marked and not any(val[:12] in x for x in outl):

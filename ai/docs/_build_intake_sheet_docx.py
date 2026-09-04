@@ -16,12 +16,14 @@ def rule(p,color='1F4E79',sz='12'):
     e=OxmlElement('w:bottom'); e.set(qn('w:val'),'single'); e.set(qn('w:sz'),sz)
     e.set(qn('w:space'),'4'); e.set(qn('w:color'),color); b.append(e)
 
-INLINE=re.compile(r'(\*\*.+?\*\*|`[^`]+`)')
+INLINE=re.compile(r'(\*\*.+?\*\*|`[^`]+`|<u>.+?</u>)')
 def rich(p,text,size=10,base=None,bold=False):
     for tok in INLINE.split(text):
         if not tok: continue
         if tok.startswith('**') and tok.endswith('**'):
             r=p.add_run(tok[2:-2]); r.bold=True
+        elif tok.startswith('<u>') and tok.endswith('</u>'):
+            r=p.add_run(tok[3:-4]); r.underline=True
         elif tok.startswith('`') and tok.endswith('`'):
             r=p.add_run(tok[1:-1]); r.font.size=Pt(size-1.5); r.font.color.rgb=GRAY; continue
         else:
