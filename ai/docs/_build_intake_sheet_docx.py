@@ -23,16 +23,17 @@ def leftbar(p):
     e.set(qn('w:space'),'8'); e.set(qn('w:color'),'E0E0E0' if DIM[0] else 'A6A6A6')
     b.append(e)
 
-def box(doc, value=None, rows=1):
-    """답 영역. 값이 있으면 적고, 없으면 쓸 만큼 빈 줄을 둔다."""
-    n = 1 if value else max(1, rows)
-    for i in range(n):
+def box(doc, value=None, rows=1, blanks=None):
+    """답 자리. 값이 있으면 답만, 없으면 밑줄로 쓸 자리를 표시한다."""
+    if value:
         p=doc.add_paragraph(); f=p.paragraph_format
-        f.space_before=Pt(2); f.space_after=Pt(2); f.left_indent=Cm(0.5); f.line_spacing=1.4
-        leftbar(p)
-        if i==0 and value: rich(p, value, 10)
-        else: p.add_run(" ").font.size=Pt(10)
-    doc.add_paragraph().paragraph_format.space_after=Pt(2)
+        f.space_before=Pt(2); f.space_after=Pt(6); f.left_indent=Cm(0.4); f.line_spacing=1.35
+        rich(p, value, 10)
+        return
+    for u in (blanks or ['_'*20]*max(1,rows)):
+        p=doc.add_paragraph(); f=p.paragraph_format
+        f.space_before=Pt(1); f.space_after=Pt(3); f.left_indent=Cm(0.4); f.line_spacing=1.35
+        r=p.add_run(u); r.font.size=Pt(10); r.font.color.rgb = FADE if DIM[0] else GRAY
 
 def shade(p,c):
     e=OxmlElement('w:shd'); e.set(qn('w:val'),'clear'); e.set(qn('w:fill'),c)
@@ -140,7 +141,8 @@ for b in blocks:
         global pend
         if pend:
             vals=[x for x in pend if not re.fullmatch(r'_{4,}', x)]
-            box(doc, " ".join(vals) if vals else None, rows=len(pend))
+            box(doc, " ".join(vals) if vals else None, rows=len(pend),
+                blanks=[x for x in pend if re.fullmatch(r'_{4,}', x)])
             pend=[]
     for s in body:
         s=s.rstrip()
@@ -150,14 +152,12 @@ for b in blocks:
         if s.startswith('|'): buf.append(s); continue
         flush()
         if not s.strip(): continue
-        if s.startswith('- '):
-            q=para(doc,s[2:],size=10,indent=0.5,after=3); leftbar(q); continue
+        if s.startswith('- '): para(doc,s[2:],size=10,indent=0.5,after=3); continue
         if s.startswith('*') and s.endswith('*') and not s.startswith('**'):
             para(doc,s.strip('*'),size=9,color=GRAY,after=6); continue
         if s.startswith('**') and s.endswith('**'):
             para(doc,s.strip('*'),size=10.5,bold=True,before=10,after=3); continue
-        q=para(doc,s,size=10,indent=0.5,after=3)
-        if '□' in s or '■' in s: leftbar(q)
+        para(doc,s,size=10,indent=0.4,after=3)
     flush(); flush_box()
     for g in guides:
         para(doc, g, size=8.5,
