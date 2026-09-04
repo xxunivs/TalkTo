@@ -9,11 +9,6 @@ FONT="맑은 고딕"
 GRAY=RGBColor(0x6E,0x6E,0x6E); DARK=RGBColor(0x1a,0x1a,0x1a); BLUE=RGBColor(0x1F,0x4E,0x79)
 RED=RGBColor(0xB0,0x3A,0x2B); FADE=RGBColor(0xB4,0xB4,0xB4)
 
-FULL=17.6   # 본문 폭(cm)
-
-def box_width(fmt, value=None):
-    return FULL
-
 def tbl_border(t, color):
     tblPr=t._tbl.tblPr; el=OxmlElement('w:tblBorders')
     for side in ('top','left','bottom','right','insideH','insideV'):
@@ -21,19 +16,22 @@ def tbl_border(t, color):
         e.set(qn('w:space'),'0'); e.set(qn('w:color'),color); el.append(e)
     tblPr.append(el)
 
-def box(doc, value=None, rows=1, fmt=None):
-    """답 칸. 값이 있으면 칸 안에 넣고, 없으면 빈 칸을 그린다."""
-    t=doc.add_table(rows=1, cols=1); t.style="Table Grid"
-    if DIM[0]: tbl_border(t, 'D9D9D9')
-    t.autofit=False
-    w=Cm(box_width(fmt, value))
-    t.columns[0].width=w; t.rows[0].cells[0].width=w
-    c=t.rows[0].cells[0]
-    p=c.paragraphs[0]; p.paragraph_format.space_before=Pt(2); p.paragraph_format.space_after=Pt(2)
-    p.paragraph_format.line_spacing=1.3
-    if value: rich(p, value, 10)
-    for _ in range(max(0, rows-1)):
-        q=c.add_paragraph(); q.paragraph_format.space_after=Pt(2); q.paragraph_format.line_spacing=1.3
+def leftbar(p):
+    """답 영역 표시 — 문단 왼쪽 세로줄."""
+    pPr=p._p.get_or_add_pPr(); b=OxmlElement('w:pBdr'); pPr.append(b)
+    e=OxmlElement('w:left'); e.set(qn('w:val'),'single'); e.set(qn('w:sz'),'12')
+    e.set(qn('w:space'),'8'); e.set(qn('w:color'),'E0E0E0' if DIM[0] else 'A6A6A6')
+    b.append(e)
+
+def box(doc, value=None, rows=1):
+    """답 영역. 값이 있으면 적고, 없으면 쓸 만큼 빈 줄을 둔다."""
+    n = 1 if value else max(1, rows)
+    for i in range(n):
+        p=doc.add_paragraph(); f=p.paragraph_format
+        f.space_before=Pt(2); f.space_after=Pt(2); f.left_indent=Cm(0.5); f.line_spacing=1.4
+        leftbar(p)
+        if i==0 and value: rich(p, value, 10)
+        else: p.add_run(" ").font.size=Pt(10)
     doc.add_paragraph().paragraph_format.space_after=Pt(2)
 
 def shade(p,c):
@@ -142,7 +140,7 @@ for b in blocks:
         global pend
         if pend:
             vals=[x for x in pend if not re.fullmatch(r'_{4,}', x)]
-            box(doc, " ".join(vals) if vals else None, rows=len(pend), fmt=CURFMT[0])
+            box(doc, " ".join(vals) if vals else None, rows=len(pend))
             pend=[]
     for s in body:
         s=s.rstrip()
@@ -152,12 +150,14 @@ for b in blocks:
         if s.startswith('|'): buf.append(s); continue
         flush()
         if not s.strip(): continue
-        if s.startswith('- '): para(doc,s[2:],size=10,indent=0.6,after=3); continue
+        if s.startswith('- '):
+            q=para(doc,s[2:],size=10,indent=0.5,after=3); leftbar(q); continue
         if s.startswith('*') and s.endswith('*') and not s.startswith('**'):
             para(doc,s.strip('*'),size=9,color=GRAY,after=6); continue
         if s.startswith('**') and s.endswith('**'):
             para(doc,s.strip('*'),size=10.5,bold=True,before=10,after=3); continue
-        para(doc,s,size=10,indent=0.4,after=3)
+        q=para(doc,s,size=10,indent=0.5,after=3)
+        if '□' in s or '■' in s: leftbar(q)
     flush(); flush_box()
     for g in guides:
         para(doc, g, size=8.5,
