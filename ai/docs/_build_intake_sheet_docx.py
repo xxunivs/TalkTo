@@ -9,9 +9,25 @@ FONT="맑은 고딕"
 GRAY=RGBColor(0x6E,0x6E,0x6E); DARK=RGBColor(0x1a,0x1a,0x1a); BLUE=RGBColor(0x1F,0x4E,0x79)
 RED=RGBColor(0xB0,0x3A,0x2B); FADE=RGBColor(0xB4,0xB4,0xB4)
 
-def box(doc, value=None, rows=1):
+FULL=17.6   # 본문 폭(cm)
+
+def box_width(fmt, value=None):
+    """문항 형식에 맞춰 답 칸 너비를 정한다."""
+    if not fmt: return FULL
+    if '서술' in fmt or '표' in fmt: return FULL
+    m=re.search(r'단답 (\d+)', fmt)
+    if m: w = 0.42*int(m.group(1)) + 1.4
+    elif '숫자' in fmt: w = 3.5
+    else: return FULL
+    if value: w = max(w, min(FULL, 0.42*len(value) + 1.4))
+    return min(FULL, w)
+
+def box(doc, value=None, rows=1, fmt=None):
     """답 칸. 값이 있으면 칸 안에 넣고, 없으면 빈 칸을 그린다."""
     t=doc.add_table(rows=1, cols=1); t.style="Table Grid"
+    t.autofit=False
+    w=Cm(box_width(fmt, value))
+    t.columns[0].width=w; t.rows[0].cells[0].width=w
     c=t.rows[0].cells[0]
     p=c.paragraphs[0]; p.paragraph_format.space_before=Pt(2); p.paragraph_format.space_after=Pt(2)
     p.paragraph_format.line_spacing=1.3
@@ -28,7 +44,7 @@ def rule(p,color='1F4E79',sz='12'):
     e=OxmlElement('w:bottom'); e.set(qn('w:val'),'single'); e.set(qn('w:sz'),sz)
     e.set(qn('w:space'),'4'); e.set(qn('w:color'),color); b.append(e)
 
-DIM=[False]
+DIM=[False]; CURFMT=[None]
 INLINE=re.compile(r'(\*\*.+?\*\*|`[^`]+`|<u>.+?</u>)')
 def rich(p,text,size=10,base=None,bold=False):
     if DIM[0]: base = FADE
@@ -93,12 +109,13 @@ for b in blocks:
     DIM[0] = any(l.strip()=='<!--dim-->' for l in b['body'])
     guides=[l[2:].strip() for l in b['body'] if l.startswith('> ')]
     body=[l for l in b['body'] if not l.startswith('> ') and l.strip()!='<!--dim-->']
+    if h and h.startswith('#'): CURFMT[0]=None
     if h and h.startswith('#'):
         lvl=len(h)-len(h.lstrip('#')); txt=h.lstrip('#').strip()
         if lvl==1: p=para(doc,txt,size=15,bold=True,color=BLUE,before=22,after=8); rule(p)
         else: para(doc,txt,size=12,bold=True,color=BLUE,before=16,after=6)
     elif h:
-        qid,txt,fmt=QID.match(h).groups()
+        qid,txt,fmt=QID.match(h).groups(); CURFMT[0]=fmt
         p=doc.add_paragraph(); f=p.paragraph_format
         f.space_before=Pt(13); f.space_after=Pt(6); f.left_indent=Cm(0.2); f.right_indent=Cm(0.2)
         f.line_spacing=1.25; shade(p,'F1F5F9')
@@ -125,7 +142,7 @@ for b in blocks:
         global pend
         if pend:
             vals=[x for x in pend if not re.fullmatch(r'_{4,}', x)]
-            box(doc, " ".join(vals) if vals else None, rows=len(pend))
+            box(doc, " ".join(vals) if vals else None, rows=len(pend), fmt=CURFMT[0])
             pend=[]
     for s in body:
         s=s.rstrip()
