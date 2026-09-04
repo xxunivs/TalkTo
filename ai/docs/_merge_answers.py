@@ -281,12 +281,16 @@ def merge(sheet, ansfile, out, title):
                     elif len(pre) == 1: hit.add(pre[0])      # 한 곳에만 걸릴 때만 인정
                 new = ['■' + x[1:] if i in hit else x for i,x in enumerate(parts)]
                 marked = marked or bool(hit)
+                for lab, v in pairs.items():
+                    if v.strip()=='모름' and re.search(re.escape(lab)+r'\s*:\s*_{3,}', s):
+                        new=[('■'+x[1:] if x.startswith('□') and norm(x)=='모름' else x) for x in new]
                 line=''.join(new)
                 marked=[x for x in new if x.startswith('■')]
                 if '____' in line and pairs and re.search(r'[가-힣]+:\s*_{3,}', line):
                     def put(mm):
-                        v=pairs.get(mm.group(1))
-                        return f"{mm.group(1)}: <u>{v.strip()}</u>" if v else mm.group(0)
+                        v=(pairs.get(mm.group(1)) or '').strip()
+                        if v == '모름': return mm.group(0)      # 옆의 □ 모름 을 대신 체크
+                        return f"{mm.group(1)}: <u>{v}</u>" if v else mm.group(0)
                     line2=re.sub(r'([가-힣]+)\s*:\s*_{3,}', put, line)
                     if line2!=line: outl.append(line2); val=None; continue
                 if '____' in line and marked and '____' in marked[-1]:
@@ -296,6 +300,8 @@ def merge(sheet, ansfile, out, title):
                         line=re.sub(r'_{3,}', '<u>'+fillv+'</u>', line)
                         if not own: val=None
                 outl.append(line); continue
+            if '____' in s and val and val.strip()=='모름' and '□ 모름' in s:
+                outl.append(s.replace('□ 모름','■ 모름').replace('_'*20,'_'*20)); val=None; continue
             if '____' in s and val:
                 v = val.strip().strip('"')
                 n = len(re.findall(r'_{3,}', s))
