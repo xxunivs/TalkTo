@@ -68,6 +68,8 @@ def parse_answers(p):
         m = re.match(r'^\|\s*(M\d-\d+|T\d-\d+)\s*\|(.+)$', l)
         if m:
             ans.setdefault(m.group(1), []).append('|' + m.group(2)); continue
+        if l.lstrip().startswith('#'):      # 제목을 만나면 그 문항의 답은 끝
+            cur = None; continue
         if cur:
             ans[cur].append(l)
             if re.search(r'건너뜀|해당 없음|해당없음', l): skips.add(cur)
