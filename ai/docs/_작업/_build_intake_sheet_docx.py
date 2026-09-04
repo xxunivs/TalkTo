@@ -103,6 +103,17 @@ def table(doc,rows):
     raw=[max(2.0, 17.4*x/tot) for x in ws]
     scale=17.4/sum(raw)
     widths=[Cm(round(x*scale, 2)) for x in raw]
+    # 워드는 고정 배치일 때 tblGrid 를 본다 — 칸 너비만 정하면 무시한다
+    tblPr=t._tbl.tblPr
+    e=OxmlElement('w:tblLayout'); e.set(qn('w:type'),'fixed'); tblPr.append(e)
+    w=OxmlElement('w:tblW'); w.set(qn('w:w'), str(int(17.4*567))); w.set(qn('w:type'),'dxa')
+    tblPr.append(w)
+    grid=t._tbl.find(qn('w:tblGrid'))
+    if grid is None:
+        grid=OxmlElement('w:tblGrid'); t._tbl.insert(1, grid)
+    for gc in list(grid): grid.remove(gc)
+    for cw in widths:
+        gc=OxmlElement('w:gridCol'); gc.set(qn('w:w'), str(int(cw.cm*567))); grid.append(gc)
     for i,row in enumerate(rows):
         cells=t.add_row().cells
         for j,c in enumerate(cells): c.width=widths[j]
