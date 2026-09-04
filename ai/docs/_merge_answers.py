@@ -239,6 +239,7 @@ def merge(sheet, ansfile, out, title):
         # "라벨: 값" 짝은 답 전체에서 모은다 (선지와 한 줄에 섞여 있어도)
         pairs = {}
         for x in (a or []):
+            x = re.sub(r'^\s*답\s*:\s*', '', x)          # "답:" 머리말은 라벨이 아니다
             for k, v in re.findall(r'([가-힣]+)\s*:\s*([^·\n|]+?)(?=\s*·|\s*$)', x):
                 pairs.setdefault(k.strip(), v.strip())
         val, card = pull_card(val)
