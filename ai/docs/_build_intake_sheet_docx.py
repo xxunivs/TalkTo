@@ -16,24 +16,27 @@ def tbl_border(t, color):
         e.set(qn('w:space'),'0'); e.set(qn('w:color'),color); el.append(e)
     tblPr.append(el)
 
-def leftbar(p):
-    """답 영역 표시 — 문단 왼쪽 세로줄."""
+def ruled(p, width_cm=None):
+    """문단 아래에 줄을 긋는다 — 글자에 붙는 밑줄이 아니라 띄운 선."""
+    f=p.paragraph_format
+    f.left_indent=Cm(0.4)
+    if width_cm: f.right_indent=Cm(max(0, 17.6-0.4-width_cm))
     pPr=p._p.get_or_add_pPr(); b=OxmlElement('w:pBdr'); pPr.append(b)
-    e=OxmlElement('w:left'); e.set(qn('w:val'),'single'); e.set(qn('w:sz'),'12')
-    e.set(qn('w:space'),'8'); e.set(qn('w:color'),'E0E0E0' if DIM[0] else 'A6A6A6')
+    e=OxmlElement('w:bottom'); e.set(qn('w:val'),'single'); e.set(qn('w:sz'),'6')
+    e.set(qn('w:space'),'4'); e.set(qn('w:color'),'D9D9D9' if DIM[0] else '9A9A9A')
     b.append(e)
 
 def box(doc, value=None, rows=1, blanks=None):
-    """답 자리. 값이 있으면 답만, 없으면 밑줄로 쓸 자리를 표시한다."""
-    if value:
+    """답 자리. 값이 있으면 줄 위에 얹고, 없으면 빈 줄만 긋는다."""
+    fmt = CURFMT[0] or ''
+    w = None if ('서술' in fmt or not fmt) else 8.0
+    n = 1 if value else max(1, rows)
+    for i in range(n):
         p=doc.add_paragraph(); f=p.paragraph_format
-        f.space_before=Pt(2); f.space_after=Pt(6); f.left_indent=Cm(0.4); f.line_spacing=1.35
-        rich(p, value, 10)
-        return
-    for u in (blanks or ['_'*20]*max(1,rows)):
-        p=doc.add_paragraph(); f=p.paragraph_format
-        f.space_before=Pt(1); f.space_after=Pt(3); f.left_indent=Cm(0.4); f.line_spacing=1.35
-        r=p.add_run(u); r.font.size=Pt(10); r.font.color.rgb = FADE if DIM[0] else GRAY
+        f.space_before=Pt(3); f.space_after=Pt(9); f.line_spacing=1.35
+        ruled(p, w)
+        if i==0 and value: rich(p, value, 10)
+        else: p.add_run(" ").font.size=Pt(10)
 
 def shade(p,c):
     e=OxmlElement('w:shd'); e.set(qn('w:val'),'clear'); e.set(qn('w:fill'),c)
@@ -87,8 +90,7 @@ st=doc.styles["Normal"]; st.font.name=FONT; st.font.size=Pt(10)
 st._element.rPr.rFonts.set(qn('w:eastAsia'),FONT)
 _raw=open(sys.argv[1],encoding="utf-8").read().splitlines()
 _title=next((l[2:].strip() for l in _raw if l.startswith('# ') and not l.startswith('# PART')),"Persona Intake")
-para(doc,_title,size=20,bold=True,after=2)
-para(doc,"설계 원칙·형식 규격은 Persona_Intake_설계규격.md",size=9,color=GRAY,after=14)
+para(doc,_title,size=20,bold=True,after=16)
 
 lines=open(sys.argv[1],encoding="utf-8").read().splitlines()
 _s=next((i for i,l in enumerate(lines) if l.startswith('# PART')), 0)

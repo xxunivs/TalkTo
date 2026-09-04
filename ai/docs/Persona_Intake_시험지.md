@@ -1,7 +1,5 @@
 # Persona Intake 문항
 
-설계 원칙·형식 코드·저장 규격은 `Persona_Intake_설계규격.md`.
-
 ---
 
 # PART 1. 관계 설정
