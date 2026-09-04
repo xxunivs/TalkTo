@@ -33,7 +33,7 @@ def box(doc, value=None, rows=1, blanks=None):
     # 답 영역 줄 수를 시험지와 같게 (답 한 줄 + 남은 빈 줄)
     n = (1 + len(blanks or [])) if value else max(1, rows)
     for i in range(n):
-        p=doc.add_paragraph(); f=p.paragraph_format
+        p=doc.add_paragraph(); BLOCK.append(p); f=p.paragraph_format
         f.space_before=Pt(0); f.space_after=Pt(LINE_AFTER+2); f.line_spacing=1.15
         ruled(p, w)
         if i==0 and value: rich(p, value, 10)
@@ -48,6 +48,19 @@ def rule(p,color='1F4E79',sz='12'):
     e.set(qn('w:space'),'4'); e.set(qn('w:color'),color); b.append(e)
 
 DIM=[False]; CURFMT=[None]; FIRST_PART=[True]
+BLOCK=[]        # 한 문항이 만든 문단·표 — 쪽이 갈리지 않게 묶는다
+
+def keep_block():
+    """문항 하나가 쪽 경계에서 잘리지 않게 붙여 둔다."""
+    ps=[x for x in BLOCK if x.__class__.__name__=='Paragraph']
+    for i,x in enumerate(ps):
+        x.paragraph_format.keep_together = True
+        x.paragraph_format.keep_with_next = (i < len(ps)-1)
+    for x in BLOCK:
+        if x.__class__.__name__=='Table':
+            for r in x.rows:
+                trPr=r._tr.get_or_add_trPr(); e=OxmlElement('w:cantSplit'); trPr.append(e)
+    BLOCK.clear()
 Q_BEFORE, Q_AFTER = 15, 5      # 문항 머리
 LINE_AFTER        = 4          # 선지·답·본문 한 줄
 GUIDE_AFTER       = 3          # 박스 밖 안내
@@ -69,7 +82,7 @@ def rich(p,text,size=10,base=None,bold=False):
         r.font.size=Pt(size); r.font.color.rgb=base or DARK
 
 def para(doc,text="",size=10,bold=False,color=None,before=0,after=4,indent=0):
-    p=doc.add_paragraph(); f=p.paragraph_format
+    p=doc.add_paragraph(); BLOCK.append(p); f=p.paragraph_format
     f.space_before=Pt(before); f.space_after=Pt(after); f.left_indent=Cm(indent); f.line_spacing=1.3
     if text: rich(p,text,size,color,bold)
     return p
@@ -77,7 +90,7 @@ def para(doc,text="",size=10,bold=False,color=None,before=0,after=4,indent=0):
 def table(doc,rows):
     n=len(rows[0])
     rows=[r[:n]+['']*(n-len(r)) for r in rows]     # 열 수를 머리행에 맞춘다
-    t=doc.add_table(rows=0,cols=n); t.style="Table Grid"
+    t=doc.add_table(rows=0,cols=n); t.style="Table Grid"; BLOCK.append(t)
     for i,row in enumerate(rows):
         cells=t.add_row().cells
         for j,v in enumerate(row):
@@ -85,7 +98,7 @@ def table(doc,rows):
             if i==0:
                 r=p.add_run(v); r.bold=True; r.font.size=Pt(8.5); shade(p,'EFEFEF')
             else: rich(p,v,9)
-    q=doc.add_paragraph(); q.paragraph_format.space_after=Pt(0)
+    q=doc.add_paragraph(); BLOCK.append(q); q.paragraph_format.space_after=Pt(0)
     q.add_run("").font.size=Pt(1)
 
 QID=re.compile(r'^\*\*([A-Za-z0-9\-]+) · (.*?)\*\*(?:\s+`(.+?)`)?\s*$')
@@ -113,6 +126,7 @@ for ln in lines:
     else: cur['body'].append(ln)
 
 for b in blocks:
+    keep_block()
     h=b['head']
     DIM[0] = any(l.strip()=='<!--dim-->' for l in b['body'])
     guides=[l[2:].strip() for l in b['body'] if l.startswith('> ')]
@@ -127,7 +141,7 @@ for b in blocks:
         else: para(doc,txt,size=12,bold=True,color=BLUE,before=H2_BEFORE,after=H2_AFTER)
     elif h:
         qid,txt,fmt=QID.match(h).groups(); CURFMT[0]=fmt
-        p=doc.add_paragraph(); f=p.paragraph_format
+        p=doc.add_paragraph(); BLOCK.append(p); f=p.paragraph_format
         f.space_before=Pt(Q_BEFORE); f.space_after=Pt(Q_AFTER); f.left_indent=Cm(0.2); f.right_indent=Cm(0.2)
         f.line_spacing=1.25; shade(p,'F1F5F9')
         r=p.add_run(qid+"  "); r.bold=True; r.font.size=Pt(10.5)
@@ -175,4 +189,5 @@ for b in blocks:
         para(doc, g, size=8.5,
              color=(FADE if DIM[0] else (RED if g.startswith('예:') else GRAY)), indent=0.6, after=GUIDE_AFTER)
 
+keep_block()
 doc.save(sys.argv[2]); print("saved:",sys.argv[2])
