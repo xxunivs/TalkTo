@@ -151,6 +151,15 @@ def fit_rows(arows, thead):
         need = 1 if len(tcols)==1 else max(2, len(tcols)//2)
         if sum(1 for x in c if key(x) in tcols) >= need: ahead=c; break
     if ahead is None:
+        if len(tcols)==1:
+            # 한 열짜리 표: 답의 머리행을 버리고 내용이 든 열만 남긴다
+            rows=[cells(r) for r in arows]
+            LAB={'규칙','표현','항목','주제','것','음식','장소','지역','이름','인물','대상','받는 사람','#'}
+            rows=[c for c in rows if not (len(c)>1 and sum(1 for x in c if x in LAB) >= 2)]
+            if not rows: return []
+            width=max(len(c) for c in rows)
+            j=max(range(width), key=lambda k: sum(len(c[k]) for c in rows if k<len(c)))
+            return ['| ' + (c[j] if j<len(c) else '') + ' |' for c in rows]
         return [r for r in arows]
     idx=[]
     for tc in tcols:
