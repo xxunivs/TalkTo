@@ -33,7 +33,7 @@ def box(doc, value=None, rows=1, blanks=None):
     n = 1 if value else max(1, rows)
     for i in range(n):
         p=doc.add_paragraph(); f=p.paragraph_format
-        f.space_before=Pt(3); f.space_after=Pt(9); f.line_spacing=1.35
+        f.space_before=Pt(0); f.space_after=Pt(LINE_AFTER+3); f.line_spacing=1.35
         ruled(p, w)
         if i==0 and value: rich(p, value, 10)
         else: p.add_run(" ").font.size=Pt(10)
@@ -47,6 +47,11 @@ def rule(p,color='1F4E79',sz='12'):
     e.set(qn('w:space'),'4'); e.set(qn('w:color'),color); b.append(e)
 
 DIM=[False]; CURFMT=[None]
+Q_BEFORE, Q_AFTER = 15, 5      # 문항 머리
+LINE_AFTER        = 4          # 선지·답·본문 한 줄
+GUIDE_AFTER       = 3          # 박스 밖 안내
+H1_BEFORE, H1_AFTER = 26, 9    # PART 제목
+H2_BEFORE, H2_AFTER = 18, 7    # 모듈 제목
 INLINE=re.compile(r'(\*\*.+?\*\*|`[^`]+`|<u>.+?</u>)')
 def rich(p,text,size=10,base=None,bold=False):
     if DIM[0]: base = FADE
@@ -79,7 +84,8 @@ def table(doc,rows):
             if i==0:
                 r=p.add_run(v); r.bold=True; r.font.size=Pt(8.5); shade(p,'EFEFEF')
             else: rich(p,v,9)
-    doc.add_paragraph().paragraph_format.space_after=Pt(2)
+    q=doc.add_paragraph(); q.paragraph_format.space_after=Pt(0)
+    q.add_run("").font.size=Pt(1)
 
 QID=re.compile(r'^\*\*([A-Za-z0-9\-]+) · (.*?)\*\*(?:\s+`(.+?)`)?\s*$')
 
@@ -113,12 +119,12 @@ for b in blocks:
     if h and h.startswith('#'): CURFMT[0]=None
     if h and h.startswith('#'):
         lvl=len(h)-len(h.lstrip('#')); txt=h.lstrip('#').strip()
-        if lvl==1: p=para(doc,txt,size=15,bold=True,color=BLUE,before=22,after=8); rule(p)
-        else: para(doc,txt,size=12,bold=True,color=BLUE,before=16,after=6)
+        if lvl==1: p=para(doc,txt,size=15,bold=True,color=BLUE,before=H1_BEFORE,after=H1_AFTER); rule(p)
+        else: para(doc,txt,size=12,bold=True,color=BLUE,before=H2_BEFORE,after=H2_AFTER)
     elif h:
         qid,txt,fmt=QID.match(h).groups(); CURFMT[0]=fmt
         p=doc.add_paragraph(); f=p.paragraph_format
-        f.space_before=Pt(13); f.space_after=Pt(6); f.left_indent=Cm(0.2); f.right_indent=Cm(0.2)
+        f.space_before=Pt(Q_BEFORE); f.space_after=Pt(Q_AFTER); f.left_indent=Cm(0.2); f.right_indent=Cm(0.2)
         f.line_spacing=1.25; shade(p,'F1F5F9')
         r=p.add_run(qid+"  "); r.bold=True; r.font.size=Pt(10.5)
         if DIM[0]: r.font.color.rgb=FADE
@@ -154,15 +160,15 @@ for b in blocks:
         if s.startswith('|'): buf.append(s); continue
         flush()
         if not s.strip(): continue
-        if s.startswith('- '): para(doc,s[2:],size=10,indent=0.5,after=3); continue
+        if s.startswith('- '): para(doc,s[2:],size=10,indent=0.5,after=LINE_AFTER); continue
         if s.startswith('*') and s.endswith('*') and not s.startswith('**'):
-            para(doc,s.strip('*'),size=9,color=GRAY,after=6); continue
+            para(doc,s.strip('*'),size=9,color=GRAY,after=LINE_AFTER); continue
         if s.startswith('**') and s.endswith('**'):
-            para(doc,s.strip('*'),size=10.5,bold=True,before=10,after=3); continue
-        para(doc,s,size=10,indent=0.4,after=3)
+            para(doc,s.strip('*'),size=10.5,bold=True,before=Q_BEFORE-3,after=Q_AFTER); continue
+        para(doc,s,size=10,indent=0.4,after=LINE_AFTER)
     flush(); flush_box()
     for g in guides:
         para(doc, g, size=8.5,
-             color=(FADE if DIM[0] else (RED if g.startswith('예:') else GRAY)), indent=0.6, after=2)
+             color=(FADE if DIM[0] else (RED if g.startswith('예:') else GRAY)), indent=0.6, after=GUIDE_AFTER)
 
 doc.save(sys.argv[2]); print("saved:",sys.argv[2])
