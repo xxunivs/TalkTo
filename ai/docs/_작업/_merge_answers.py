@@ -157,11 +157,20 @@ def fit_rows(arows, thead):
         if len(tcols)==1:
             # 한 열짜리 표: 답의 머리행을 버리고 내용이 든 열만 남긴다
             rows=[cells(r) for r in arows]
-            LAB={'규칙','표현','항목','주제','것','음식','장소','지역','이름','인물','대상','받는 사람','#'}
+            LAB={'규칙','표현','항목','주제','것','음식','장소','지역','이름','인물','대상','받는 사람','#','출처','상태'}
             rows=[c for c in rows if not (len(c)>1 and sum(1 for x in c if x in LAB) >= 2)]
             if not rows: return []
             width=max(len(c) for c in rows)
-            j=max(range(width), key=lambda k: sum(len(c[k]) for c in rows if k<len(c)))
+            # 답의 머리행에 내용 열 이름이 있으면 그 자리를 쓴다
+            head=next((cells(r) for r in arows
+                       if sum(1 for x in cells(r) if x in LAB) >= 2), None)
+            PREF=['표현','규칙','항목','주제','것','음식','장소','지역','이름','인물','대상']
+            j=None
+            if head:
+                for name in PREF:
+                    if name in head: j=head.index(name); break
+            if j is None:
+                j=max(range(width), key=lambda k: sum(len(c[k]) for c in rows if k<len(c)))
             return ['| ' + (c[j] if j<len(c) else '') + ' |' for c in rows]
         return [r for r in arows]
     idx=[]
@@ -235,7 +244,6 @@ def merge(sheet, ansfile, out, title):
             sel = sel_texts(a, selval) if a else []
             val = free_text(a) if a else None
         arows = arows if (a and b['id'] and b['id'].startswith('M8-')) else (rows_of(a) if a else [])
-        arows = [r for r in arows if not re.match(r'^\|\s*(표현|음식|장소|것|규칙|지역|이름|인물|주제|받는|항목)\s*\|', r)]
         if val: val = re.sub(r'^[가-힣A-Za-z0-9 ]{1,14}\s*\([^)]{0,20}\)\s*:\s*', '', val.strip())
         if val and EMPTYV.match(val.strip()): val = None
         # "라벨: 값" 짝은 답 전체에서 모은다 (선지와 한 줄에 섞여 있어도)
