@@ -224,8 +224,10 @@ def merge(sheet, ansfile, out, title):
             if s.startswith('|'):
                 if not in_tbl: in_tbl = True; outl.append(s); continue   # 머리행
                 if re.match(r'^\|[\s:\|]*-[\s:\-\|]*\|$', s.strip()): outl.append(s); continue
-                if arows and not tbl_done:
-                    outl.extend(fit_rows(arows, outl[-2] if len(outl)>=2 else s)); tbl_done = True
+                if not tbl_done:
+                    rows = fit_rows(arows, outl[-2] if len(outl)>=2 else s) if arows else []
+                    outl.extend(rows if rows else [s])   # 답이 없으면 빈 칸을 남긴다
+                    tbl_done = True
                 continue
             in_tbl = False
             if card and re.match(r'^(시기|감정|확실성|사용 범위):', s.strip()):
@@ -302,7 +304,6 @@ def merge(sheet, ansfile, out, title):
         res.extend(render(b, a))
     txt = title + "\n\n<!--answersheet-->\n\n" + "\n".join(res) + "\n"
     # 정답지 뒷정리: 빈 표행·안 고른 선지의 빈칸 제거, 카드 이름으로 M2-00 채우기
-    txt = re.sub(r'^\|(?:\s*\|)+\s*\n', '', txt, flags=re.M)
     txt = re.sub(r'[ \t]*→[ \t]*_{4,}[ \t]*(\([^)]*\))?', '', txt)
     lines, name = [], None
     for l in txt.splitlines():
