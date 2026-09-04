@@ -104,7 +104,18 @@ def table(doc,rows):
                     p.add_run().add_break()
                     r=p.add_run(sub); r.font.size=Pt(7.5)
                     r.font.color.rgb = FADE if DIM[0] else GRAY
-            else: rich(p,v,9)
+            else:
+                m=re.fullmatch(r'(<u>.*?</u>|_{3,})\s+(□|■) 모름', v.strip())
+                if m:
+                    # 값은 줄 위에, 체크는 그 아래 — 단독 문항과 같은 모양
+                    if m.group(1).startswith('_'): p.add_run(" ").font.size=Pt(9)
+                    else: rich(p, m.group(1), 9)
+                    ruled(p); p.paragraph_format.left_indent=Cm(0.05)
+                    q=cells[j].add_paragraph()
+                    q.paragraph_format.space_before=Pt(2); q.paragraph_format.space_after=Pt(2)
+                    r=q.add_run(f"{m.group(2)} 모름"); r.font.size=Pt(8.5)
+                    r.font.color.rgb = FADE if DIM[0] else GRAY
+                else: rich(p,v,9)
     q=doc.add_paragraph(); BLOCK.append(q); q.paragraph_format.space_after=Pt(0)
     q.add_run("").font.size=Pt(1)
 
