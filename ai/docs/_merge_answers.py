@@ -90,12 +90,15 @@ def drop_xref(v):
     return XTAIL.sub('', v).strip() if v else v
 
 CARDF=re.compile(r'(시기|감정|확실성|사용 범위|출처)\s*:\s*\**([^·\n(*]+)\**')
+SENS=re.compile(r'\s*·?\s*민감도\s*[:]?\s*(낮음|중간|중|높음)')
 def pull_card(v):
     """답 문장 뒤에 붙은 카드 필드(시기·감정·사용 범위 등)를 떼어낸다."""
     d={}
     if not v: return v, d
     for k,x in CARDF.findall(v): d.setdefault(k, x.strip(' .·'))
     v=CARDF.sub('', v)
+    v=SENS.sub('', v)
+    v=re.sub(r'\*{2,}','',v)
     v=re.sub(r'\((?:M\d{3}[^)]*)\)','',v)                 # 인터뷰 정리본 번호
     v=re.sub(r'(?:\s*·\s*){2,}',' ',v)
     v=re.sub(r'\s*[·,]\s*$','',re.sub(r'\s{2,}',' ',v)).strip(' ·')
@@ -188,8 +191,9 @@ def merge(sheet, ansfile, out, title):
                     return f"{k}: <u>{v}</u>" if v else mm.group(0)
                 s = re.sub(r'(시기|감정): _{3,}', fill, s)
                 for k in ('확실성','사용 범위'):
-                    if card.get(k) and k in s:
-                        s = re.sub(r'□ ('+re.escape(card[k])+r')', r'■ \1', s)
+                    v = (card.get(k) or '').split('—')[0].split('(')[0].strip()
+                    if v and k in s:
+                        s = re.sub(r'□ ('+re.escape(v)+r')', r'■ \1', s)
                 outl.append(s); continue
             if '□' in s and sel:
                 parts = re.split(r'(?=[■□])', s)
