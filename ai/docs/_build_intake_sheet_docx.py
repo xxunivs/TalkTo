@@ -12,15 +12,7 @@ RED=RGBColor(0xB0,0x3A,0x2B); FADE=RGBColor(0xB4,0xB4,0xB4)
 FULL=17.6   # 본문 폭(cm)
 
 def box_width(fmt, value=None):
-    """문항 형식에 맞춰 답 칸 너비를 정한다."""
-    if not fmt: return FULL
-    if '서술' in fmt or '표' in fmt: return FULL
-    m=re.search(r'단답 (\d+)', fmt)
-    if m: w = 0.42*int(m.group(1)) + 1.4
-    elif '숫자' in fmt: w = 3.5
-    else: return FULL
-    if value: w = max(w, min(FULL, 0.42*len(value) + 1.4))
-    return min(FULL, w)
+    return FULL
 
 def box(doc, value=None, rows=1, fmt=None):
     """답 칸. 값이 있으면 칸 안에 넣고, 없으면 빈 칸을 그린다."""
@@ -53,7 +45,7 @@ def rich(p,text,size=10,base=None,bold=False):
         if tok.startswith('**') and tok.endswith('**'):
             r=p.add_run(tok[2:-2]); r.bold=True
         elif tok.startswith('<u>') and tok.endswith('</u>'):
-            r=p.add_run(tok[3:-4]); r.underline=True
+            r=p.add_run(tok[3:-4])
         elif tok.startswith('`') and tok.endswith('`'):
             r=p.add_run(tok[1:-1]); r.font.size=Pt(size-1.5); r.font.color.rgb=GRAY; continue
         else:
