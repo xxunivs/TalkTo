@@ -1,4 +1,4 @@
-# Persona Intake 문항
+# Persona Intake
 
 ---
 
