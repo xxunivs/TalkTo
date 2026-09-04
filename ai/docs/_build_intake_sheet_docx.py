@@ -95,7 +95,11 @@ def table(doc,rows):
         for j,v in enumerate(row):
             p=cells[j].paragraphs[0]; p.paragraph_format.space_after=Pt(3)
             if i==0:
-                r=p.add_run(v); r.bold=True; r.font.size=Pt(8.5); shade(p,'EFEFEF')
+                head, _, sub = v.partition('<br>')
+                r=p.add_run(head); r.bold=True; r.font.size=Pt(8.5); shade(p,'EFEFEF')
+                if sub:
+                    p.add_run().add_break()
+                    r=p.add_run(sub); r.font.size=Pt(7.5); r.font.color.rgb=GRAY
             else: rich(p,v,9)
     q=doc.add_paragraph(); BLOCK.append(q); q.paragraph_format.space_after=Pt(0)
     q.add_run("").font.size=Pt(1)
