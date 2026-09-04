@@ -48,7 +48,13 @@ def parse_answers(p):
             cur = m.group(1); rest = m.group(2)
             ans.setdefault(cur, [])
             if re.search(r'건너뜀|해당 없음|해당없음', rest): skips.add(cur)
-            if ':' in rest: ans[cur].append(rest.split(':',1)[1].strip())
+            # 대괄호·백틱 밖의 콜론에서만 자른다 ([상태: 미수집] 안의 콜론을 피함)
+            depth=0; cut=None
+            for k,c in enumerate(rest):
+                if c in '[`': depth+=1
+                elif c in ']`': depth=max(0,depth-1)
+                elif c==':' and depth==0: cut=k; break
+            if cut is not None: ans[cur].append(rest[cut+1:].strip())
             continue
         m = re.match(r'^\*\*카드 \d+ — (.+?)\*\*\s*(.*)$', l)
         if m:
@@ -77,13 +83,17 @@ def m8_split(lines):
         return sel, (say[0] if say else None)
     return [], None
 
-def sel_texts(lines):
+def sel_texts(lines, vals=None):
     out = []
     for l in lines:
         for seg in re.split(r'(?=[■□])', l):
-            if seg.startswith('■'):
-                seg = re.split(r'\s+[—–]\s+|\s+·\s+|\s+\[', seg)[0]
-                out.append(norm(seg))
+            if not seg.startswith('■'): continue
+            head = re.split(r'\s+[—–]\s+|\s+·\s+|\s+\[', seg)[0]
+            k = norm(head)
+            if k:
+                out.append(k)
+                m = re.search(r'→\s*(.+)$', head)          # "직접 입력 → 덕후 기질"
+                if m and vals is not None: vals[k] = m.group(1).strip()
     return [x for x in out if x]
 
 # 답 뒤에 붙은 편집 주석(다른 문항 가리키기)은 잘라낸다
@@ -205,12 +215,14 @@ def merge(sheet, ansfile, out, title):
         a = [drop_xref(strip_tags(x)) for x in a] if a else a
         if a and b['id'] and b['id'].startswith(('M8-','T1-02b')):
             s8, say = m8_split(a)
-            sel = [norm(x) for x in s8]; val = say; arows = []
+            sel = [norm(x) for x in s8]; val = say; arows = []; selval = {}
         else:
-            sel = sel_texts(a) if a else []
+            selval = {}
+            sel = sel_texts(a, selval) if a else []
             val = free_text(a) if a else None
         arows = arows if (a and b['id'] and b['id'].startswith('M8-')) else (rows_of(a) if a else [])
         arows = [r for r in arows if not re.match(r'^\|\s*(표현|음식|장소|것|규칙|지역|이름|인물|주제|받는|항목)\s*\|', r)]
+        if val: val = re.sub(r'^[가-힣A-Za-z0-9 ]{1,14}\s*\([^)]{0,20}\)\s*:\s*', '', val.strip())
         if val and EMPTYV.match(val.strip()): val = None
         val, card = pull_card(val)
         outl, in_tbl, tbl_done, marked, wrote = [], False, False, False, False
@@ -253,8 +265,12 @@ def merge(sheet, ansfile, out, title):
                 marked = marked or bool(hit)
                 line=''.join(new)
                 marked=[x for x in new if x.startswith('■')]
-                if '____' in line and val and marked and '____' in marked[-1]:
-                    line=re.sub(r'_{3,}', '<u>'+val.strip().strip('"')+'</u>', line); val=None
+                if '____' in line and marked and '____' in marked[-1]:
+                    own = selval.get(norm(marked[-1]))
+                    fillv = own or (val.strip().strip('"') if val else None)
+                    if fillv:
+                        line=re.sub(r'_{3,}', '<u>'+fillv+'</u>', line)
+                        if not own: val=None
                 outl.append(line); continue
             if '____' in s and val:
                 v = val.strip().strip('"')
@@ -304,7 +320,6 @@ def merge(sheet, ansfile, out, title):
         res.extend(render(b, a))
     txt = title + "\n\n<!--answersheet-->\n\n" + "\n".join(res) + "\n"
     # 정답지 뒷정리: 빈 표행·안 고른 선지의 빈칸 제거, 카드 이름으로 M2-00 채우기
-    txt = re.sub(r'[ \t]*→[ \t]*_{4,}[ \t]*(\([^)]*\))?', '', txt)
     lines, name = [], None
     for l in txt.splitlines():
         mm = re.match(r'^\*\*카드 \d+ · (.+?)\*\*', l)
