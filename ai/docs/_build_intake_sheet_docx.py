@@ -14,9 +14,17 @@ FULL=17.6   # 본문 폭(cm)
 def box_width(fmt, value=None):
     return FULL
 
+def tbl_border(t, color):
+    tblPr=t._tbl.tblPr; el=OxmlElement('w:tblBorders')
+    for side in ('top','left','bottom','right','insideH','insideV'):
+        e=OxmlElement('w:'+side); e.set(qn('w:val'),'single'); e.set(qn('w:sz'),'4')
+        e.set(qn('w:space'),'0'); e.set(qn('w:color'),color); el.append(e)
+    tblPr.append(el)
+
 def box(doc, value=None, rows=1, fmt=None):
     """답 칸. 값이 있으면 칸 안에 넣고, 없으면 빈 칸을 그린다."""
     t=doc.add_table(rows=1, cols=1); t.style="Table Grid"
+    if DIM[0]: tbl_border(t, 'D9D9D9')
     t.autofit=False
     w=Cm(box_width(fmt, value))
     t.columns[0].width=w; t.rows[0].cells[0].width=w

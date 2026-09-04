@@ -159,16 +159,48 @@ def rows_of(lines):
     return rows
 
 # ── 병합 ──────────────────────────────────────
+COND=re.compile(r'^\*\*[A-Za-z0-9\-]+ · \((?:[PCMT]\d[\w\-]*에서|본인|타인)')
+
+def axis_of(ans):
+    def picked(i):
+        """그 문항에서 실제로 고른(■) 선지들만."""
+        out=[]
+        for l in ans.get(i) or []:
+            for seg in re.split(r'(?=[■□])', l):
+                if seg.startswith('■'): out.append(seg)
+        return " ".join(out)
+    return {
+        'self':     '본인' in picked('P1-02'),
+        'deceased': '돌아가셨' in picked('P1-04'),
+        'public':   '공개'   in picked('P1-06'),
+        'period':   '특정 시기' in picked('P1-05'),
+        'tell_hard':'말하겠다'  in picked('M5-07A'),
+    }
+
 def merge(sheet, ansfile, out, title):
     blocks = parse_sheet(sheet)
     ans, cards, skips = parse_answers(ansfile)
+    ax = axis_of(ans)
     res, used = [], set()
 
     def render(b, a, card_name=None):
         lines = b['lines'][:]
         if card_name:
             lines = [lines[0]] + lines[1:]
-        skipped = (b['id'] in skips) and not card_name
+        i = b['id'] or ''
+        if   i.startswith('T1-'): skipped = not ax['deceased']
+        elif i.startswith('T2-'): skipped = not ax['self']
+        elif i.startswith('T3-'): skipped = ax['self'] or ax['deceased']
+        elif i.startswith('T4-'): skipped = not (ax['self'] and ax['period'])
+        elif i in ('P1-03','P1-08'):   skipped = ax['self']
+        elif i == 'M9-03':             skipped = not ax['self']
+        elif i == 'P1-07A':            skipped = ax['public']
+        elif i in ('P1-07B','P1-07C'): skipped = not ax['public']
+        elif i == 'M5-07B':            skipped = not ax['tell_hard']
+        elif COND.match(b['lines'][0]):
+            skipped = not (a and any(x.strip() for x in a))   # 그 밖의 조건부
+        else: skipped = False
+        if card_name: skipped = False
         a = [drop_xref(strip_tags(x)) for x in a] if a else a
         if a and b['id'] and b['id'].startswith(('M8-','T1-02b')):
             s8, say = m8_split(a)
@@ -240,7 +272,19 @@ def merge(sheet, ansfile, out, title):
             outl.append(val)
         return outl
 
+    dim_head = None
     for b in blocks:
+        h = b['lines'][0] if b['lines'] else ''
+        if h.startswith('#'):
+            m2 = re.match(r'^#{2,3} (T[1-4])\.', h)
+            if m2:
+                k = m2.group(1)
+                dim_head = (k=='T1' and not ax['deceased']) or (k=='T2' and not ax['self']) \
+                        or (k=='T3' and (ax['self'] or ax['deceased'])) \
+                        or (k=='T4' and not (ax['self'] and ax['period']))
+            else: dim_head = False
+            if dim_head:
+                res.append(h); res.append('<!--dim-->'); res.extend(b['lines'][1:]); continue
         if b['id'] == 'M2-00' and cards:
             for n, c in enumerate(cards, 1):
                 res.append(f"**카드 {n} · {c['name']}**")
