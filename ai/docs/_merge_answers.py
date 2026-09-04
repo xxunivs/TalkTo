@@ -306,16 +306,16 @@ def merge(sheet, ansfile, out, title):
             else: dim_head = False
             if dim_head:
                 res.append(h); res.append('<!--dim-->'); res.extend(b['lines'][1:]); continue
-        if b['id'] == 'M2-00' and cards:
+        if b['id'] == 'M2-01' and cards:
             for n, c in enumerate(cards, 1):
                 res.append(f"**카드 {n} · {c['name']}**")
                 for bb in blocks:
-                    if bb['id'] and bb['id'].startswith('M2-') and bb['id']!='M2-OE':
+                    if bb['id'] and bb['id'].startswith('M2-') and bb['id']!='M2-11':
                         v = c['f'].get(bb['id'])
                         res.extend(render(bb, [v] if v else None))
                         res.append('')
             continue
-        if b['id'] and b['id'].startswith('M2-') and b['id']!='M2-OE' and cards: continue
+        if b['id'] and b['id'].startswith('M2-') and b['id']!='M2-11' and cards: continue
         a = ans.get(b['id'])
         if a: used.add(b['id'])
         res.extend(render(b, a))
