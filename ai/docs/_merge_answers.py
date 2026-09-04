@@ -182,14 +182,12 @@ def merge(sheet, ansfile, out, title):
             if '____' in s and val:
                 v = val.strip().strip('"')
                 s = re.sub(r'_{3,}', v, s); outl.append(s); val=None; continue
-            m = re.match(r'^답:\s*_*\s*$', s)
-            if m:
-                outl.append('답: ' + (val or '')); continue
-            if s.strip() == '답:':
-                outl.append('답: ' + (val or '')); continue
+            if re.match(r'^_{4,}$', s.strip()):
+                if val: outl.append(val); val = None
+                continue
             outl.append(s)
-        if val and not marked and not any(('답: ' in x and x.strip()!='답:') or val[:12] in x for x in outl):
-            outl.append('답: ' + val)
+        if val and not marked and not any(val[:12] in x for x in outl):
+            outl.append(val)
         return outl
 
     for b in blocks:
