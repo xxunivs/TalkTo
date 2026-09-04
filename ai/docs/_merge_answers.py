@@ -134,7 +134,8 @@ def free_text(lines):
     return None
 
 def cells(l): return [c.strip() for c in l.strip().strip('|').split('|')]
-ALIAS={'언제쓰는말':'상황','언제':'상황','무엇을하던곳':'무엇을하던곳','어떻게얼마나':'어떻게얼마나',
+ALIAS={'언제쓰는말':'상황','언제':'상황','규칙':'하지않아야할말행동',
+       '대신어떻게':'대신어떻게하면좋을까요','무엇을하던곳':'무엇을하던곳','어떻게얼마나':'어떻게얼마나',
        '얽힌기억':'얽힌기억','그분과의관계':'관계','받는사람':'받는사람','언제들려줄지':'언제'}
 def key(s):
     s=s.split('<br>')[0]                    # 머리행에 붙인 선지는 이름에서 뺀다
@@ -148,7 +149,7 @@ def fit_rows(arows, thead):
     ahead=None
     for r in arows:
         c=cells(r)
-        need = 1 if len(tcols)==1 else max(2, len(tcols)//2)
+        need = 1 if len(tcols)<=2 else max(2, len(tcols)//2)
         if sum(1 for x in c if key(x) in tcols) >= need: ahead=c; break
     if ahead is None:
         if len(tcols)==1:
