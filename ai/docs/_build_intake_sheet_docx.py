@@ -35,7 +35,7 @@ def box(doc, value=None, rows=1, blanks=None):
         p=doc.add_paragraph(); BLOCK.append(p); f=p.paragraph_format
         f.space_before=Pt(0); f.space_after=Pt(LINE_AFTER+2); f.line_spacing=1.15
         ruled(p, w)
-        if i==0 and value: rich(p, value, 10)
+        if i==0 and value: rich(p, re.sub(r'</?u>', '', value), 10)
         else: p.add_run(" ").font.size=Pt(10)
 
 def shade(p,c):
@@ -73,7 +73,7 @@ def rich(p,text,size=10,base=None,bold=False):
         if tok.startswith('**') and tok.endswith('**'):
             r=p.add_run(tok[2:-2]); r.bold=True
         elif tok.startswith('<u>') and tok.endswith('</u>'):
-            r=p.add_run(tok[3:-4])
+            r=p.add_run(tok[3:-4]); r.underline=True
         elif tok.startswith('`') and tok.endswith('`'):
             r=p.add_run(tok[1:-1]); r.font.size=Pt(size-1.5); r.font.color.rgb=GRAY; continue
         else:
