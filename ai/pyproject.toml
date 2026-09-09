@@ -34,7 +34,7 @@ speaker = [
 include = ["infra*", "pipeline*"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["test"]
 addopts = "-q"
 
 [tool.ruff]

@@ -1,0 +1,65 @@
+{
+  "sensitivityFlags": [
+    {
+      "type": "health",
+      "description": "닭가슴살을 건강을 위해 먹는다는 언급과 배탈, 세균, 나트륨, 염분, 건강 상태에 대한 대화",
+      "sourceSegmentIds": [
+        44,
+        49,
+        50,
+        72,
+        73,
+        74,
+        75,
+        76,
+        98,
+        99,
+        101,
+        102,
+        103,
+        104,
+        105,
+        106,
+        107,
+        108,
+        109,
+        120,
+        122,
+        128,
+        146,
+        147,
+        170,
+        182,
+        183,
+        184,
+        186
+      ]
+    },
+    {
+      "type": "asset",
+      "description": "배달 음식 비용이 만 원 정도 든다는 구체적인 금전 언급",
+      "sourceSegmentIds": [
+        65,
+        67,
+        69
+      ]
+    },
+    {
+      "type": "thirdParty",
+      "description": "회사에서 다른 사람들이 점심을 배달시켜 먹는다는 직장 내 타인 상황 언급",
+      "sourceSegmentIds": [
+        65,
+        67,
+        75
+      ]
+    },
+    {
+      "type": "thirdParty",
+      "description": "준혁이라는 다른 가족으로 보이는 사람의 식사 습관 언급",
+      "sourceSegmentIds": [
+        20
+      ]
+    }
+  ],
+  "judgeDropped": []
+}

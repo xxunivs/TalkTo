@@ -1,0 +1,287 @@
+{
+  "provider": "elevenlabs",
+  "model": "scribe_v1",
+  "segments": [
+    {
+      "segmentIndex": 0,
+      "startMs": 100,
+      "endMs": 1280,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "어?"
+    },
+    {
+      "segmentIndex": 1,
+      "startMs": 1280,
+      "endMs": 2320,
+      "speakerLabel": "SPK_1",
+      "transcriptText": "어, 잘 있지."
+    },
+    {
+      "segmentIndex": 2,
+      "startMs": 3660,
+      "endMs": 8580,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "어, 궁금했어. 궁금했었다. 두 번째 저거 예방주사 맞고 괜찮았었어?"
+    },
+    {
+      "segmentIndex": 3,
+      "startMs": 9700,
+      "endMs": 11820,
+      "speakerLabel": "SPK_1",
+      "transcriptText": "어, 괜찮아."
+    },
+    {
+      "segmentIndex": 4,
+      "startMs": 11820,
+      "endMs": 12200,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "어."
+    },
+    {
+      "segmentIndex": 5,
+      "startMs": 13260,
+      "endMs": 15540,
+      "speakerLabel": "SPK_1",
+      "transcriptText": "할머니도 괜찮지?"
+    },
+    {
+      "segmentIndex": 6,
+      "startMs": 15540,
+      "endMs": 21060,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "어. 궁금했었다. 그래서 전화했어."
+    },
+    {
+      "segmentIndex": 7,
+      "startMs": 21060,
+      "endMs": 24900,
+      "speakerLabel": "SPK_1",
+      "transcriptText": "음. 할머니도 삼차 맞고 좀 됐네."
+    },
+    {
+      "segmentIndex": 8,
+      "startMs": 24900,
+      "endMs": 25040,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "어?"
+    },
+    {
+      "segmentIndex": 9,
+      "startMs": 26320,
+      "endMs": 29820,
+      "speakerLabel": "SPK_1",
+      "transcriptText": "삼차 맞고 주사 맞고 좀 됐네. 할머니도."
+    },
+    {
+      "segmentIndex": 10,
+      "startMs": 29820,
+      "endMs": 32900,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "어, 괜찮았어, 할머니."
+    },
+    {
+      "segmentIndex": 11,
+      "startMs": 32900,
+      "endMs": 33480,
+      "speakerLabel": "SPK_1",
+      "transcriptText": "다행이다."
+    },
+    {
+      "segmentIndex": 12,
+      "startMs": 35120,
+      "endMs": 35600,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "집이니?"
+    },
+    {
+      "segmentIndex": 13,
+      "startMs": 36820,
+      "endMs": 39400,
+      "speakerLabel": "SPK_1",
+      "transcriptText": "어, 나 이제 씻고 잘라고. 좀 피곤해서."
+    },
+    {
+      "segmentIndex": 14,
+      "startMs": 39680,
+      "endMs": 41860,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "어, 그래. 어서 씻고 자라."
+    },
+    {
+      "segmentIndex": 15,
+      "startMs": 41860,
+      "endMs": 44040,
+      "speakerLabel": "SPK_1",
+      "transcriptText": "할머니 저녁은 드셨지?"
+    },
+    {
+      "segmentIndex": 16,
+      "startMs": 44040,
+      "endMs": 47180,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "어, 저녁 잘 먹고 들었어?"
+    },
+    {
+      "segmentIndex": 17,
+      "startMs": 47180,
+      "endMs": 48840,
+      "speakerLabel": "SPK_1",
+      "transcriptText": "네. 네."
+    },
+    {
+      "segmentIndex": 18,
+      "startMs": 48840,
+      "endMs": 52040,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "응. 그래. 어서 씻고 자. 추운데 날씨가 춥다."
+    },
+    {
+      "segmentIndex": 19,
+      "startMs": 52040,
+      "endMs": 58360,
+      "speakerLabel": "SPK_1",
+      "transcriptText": "어, 너무 춥네. 어, 이제. 어, 내일 지금 비 오거든, 밖에."
+    },
+    {
+      "segmentIndex": 20,
+      "startMs": 58360,
+      "endMs": 60060,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "어."
+    },
+    {
+      "segmentIndex": 21,
+      "startMs": 60060,
+      "endMs": 62379,
+      "speakerLabel": "SPK_1",
+      "transcriptText": "그래서 아마 내일은 더 추워질 거야."
+    },
+    {
+      "segmentIndex": 22,
+      "startMs": 63440,
+      "endMs": 66740,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "어, 그래. 내일 더 춥겠다. 옷 뚠뚠하게 잘 입고 가."
+    },
+    {
+      "segmentIndex": 23,
+      "startMs": 66740,
+      "endMs": 68140,
+      "speakerLabel": "SPK_1",
+      "transcriptText": "어, 그래요."
+    },
+    {
+      "segmentIndex": 24,
+      "startMs": 68600,
+      "endMs": 70880,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "어, 그래. 어서 씻고 자라 그럼."
+    },
+    {
+      "segmentIndex": 25,
+      "startMs": 70880,
+      "endMs": 73070,
+      "speakerLabel": "SPK_1",
+      "transcriptText": "구리 우유. 할머니도 잘자."
+    },
+    {
+      "segmentIndex": 26,
+      "startMs": 74100,
+      "endMs": 76060,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "어, 잘 자."
+    },
+    {
+      "segmentIndex": 27,
+      "startMs": 76060,
+      "endMs": 77479,
+      "speakerLabel": "SPK_1",
+      "transcriptText": "네."
+    },
+    {
+      "segmentIndex": 28,
+      "startMs": 77480,
+      "endMs": 78880,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "어, 감기 조심하고."
+    },
+    {
+      "segmentIndex": 29,
+      "startMs": 80420,
+      "endMs": 81300,
+      "speakerLabel": "SPK_1",
+      "transcriptText": "음."
+    },
+    {
+      "segmentIndex": 30,
+      "startMs": 81300,
+      "endMs": 82300,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "알았다."
+    },
+    {
+      "segmentIndex": 31,
+      "startMs": 82300,
+      "endMs": 83700,
+      "speakerLabel": "SPK_1",
+      "transcriptText": "음."
+    },
+    {
+      "segmentIndex": 32,
+      "startMs": 83700,
+      "endMs": 90120,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "어, 늦었다. 어서 씻고 자. 늦어서 전화 아까 말까 했다. 그래. 어서 씻고 잘 자."
+    },
+    {
+      "segmentIndex": 33,
+      "startMs": 90120,
+      "endMs": 90600,
+      "speakerLabel": "SPK_1",
+      "transcriptText": "음."
+    },
+    {
+      "segmentIndex": 34,
+      "startMs": 92500,
+      "endMs": 94620,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "그래, 사랑한다."
+    },
+    {
+      "segmentIndex": 35,
+      "startMs": 94620,
+      "endMs": 96280,
+      "speakerLabel": "SPK_1",
+      "transcriptText": "사랑해요."
+    },
+    {
+      "segmentIndex": 36,
+      "startMs": 96280,
+      "endMs": 103960,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "어, 안녕. 잘 보고해야겠다. 날씨가 너무 추워가지고 조심하고."
+    },
+    {
+      "segmentIndex": 37,
+      "startMs": 105020,
+      "endMs": 106220,
+      "speakerLabel": "SPK_1",
+      "transcriptText": "알았어. 할머니 끊어."
+    },
+    {
+      "segmentIndex": 38,
+      "startMs": 107580,
+      "endMs": 108720,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "어, 알았다."
+    },
+    {
+      "segmentIndex": 39,
+      "startMs": 108720,
+      "endMs": 109020,
+      "speakerLabel": "SPK_1",
+      "transcriptText": "응."
+    }
+  ],
+  "latencySeconds": 9.4
+}

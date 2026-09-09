@@ -1,4 +1,4 @@
-# 로컬 실행 (입력 -> output/sN). 전체 또는 단계만 골라 돌린다.
+# 로컬 실행 (입력 -> input_and_output/<대상자>/sN). 전체 또는 단계만 골라 돌린다.
 # 같은 단계 순서가 infra/be_ai_api/recording_analysis.py 에도 있다. 순서를 바꾸면 둘 다 확인할 것.
 #
 #     python -m pipeline.run_pipeline --subject 신금자                # 전체
@@ -6,11 +6,11 @@
 #     python -m pipeline.run_pipeline --subject 신금자 --only s2_d    # 기억 추출만
 #     python -m pipeline.run_pipeline --subject 신금자 --from s2 --to s3
 #
-# 각 단계는 앞 단계 결과를 output/<subject>/ 에서 읽는다. 전사는 a_transcript.json 에
+# 각 단계는 앞 단계 결과를 input_and_output/<subject>/ 에서 읽는다. 전사는 a_transcript.json 에
 # 이미 있는 녹음을 건너뛰어, 다시 돌려도 유료 API 를 부르지 않는다.
 #
-# s0_input 에는 파이프라인이 읽는 persona_intake.json 과 통화녹음/ 만 넣는다.
-# 사람이 보는 자료(원본 인터뷰, 손으로 쓴 분석 등)는 output/<subject>/reference/ 로.
+# s0_input 에는 파이프라인이 읽는 persona_intake.json 과 음성/ 만 넣는다.
+# 사람이 보는 자료(원본 인터뷰, 손으로 쓴 분석 등)는 input_and_output/<subject>/reference/ 로.
 
 import argparse
 import json
@@ -134,7 +134,7 @@ class Ctx:
         self.glossary = build_glossary(self.subject_context, self.intake_context)
 
     def clips(self) -> list[Path]:
-        audio_dir = self.dir / "s0_input" / "통화녹음"
+        audio_dir = self.dir / "s0_input" / "음성"
         found: list[Path] = []
         for pattern in AUDIO_EXTS:
             found.extend(audio_dir.glob(pattern))
@@ -207,7 +207,7 @@ def step_s1_a(ctx: Ctx) -> str:
     """
     clips = ctx.clips()
     if not clips:
-        raise NeedPriorStep(ctx.dir / "s0_input" / "통화녹음", "s1_a")
+        raise NeedPriorStep(ctx.dir / "s0_input" / "음성", "s1_a")
 
     done: dict[str, list[TranscriptSegment]] = {}
     path = ctx.dir / "s1_transcription" / "a_transcript.json"
@@ -425,10 +425,10 @@ def run(subject_dir: Path, *, settings: Settings, limit: int | None, steps: list
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="파이프라인 로컬 실행 (입력 -> output/sN)")
+    parser = argparse.ArgumentParser(description="파이프라인 로컬 실행 (입력 -> input_and_output/<대상자>/sN)")
     parser.add_argument("--subject", required=True, help="대상자 폴더명 (예: 신금자)")
-    parser.add_argument("--root", default="output", help="output 루트 (기본 output)")
-    parser.add_argument("--limit", type=int, default=None, help="통화녹음 최대 개수(빠른 테스트용)")
+    parser.add_argument("--root", default="input_and_output", help="대상자 폴더 루트 (기본 input_and_output)")
+    parser.add_argument("--limit", type=int, default=None, help="음성 파일 최대 개수(빠른 테스트용)")
     parser.add_argument("--only", help="이 단계만 (s2 또는 s2_d)")
     parser.add_argument("--from", dest="start", help="이 단계부터")
     parser.add_argument("--to", dest="end", help="이 단계까지")

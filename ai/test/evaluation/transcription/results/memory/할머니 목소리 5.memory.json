@@ -1,0 +1,266 @@
+{
+  "memorySegments": [
+    {
+      "segmentIndex": 0,
+      "sourceSegmentIds": [
+        0,
+        1,
+        4,
+        5,
+        11,
+        13,
+        15
+      ],
+      "startMs": 100,
+      "endMs": 47680,
+      "speakerLabel": "SPK_1",
+      "memoryText": "신금자는 상대에게 삶아 둔 닭가슴살을 내일 회사에 가져가서 점심으로 먹어도 괜찮다고 조언했다.",
+      "relatedPeople": [],
+      "confidence": "confirmed",
+      "importanceScore": 4,
+      "tags": [
+        "음식요리",
+        "최근"
+      ],
+      "sensitivityFlags": []
+    },
+    {
+      "segmentIndex": 1,
+      "sourceSegmentIds": [
+        7,
+        16,
+        17,
+        51,
+        53
+      ],
+      "startMs": 28080,
+      "endMs": 201160,
+      "speakerLabel": "SPK_1",
+      "memoryText": "신금자는 삶은 음식은 냉장고처럼 시원한 곳에 두고, 식은 다음에 보관해야 한다고 말했다.",
+      "relatedPeople": [],
+      "confidence": "confirmed",
+      "importanceScore": 5,
+      "tags": [
+        "음식요리",
+        "최근"
+      ],
+      "sensitivityFlags": [
+        "health"
+      ]
+    },
+    {
+      "segmentIndex": 2,
+      "sourceSegmentIds": [
+        21,
+        22,
+        23,
+        24,
+        26
+      ],
+      "startMs": 58740,
+      "endMs": 87339,
+      "speakerLabel": "SPK_0",
+      "memoryText": "신금자는 상대가 회사에 점심을 싸 간다고 들었고, 상대가 늘 도시락을 싸 가며 사진도 보낸다고 말했다.",
+      "relatedPeople": [],
+      "confidence": "confirmed",
+      "importanceScore": 3,
+      "tags": [
+        "가족안부",
+        "최근"
+      ],
+      "sensitivityFlags": []
+    },
+    {
+      "segmentIndex": 3,
+      "sourceSegmentIds": [
+        29
+      ],
+      "startMs": 94100,
+      "endMs": 98360,
+      "speakerLabel": "SPK_1",
+      "memoryText": "신금자는 건강을 잘 챙기라고 당부했다.",
+      "relatedPeople": [],
+      "confidence": "confirmed",
+      "importanceScore": 3,
+      "tags": [
+        "가족안부",
+        "최근"
+      ],
+      "sensitivityFlags": []
+    },
+    {
+      "segmentIndex": 4,
+      "sourceSegmentIds": [
+        31,
+        33
+      ],
+      "startMs": 102860,
+      "endMs": 114840,
+      "speakerLabel": "SPK_1",
+      "memoryText": "신금자는 마스크가 많이 있고, 병원에 갈 때만 쓰고 평소에는 많이 돌아다니지 않는다고 말했다.",
+      "relatedPeople": [],
+      "confidence": "confirmed",
+      "importanceScore": 3,
+      "tags": [
+        "건강병원",
+        "최근"
+      ],
+      "sensitivityFlags": []
+    },
+    {
+      "segmentIndex": 5,
+      "sourceSegmentIds": [
+        34,
+        35
+      ],
+      "startMs": 114840,
+      "endMs": 119490,
+      "speakerLabel": "SPK_0",
+      "memoryText": "신금자는 무릎이 많이 좋아졌다고 말했다.",
+      "relatedPeople": [],
+      "confidence": "confirmed",
+      "importanceScore": 6,
+      "tags": [
+        "건강병원",
+        "최근"
+      ],
+      "sensitivityFlags": [
+        "health"
+      ]
+    },
+    {
+      "segmentIndex": 6,
+      "sourceSegmentIds": [
+        36,
+        37,
+        38,
+        39,
+        41
+      ],
+      "startMs": 119490,
+      "endMs": 152220,
+      "speakerLabel": "SPK_1",
+      "memoryText": "신금자는 허리가 조금씩 나아지고 있으며, 허리 때문에 맞던 주사는 이번에는 코로나 예방주사를 맞아서 안 맞아도 된다고 말했다.",
+      "relatedPeople": [],
+      "confidence": "confirmed",
+      "importanceScore": 6,
+      "tags": [
+        "건강병원",
+        "최근"
+      ],
+      "sensitivityFlags": [
+        "health"
+      ]
+    },
+    {
+      "segmentIndex": 7,
+      "sourceSegmentIds": [
+        46,
+        47,
+        48
+      ],
+      "startMs": 161260,
+      "endMs": 174480,
+      "speakerLabel": "SPK_0",
+      "memoryText": "신금자는 집 안에서는 괜찮지만 밖에 나가면 조금 춥다고 했고, 겉옷 하나를 걸치고 가라고 조언했다.",
+      "relatedPeople": [],
+      "confidence": "confirmed",
+      "importanceScore": 3,
+      "tags": [
+        "날씨계절",
+        "최근"
+      ],
+      "sensitivityFlags": []
+    },
+    {
+      "segmentIndex": 8,
+      "sourceSegmentIds": [
+        49
+      ],
+      "startMs": 174480,
+      "endMs": 181400,
+      "speakerLabel": "SPK_1",
+      "memoryText": "신금자는 상대가 잘 먹고 잘 입는다고 칭찬했다.",
+      "relatedPeople": [],
+      "confidence": "confirmed",
+      "importanceScore": 2,
+      "tags": [
+        "가족안부",
+        "최근"
+      ],
+      "sensitivityFlags": []
+    },
+    {
+      "segmentIndex": 9,
+      "sourceSegmentIds": [
+        45,
+        55,
+        57,
+        59,
+        63,
+        65,
+        67
+      ],
+      "startMs": 158989,
+      "endMs": 240630,
+      "speakerLabel": "SPK_1",
+      "memoryText": "신금자는 상대에게 잘 쉬고 잘 자라고 말했다.",
+      "relatedPeople": [],
+      "confidence": "confirmed",
+      "importanceScore": 2,
+      "tags": [
+        "가족안부",
+        "애정",
+        "최근"
+      ],
+      "sensitivityFlags": []
+    },
+    {
+      "segmentIndex": 10,
+      "sourceSegmentIds": [
+        57,
+        58
+      ],
+      "startMs": 209100,
+      "endMs": 213740,
+      "speakerLabel": "SPK_1",
+      "memoryText": "신금자와 상대는 서로 사랑한다고 말했다.",
+      "relatedPeople": [],
+      "confidence": "confirmed",
+      "importanceScore": 4,
+      "tags": [
+        "가족안부",
+        "애정",
+        "최근"
+      ],
+      "sensitivityFlags": []
+    },
+    {
+      "segmentIndex": 11,
+      "sourceSegmentIds": [
+        20,
+        28,
+        60,
+        61
+      ],
+      "startMs": 56400,
+      "endMs": 220480,
+      "speakerLabel": "SPK_0",
+      "memoryText": "신금자는 상대가 저녁을 먹었는지 여러 번 확인했다.",
+      "relatedPeople": [],
+      "confidence": "confirmed",
+      "importanceScore": 4,
+      "tags": [
+        "가족안부",
+        "최근"
+      ],
+      "sensitivityFlags": [
+        "health"
+      ]
+    }
+  ],
+  "validationDropped": {
+    "memories": 0,
+    "duplicates": 0
+  }
+}

@@ -1,0 +1,67 @@
+{
+  "memorySegments": [
+    {
+      "segmentIndex": 0,
+      "sourceSegmentIds": [
+        3,
+        4,
+        9,
+        10,
+        11
+      ],
+      "startMs": 12000,
+      "endMs": 48000,
+      "speakerLabel": "SPK_1",
+      "memoryText": "상대는 NCS 인정 강의 수강 신청과 국비 지원 가능 여부를 문의했다.",
+      "relatedPeople": [],
+      "confidence": "confirmed",
+      "sensitivityFlags": []
+    },
+    {
+      "segmentIndex": 1,
+      "sourceSegmentIds": [
+        6,
+        7
+      ],
+      "startMs": 24000,
+      "endMs": 32000,
+      "speakerLabel": "SPK_0",
+      "memoryText": "대상자는 '역사 플러스 고구려 한민족 최강의 리더십을 말하다'라는 수업 이름을 확인했다.",
+      "relatedPeople": [],
+      "confidence": "confirmed",
+      "sensitivityFlags": []
+    },
+    {
+      "segmentIndex": 2,
+      "sourceSegmentIds": [
+        8
+      ],
+      "startMs": 32000,
+      "endMs": 36000,
+      "speakerLabel": "SPK_0",
+      "memoryText": "대상자는 작가의 소설을 매우 좋아해서 그 소설을 모두 읽었고, 그 소설로 하는 리더십 강의를 듣고 싶어했다.",
+      "relatedPeople": [],
+      "confidence": "confirmed",
+      "sensitivityFlags": []
+    },
+    {
+      "segmentIndex": 3,
+      "sourceSegmentIds": [
+        12,
+        13,
+        14
+      ],
+      "startMs": 48000,
+      "endMs": 60000,
+      "speakerLabel": "SPK_0",
+      "memoryText": "대상자는 수업에서 고구려사와 현대 경영의 사례를 통해 리더십의 핵심 요소와 실무 적용 방법을 배울 수 있는지 물었다.",
+      "relatedPeople": [],
+      "confidence": "confirmed",
+      "sensitivityFlags": []
+    }
+  ],
+  "validationDropped": {
+    "memories": 0,
+    "duplicates": 0
+  }
+}

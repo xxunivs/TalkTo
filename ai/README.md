@@ -35,7 +35,7 @@ docker run --rm -p 8000:8000 --env-file .env talkto-app-ai
 테스트:
 
 ```bash
-python -m unittest discover -s tests -v
+python -m unittest discover -t . -s test -v
 ```
 
 ## 환경변수

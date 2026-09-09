@@ -1,4 +1,7 @@
+# 비밀값 — 절대 커밋하지 않는다
 .env
+
+# 가상환경·캐시·빌드 산물
 .venv/
 venv/
 __pycache__/
@@ -14,31 +17,9 @@ build/
 .DS_Store
 *.log
 tmp/
-*.wav
-*.mp3
-*.m4a
-*.aac
-*.amr
 
-# bake-off outputs contain transcripts; never commit
-evaluation/transcription/bakeoff/results*/
-evaluation/transcription/gold/
-evaluation/transcription/results/
-# real family data for tests; never commit
-data/fixtures/
-# 신금자(실대상자) 페르소나 산출·평가 결과물; never commit
-evaluation/persona/results/*singeumja*
-evaluation/persona/results/*_sg.*
-# audio + external datasets; never commit
-data/
-# 예외: manual 빌드(신금자 등)는 실행에 data/(기억·임베딩)가 필요해 함께 배포된다.
-# 이 레포는 private이며, 원본 음성·mp3·평가 산출물은 아래에서 다시 제외한다.
-!manual_persona/*/data/
-!manual_persona/*/data/**
-manual_persona/*/data/voice_raw/
-manual_persona/*/data/*.mp3
-manual_persona/*/data/eval_results/
+# AI Hub 원본(9.8GB)으로 가는 바로가기. 실체는 레포 밖에 있어 받는 쪽에서는 깨진다.
+외부데이터/aihub_원본
 
-# 폐기 예정 보관함 (실제 삭제 보류, git 추적 제외)
-delete/
-
+# 151MB — GitHub 파일 한도(100MB) 초과. 팀 공유는 별도 전달.
+input_and_output/신금자/s0_input/음성/통화12.wav

@@ -1,0 +1,510 @@
+{
+  "memorySegments": [
+    {
+      "segmentIndex": 0,
+      "sourceSegmentIds": [
+        3,
+        5,
+        9,
+        19,
+        21
+      ],
+      "startMs": 8260,
+      "endMs": 73380,
+      "speakerLabel": "SPK_1",
+      "memoryText": "신금자는 뭇국에 연한 소고기 부위로 안심을 고르라고 알려줬다.",
+      "relatedPeople": [],
+      "confidence": "confirmed",
+      "importanceScore": 5,
+      "tags": [
+        "음식요리",
+        "최근"
+      ],
+      "sensitivityFlags": []
+    },
+    {
+      "segmentIndex": 1,
+      "sourceSegmentIds": [
+        23,
+        29,
+        31,
+        33,
+        35,
+        39,
+        43
+      ],
+      "startMs": 75220,
+      "endMs": 269800,
+      "speakerLabel": "SPK_1",
+      "memoryText": "신금자는 뭇국을 만들 때 고기를 참기름에 볶으면서 마늘을 넣고, 고기가 익어가면 무를 넣어 끓이라고 설명했다.",
+      "relatedPeople": [],
+      "confidence": "confirmed",
+      "importanceScore": 8,
+      "tags": [
+        "음식요리",
+        "최근"
+      ],
+      "sensitivityFlags": []
+    },
+    {
+      "segmentIndex": 2,
+      "sourceSegmentIds": [
+        45,
+        47,
+        49,
+        51,
+        53,
+        65
+      ],
+      "startMs": 277260,
+      "endMs": 409744,
+      "speakerLabel": "SPK_1",
+      "memoryText": "신금자는 뭇국의 간은 끓인 뒤에 양조간장으로 조금만 하고, 마지막에는 소금으로 맞추라고 말했다.",
+      "relatedPeople": [],
+      "confidence": "confirmed",
+      "importanceScore": 8,
+      "tags": [
+        "음식요리",
+        "최근"
+      ],
+      "sensitivityFlags": []
+    },
+    {
+      "segmentIndex": 3,
+      "sourceSegmentIds": [
+        69,
+        71,
+        73,
+        75,
+        77,
+        79
+      ],
+      "startMs": 419864,
+      "endMs": 467524,
+      "speakerLabel": "SPK_1",
+      "memoryText": "신금자는 잣죽을 만들 때 보리, 현미, 귀리 같은 곡물을 여러 시간 불린 뒤 믹서에 갈아 쓰라고 설명했다.",
+      "relatedPeople": [],
+      "confidence": "confirmed",
+      "importanceScore": 7,
+      "tags": [
+        "음식요리",
+        "최근"
+      ],
+      "sensitivityFlags": []
+    },
+    {
+      "segmentIndex": 4,
+      "sourceSegmentIds": [
+        85,
+        87,
+        89,
+        91,
+        93,
+        97,
+        99,
+        101
+      ],
+      "startMs": 501904,
+      "endMs": 658264,
+      "speakerLabel": "SPK_1",
+      "memoryText": "신금자는 잣죽에 호두, 잣, 아몬드, 땅콩, 팥, 호박씨 같은 재료를 넣을 수 있다고 말했다.",
+      "relatedPeople": [],
+      "confidence": "confirmed",
+      "importanceScore": 5,
+      "tags": [
+        "음식요리",
+        "최근"
+      ],
+      "sensitivityFlags": []
+    },
+    {
+      "segmentIndex": 5,
+      "sourceSegmentIds": [
+        109,
+        111,
+        115,
+        117,
+        119,
+        121
+      ],
+      "startMs": 726836,
+      "endMs": 803956,
+      "speakerLabel": "SPK_1",
+      "memoryText": "신금자는 잣죽이 너무 되면 우유를 넣어 부드럽게 먹을 수 있다고 말했다.",
+      "relatedPeople": [],
+      "confidence": "confirmed",
+      "importanceScore": 6,
+      "tags": [
+        "음식요리",
+        "최근"
+      ],
+      "sensitivityFlags": []
+    },
+    {
+      "segmentIndex": 6,
+      "sourceSegmentIds": [
+        125,
+        127,
+        129
+      ],
+      "startMs": 810476,
+      "endMs": 830236,
+      "speakerLabel": "SPK_1",
+      "memoryText": "신금자는 잣죽에도 소금을 넣어야 하고, 끓이기 전에 넣어야 간이 밴다고 말했다.",
+      "relatedPeople": [],
+      "confidence": "confirmed",
+      "importanceScore": 6,
+      "tags": [
+        "음식요리",
+        "최근"
+      ],
+      "sensitivityFlags": []
+    },
+    {
+      "segmentIndex": 7,
+      "sourceSegmentIds": [
+        135,
+        139
+      ],
+      "startMs": 852336,
+      "endMs": 897796,
+      "speakerLabel": "SPK_1",
+      "memoryText": "신금자는 된장찌개를 만들 때 물 세 컵에 된장 한 숟가락 정도를 넣고, 끓이면서 간을 보며 조금씩 더 넣으라고 말했다.",
+      "relatedPeople": [],
+      "confidence": "confirmed",
+      "importanceScore": 7,
+      "tags": [
+        "음식요리",
+        "최근"
+      ],
+      "sensitivityFlags": []
+    },
+    {
+      "segmentIndex": 8,
+      "sourceSegmentIds": [
+        155,
+        157
+      ],
+      "startMs": 998176,
+      "endMs": 1013416,
+      "speakerLabel": "SPK_1",
+      "memoryText": "신금자는 된장찌개에 두부, 호박, 파, 마늘을 넣고, 경우에 따라 새우젓을 조금 넣는다고 말했다.",
+      "relatedPeople": [],
+      "confidence": "confirmed",
+      "importanceScore": 6,
+      "tags": [
+        "음식요리",
+        "최근"
+      ],
+      "sensitivityFlags": []
+    },
+    {
+      "segmentIndex": 9,
+      "sourceSegmentIds": [
+        159,
+        161
+      ],
+      "startMs": 1017516,
+      "endMs": 1024776,
+      "speakerLabel": "SPK_1",
+      "memoryText": "신금자는 된장찌개에 돼지고기 살코기나 소고기를 넣을 수 있다고 말했다.",
+      "relatedPeople": [],
+      "confidence": "confirmed",
+      "importanceScore": 4,
+      "tags": [
+        "음식요리",
+        "최근"
+      ],
+      "sensitivityFlags": []
+    },
+    {
+      "segmentIndex": 10,
+      "sourceSegmentIds": [
+        163,
+        169,
+        171,
+        173,
+        175,
+        177
+      ],
+      "startMs": 1039536,
+      "endMs": 1101948,
+      "speakerLabel": "SPK_1",
+      "memoryText": "신금자는 돼지고기나 소고기를 넣는 찌개나 볶음에 참기름과 간장을 조금 넣고 볶아 맛을 들이라고 말했다.",
+      "relatedPeople": [],
+      "confidence": "confirmed",
+      "importanceScore": 6,
+      "tags": [
+        "음식요리",
+        "최근"
+      ],
+      "sensitivityFlags": []
+    },
+    {
+      "segmentIndex": 11,
+      "sourceSegmentIds": [
+        183,
+        185,
+        189,
+        191,
+        195,
+        197
+      ],
+      "startMs": 1115788,
+      "endMs": 1203768,
+      "speakerLabel": "SPK_1",
+      "memoryText": "신금자는 매실청이 고기 볶을 때나 단맛을 내고 싶을 때 설탕 대신 조금 들어가며, 매실과 설탕을 같은 양으로 담근다고 말했다.",
+      "relatedPeople": [],
+      "confidence": "confirmed",
+      "importanceScore": 5,
+      "tags": [
+        "음식요리",
+        "최근"
+      ],
+      "sensitivityFlags": []
+    },
+    {
+      "segmentIndex": 12,
+      "sourceSegmentIds": [
+        199,
+        201,
+        203,
+        205,
+        207,
+        211,
+        213
+      ],
+      "startMs": 1210768,
+      "endMs": 1291128,
+      "speakerLabel": "SPK_1",
+      "memoryText": "신금자는 꽃게찌개에 된장과 고추장을 넣고, 매운맛을 원하면 고춧가루도 조금 넣을 수 있다고 말했다.",
+      "relatedPeople": [],
+      "confidence": "confirmed",
+      "importanceScore": 6,
+      "tags": [
+        "음식요리",
+        "최근"
+      ],
+      "sensitivityFlags": []
+    },
+    {
+      "segmentIndex": 13,
+      "sourceSegmentIds": [
+        215,
+        217,
+        219,
+        221,
+        223
+      ],
+      "startMs": 1292848,
+      "endMs": 1354027,
+      "speakerLabel": "SPK_1",
+      "memoryText": "신금자는 꽃게찌개나 다른 국물 요리에 파, 마늘, 양파, 다시마를 넣을 수 있고 다시마는 미리 넣어야 한다고 말했다.",
+      "relatedPeople": [],
+      "confidence": "confirmed",
+      "importanceScore": 6,
+      "tags": [
+        "음식요리",
+        "최근"
+      ],
+      "sensitivityFlags": []
+    },
+    {
+      "segmentIndex": 14,
+      "sourceSegmentIds": [
+        224,
+        225,
+        227,
+        229,
+        231,
+        245,
+        249
+      ],
+      "startMs": 1354027,
+      "endMs": 1591384,
+      "speakerLabel": "SPK_1",
+      "memoryText": "신금자는 미역국에 미역을 불린 뒤 소고기와 마늘을 참기름에 볶고, 물과 미역을 넣은 다음 간장과 소금으로 간을 한다고 설명했다.",
+      "relatedPeople": [],
+      "confidence": "confirmed",
+      "importanceScore": 9,
+      "tags": [
+        "음식요리",
+        "최근"
+      ],
+      "sensitivityFlags": []
+    },
+    {
+      "segmentIndex": 15,
+      "sourceSegmentIds": [
+        231,
+        245,
+        247,
+        249
+      ],
+      "startMs": 1430788,
+      "endMs": 1591384,
+      "speakerLabel": "SPK_1",
+      "memoryText": "신금자는 미역국 국물을 따로 만들어 두었다가 미역과 볶은 고기에 넣으면 맛이 더 낫다고 말했다.",
+      "relatedPeople": [],
+      "confidence": "confirmed",
+      "importanceScore": 8,
+      "tags": [
+        "음식요리",
+        "최근"
+      ],
+      "sensitivityFlags": []
+    },
+    {
+      "segmentIndex": 16,
+      "sourceSegmentIds": [
+        231,
+        233,
+        235,
+        237,
+        239,
+        241,
+        243,
+        245,
+        251,
+        253,
+        255,
+        259,
+        261
+      ],
+      "startMs": 1430788,
+      "endMs": 1700064,
+      "speakerLabel": "SPK_1",
+      "memoryText": "신금자는 미역국 국물에 사과, 배, 양파, 대파의 하얀 부분, 무를 넣을 수 있다고 말했다.",
+      "relatedPeople": [],
+      "confidence": "confirmed",
+      "importanceScore": 6,
+      "tags": [
+        "음식요리",
+        "최근"
+      ],
+      "sensitivityFlags": []
+    },
+    {
+      "segmentIndex": 17,
+      "sourceSegmentIds": [
+        245,
+        247,
+        251,
+        257
+      ],
+      "startMs": 1524004,
+      "endMs": 1645564,
+      "speakerLabel": "SPK_1",
+      "memoryText": "신금자는 요리를 하려면 정성을 들여야 맛이 더 낫다고 말했다.",
+      "relatedPeople": [],
+      "confidence": "confirmed",
+      "importanceScore": 7,
+      "tags": [
+        "음식요리",
+        "최근"
+      ],
+      "sensitivityFlags": []
+    },
+    {
+      "segmentIndex": 18,
+      "sourceSegmentIds": [
+        141,
+        153
+      ],
+      "startMs": 898336,
+      "endMs": 981675,
+      "speakerLabel": "SPK_1",
+      "memoryText": "신금자는 요리를 배울 때 적어 두면 양을 기억하기 쉽다고 말했다.",
+      "relatedPeople": [],
+      "confidence": "confirmed",
+      "importanceScore": 4,
+      "tags": [
+        "음식요리",
+        "최근"
+      ],
+      "sensitivityFlags": []
+    },
+    {
+      "segmentIndex": 19,
+      "sourceSegmentIds": [
+        265
+      ],
+      "startMs": 1727304,
+      "endMs": 1734664,
+      "speakerLabel": "SPK_1",
+      "memoryText": "신금자는 허리가 아파서 최근에는 일을 많이 못하고, 한 가지를 하면 쉽게 지친다고 말했다.",
+      "relatedPeople": [],
+      "confidence": "confirmed",
+      "importanceScore": 8,
+      "tags": [
+        "건강병원",
+        "최근",
+        "걱정"
+      ],
+      "sensitivityFlags": [
+        "health"
+      ]
+    },
+    {
+      "segmentIndex": 20,
+      "sourceSegmentIds": [
+        267
+      ],
+      "startMs": 1741764,
+      "endMs": 1747704,
+      "speakerLabel": "SPK_1",
+      "memoryText": "신금자는 쌀밥을 한 번 하면 이틀에서 사흘 먹을 만큼 한꺼번에 해둔다고 말했다.",
+      "relatedPeople": [],
+      "confidence": "confirmed",
+      "importanceScore": 5,
+      "tags": [
+        "음식요리",
+        "최근"
+      ],
+      "sensitivityFlags": []
+    },
+    {
+      "segmentIndex": 21,
+      "sourceSegmentIds": [
+        269,
+        271
+      ],
+      "startMs": 1758424,
+      "endMs": 1767104,
+      "speakerLabel": "SPK_1",
+      "memoryText": "신금자는 쌀밥을 지을 때 귀리와 검은콩만 넣는다고 말했다.",
+      "relatedPeople": [],
+      "confidence": "confirmed",
+      "importanceScore": 6,
+      "tags": [
+        "음식요리",
+        "최근"
+      ],
+      "sensitivityFlags": []
+    },
+    {
+      "segmentIndex": 22,
+      "sourceSegmentIds": [
+        273,
+        275
+      ],
+      "startMs": 1771544,
+      "endMs": 1799934,
+      "speakerLabel": "SPK_1",
+      "memoryText": "신금자는 죽을 만들 때 귀리와 서리태콩을 조금 넣고, 손주가 많이 넣는 것을 좋아하지 않는다고 말했다.",
+      "relatedPeople": [],
+      "confidence": "confirmed",
+      "importanceScore": 6,
+      "tags": [
+        "음식요리",
+        "최근",
+        "가족안부"
+      ],
+      "sensitivityFlags": []
+    }
+  ],
+  "validationDropped": {
+    "memories": 0,
+    "duplicates": 0
+  }
+}

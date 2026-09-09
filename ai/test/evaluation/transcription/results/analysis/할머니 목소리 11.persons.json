@@ -1,0 +1,78 @@
+{
+  "persons": [
+    {
+      "name": "이재산",
+      "relationToSubject": "배우자",
+      "mentions": [
+        "할아버지",
+        "형이"
+      ],
+      "confidence": "inferred",
+      "sourceSegmentIds": [
+        27,
+        39,
+        41,
+        43,
+        47,
+        53,
+        55,
+        57,
+        59,
+        61,
+        63,
+        65
+      ],
+      "relationsToOthers": [
+        {
+          "name": "신금자",
+          "relation": "배우자",
+          "sourceSegmentIds": [
+            27,
+            39,
+            41,
+            43,
+            47,
+            53,
+            55,
+            57,
+            59,
+            61,
+            63,
+            65
+          ],
+          "confidence": "confirmed"
+        }
+      ],
+      "facts": [
+        {
+          "fact": "오랜만에 전화를 받았고, 잠깐 바꿔서 통화했다.",
+          "sourceSegmentIds": [
+            39,
+            41,
+            43
+          ],
+          "confidence": "confirmed"
+        },
+        {
+          "fact": "대상자와 식사하러 만나기를 이야기했다.",
+          "sourceSegmentIds": [
+            43,
+            47,
+            53,
+            55,
+            57
+          ],
+          "confidence": "confirmed"
+        }
+      ]
+    }
+  ],
+  "unresolvedMentions": [],
+  "validationDropped": {
+    "persons": 0,
+    "relations": 0,
+    "facts": 0,
+    "unresolved": 0,
+    "mentions": 0
+  }
+}

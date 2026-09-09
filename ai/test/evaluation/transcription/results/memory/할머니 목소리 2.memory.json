@@ -1,0 +1,228 @@
+{
+  "memorySegments": [
+    {
+      "segmentIndex": 0,
+      "sourceSegmentIds": [
+        0,
+        4,
+        8
+      ],
+      "startMs": 1360,
+      "endMs": 33019,
+      "speakerLabel": "SPK_0",
+      "memoryText": "신금자는 밥이 있어서 콩나물국을 끓여서 저녁을 간단히 먹으려 했다.",
+      "relatedPeople": [],
+      "confidence": "confirmed",
+      "sensitivityFlags": []
+    },
+    {
+      "segmentIndex": 1,
+      "sourceSegmentIds": [
+        12,
+        52
+      ],
+      "startMs": 48520,
+      "endMs": 242700,
+      "speakerLabel": "SPK_0",
+      "memoryText": "신금자는 콩나물국을 맑고 개운한 맛으로 먹는다고 말했다.",
+      "relatedPeople": [],
+      "confidence": "confirmed",
+      "sensitivityFlags": []
+    },
+    {
+      "segmentIndex": 2,
+      "sourceSegmentIds": [
+        40,
+        84,
+        86
+      ],
+      "startMs": 176980,
+      "endMs": 399028,
+      "speakerLabel": "SPK_0",
+      "memoryText": "신금자는 콩나물국을 끓일 때 오래 끓이면 콩나물이 질겨진다고 알고 있었다.",
+      "relatedPeople": [],
+      "confidence": "confirmed",
+      "sensitivityFlags": []
+    },
+    {
+      "segmentIndex": 3,
+      "sourceSegmentIds": [
+        46,
+        48,
+        50
+      ],
+      "startMs": 211580,
+      "endMs": 237579,
+      "speakerLabel": "SPK_0",
+      "memoryText": "신금자는 콩나물국 간을 맞출 때 새우젓을 사용한다고 말했다.",
+      "relatedPeople": [],
+      "confidence": "confirmed",
+      "sensitivityFlags": []
+    },
+    {
+      "segmentIndex": 4,
+      "sourceSegmentIds": [
+        50,
+        52
+      ],
+      "startMs": 227000,
+      "endMs": 242700,
+      "speakerLabel": "SPK_0",
+      "memoryText": "신금자는 콩나물국에 고춧가루를 넣지 않고 먹는다.",
+      "relatedPeople": [],
+      "confidence": "confirmed",
+      "sensitivityFlags": []
+    },
+    {
+      "segmentIndex": 5,
+      "sourceSegmentIds": [
+        54,
+        56,
+        58
+      ],
+      "startMs": 248400,
+      "endMs": 267880,
+      "speakerLabel": "SPK_0",
+      "memoryText": "신금자는 남은 나물을 냉동실에 보관하면 얼어도 괜찮다고 말했다.",
+      "relatedPeople": [],
+      "confidence": "confirmed",
+      "sensitivityFlags": []
+    },
+    {
+      "segmentIndex": 6,
+      "sourceSegmentIds": [
+        59,
+        62
+      ],
+      "startMs": 267880,
+      "endMs": 280500,
+      "speakerLabel": "SPK_1",
+      "memoryText": "손현선이 며칠 전 신금자 집에 다녀갔다.",
+      "relatedPeople": [
+        "손현선"
+      ],
+      "confidence": "confirmed",
+      "sensitivityFlags": []
+    },
+    {
+      "segmentIndex": 7,
+      "sourceSegmentIds": [
+        62,
+        64,
+        72,
+        74,
+        76
+      ],
+      "startMs": 277180,
+      "endMs": 339980,
+      "speakerLabel": "SPK_0",
+      "memoryText": "손현선은 신금자에게 최근 집 수리 이야기를 전했다.",
+      "relatedPeople": [
+        "손현선"
+      ],
+      "confidence": "inferred",
+      "sensitivityFlags": []
+    },
+    {
+      "segmentIndex": 8,
+      "sourceSegmentIds": [
+        8,
+        40
+      ],
+      "startMs": 25440,
+      "endMs": 192440,
+      "speakerLabel": "SPK_0",
+      "memoryText": "신금자는 콩나물국이 쉬운 음식이라고 생각하며, 급하게 끓여도 된다고 말했다.",
+      "relatedPeople": [],
+      "confidence": "confirmed",
+      "sensitivityFlags": []
+    },
+    {
+      "segmentIndex": 9,
+      "sourceSegmentIds": [
+        88,
+        92,
+        94,
+        96,
+        98,
+        100,
+        102
+      ],
+      "startMs": 400828,
+      "endMs": 485508,
+      "speakerLabel": "SPK_0",
+      "memoryText": "신금자는 손현선이 고등학교 3학년이 된 두 아이 때문에 바빠서 반찬을 해오지 말라고 했다고 말했다.",
+      "relatedPeople": [
+        "손현선"
+      ],
+      "confidence": "confirmed",
+      "sensitivityFlags": [
+        "familyConflict",
+        "thirdParty"
+      ]
+    },
+    {
+      "segmentIndex": 10,
+      "sourceSegmentIds": [
+        102,
+        110,
+        114,
+        118
+      ],
+      "startMs": 459488,
+      "endMs": 546348,
+      "speakerLabel": "SPK_0",
+      "memoryText": "신금자는 손현선과 함께 시장에 다니던 어린 시절 손주 시아를 업고 다닌 기억을 떠올렸다.",
+      "relatedPeople": [
+        "손현선"
+      ],
+      "confidence": "confirmed",
+      "sensitivityFlags": [
+        "thirdParty"
+      ]
+    },
+    {
+      "segmentIndex": 11,
+      "sourceSegmentIds": [
+        110,
+        113,
+        114,
+        116
+      ],
+      "startMs": 507308,
+      "endMs": 538448,
+      "speakerLabel": "SPK_0",
+      "memoryText": "신금자는 손현선이 어린 시절 빨간 소리나는 슬리퍼를 신고 시장을 따라왔던 일을 기억했다.",
+      "relatedPeople": [
+        "손현선"
+      ],
+      "confidence": "confirmed",
+      "sensitivityFlags": [
+        "thirdParty"
+      ]
+    },
+    {
+      "segmentIndex": 12,
+      "sourceSegmentIds": [
+        124,
+        126,
+        127
+      ],
+      "startMs": 562628,
+      "endMs": 577508,
+      "speakerLabel": "SPK_0",
+      "memoryText": "신금자는 손현선이 시아 사진이 귀엽다고 말했다고 전했다.",
+      "relatedPeople": [
+        "손현선"
+      ],
+      "confidence": "confirmed",
+      "sensitivityFlags": [
+        "thirdParty"
+      ]
+    }
+  ],
+  "validationDropped": {
+    "memories": 0,
+    "duplicates": 0
+  }
+}

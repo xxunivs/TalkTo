@@ -1,0 +1,121 @@
+{
+  "memorySegments": [
+    {
+      "segmentIndex": 0,
+      "sourceSegmentIds": [
+        0,
+        8,
+        12,
+        13,
+        14
+      ],
+      "startMs": 0,
+      "endMs": 45000,
+      "speakerLabel": "SPK_0",
+      "memoryText": "대상자는 농사에서 기계가 사람이 하는 것보다 훨씬 낫다고 생각한다.",
+      "relatedPeople": [],
+      "confidence": "confirmed",
+      "sensitivityFlags": []
+    },
+    {
+      "segmentIndex": 1,
+      "sourceSegmentIds": [
+        1,
+        12,
+        13
+      ],
+      "startMs": 3000,
+      "endMs": 42000,
+      "speakerLabel": "SPK_0",
+      "memoryText": "대상자는 집에 밭이 있고 농사를 짓고 있다.",
+      "relatedPeople": [],
+      "confidence": "confirmed",
+      "sensitivityFlags": []
+    },
+    {
+      "segmentIndex": 2,
+      "sourceSegmentIds": [
+        1,
+        2,
+        11
+      ],
+      "startMs": 3000,
+      "endMs": 36000,
+      "speakerLabel": "SPK_0",
+      "memoryText": "대상자는 밭일을 하다가 무릎과 다리, 허리가 아플 수 있다고 말한다.",
+      "relatedPeople": [],
+      "confidence": "confirmed",
+      "sensitivityFlags": []
+    },
+    {
+      "segmentIndex": 3,
+      "sourceSegmentIds": [
+        3,
+        4,
+        5,
+        6
+      ],
+      "startMs": 9000,
+      "endMs": 21000,
+      "speakerLabel": "SPK_0",
+      "memoryText": "대상자는 농약을 칠 때 마스크를 써야 하고, 여름에는 더워서 힘들다고 말한다.",
+      "relatedPeople": [],
+      "confidence": "confirmed",
+      "sensitivityFlags": []
+    },
+    {
+      "segmentIndex": 4,
+      "sourceSegmentIds": [
+        3,
+        4,
+        5,
+        6
+      ],
+      "startMs": 9000,
+      "endMs": 21000,
+      "speakerLabel": "SPK_0",
+      "memoryText": "대상자의 아버지는 여름에 복숭아나무에 약을 치다가 어지럽다고 하며 집으로 돌아온 적이 있다.",
+      "relatedPeople": [],
+      "confidence": "confirmed",
+      "sensitivityFlags": []
+    },
+    {
+      "segmentIndex": 5,
+      "sourceSegmentIds": [
+        7,
+        12,
+        13
+      ],
+      "startMs": 21000,
+      "endMs": 42000,
+      "speakerLabel": "SPK_0",
+      "memoryText": "대상자는 농사가 규모가 작아서 비싼 기계를 사기 어렵다고 말한다.",
+      "relatedPeople": [],
+      "confidence": "confirmed",
+      "sensitivityFlags": []
+    },
+    {
+      "segmentIndex": 6,
+      "sourceSegmentIds": [
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14
+      ],
+      "startMs": 24000,
+      "endMs": 45000,
+      "speakerLabel": "SPK_0",
+      "memoryText": "대상자는 기계가 할 일과 사람이 할 일이 따로 있다고 본다.",
+      "relatedPeople": [],
+      "confidence": "confirmed",
+      "sensitivityFlags": []
+    }
+  ],
+  "validationDropped": {
+    "memories": 0,
+    "duplicates": 0
+  }
+}

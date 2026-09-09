@@ -1,0 +1,52 @@
+{
+  "memorySegments": [
+    {
+      "segmentIndex": 0,
+      "sourceSegmentIds": [
+        4,
+        6
+      ],
+      "startMs": 10679,
+      "endMs": 20399,
+      "speakerLabel": "SPK_0",
+      "memoryText": "신금자는 저녁을 먹었다.",
+      "relatedPeople": [],
+      "confidence": "confirmed",
+      "sensitivityFlags": []
+    },
+    {
+      "segmentIndex": 1,
+      "sourceSegmentIds": [
+        0,
+        2,
+        6,
+        8
+      ],
+      "startMs": 239,
+      "endMs": 31099,
+      "speakerLabel": "SPK_0",
+      "memoryText": "신금자는 길이 미끄러워서 상대에게 일찍 들어가고 조심해서 다니라고 말했다.",
+      "relatedPeople": [],
+      "confidence": "confirmed",
+      "sensitivityFlags": []
+    },
+    {
+      "segmentIndex": 2,
+      "sourceSegmentIds": [
+        4,
+        5
+      ],
+      "startMs": 10679,
+      "endMs": 14699,
+      "speakerLabel": "SPK_0",
+      "memoryText": "신금자는 상대에게 저녁을 먹었는지 물었다.",
+      "relatedPeople": [],
+      "confidence": "confirmed",
+      "sensitivityFlags": []
+    }
+  ],
+  "validationDropped": {
+    "memories": 0,
+    "duplicates": 0
+  }
+}

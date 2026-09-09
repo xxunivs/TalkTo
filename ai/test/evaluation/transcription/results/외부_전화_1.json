@@ -1,0 +1,156 @@
+{
+  "segments": [
+    {
+      "segmentIndex": 0,
+      "startMs": 0,
+      "endMs": 4000,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "NCS 고객센터인가요?",
+      "confidence": null,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "segmentIndex": 1,
+      "startMs": 4000,
+      "endMs": 8000,
+      "speakerLabel": "SPK_1",
+      "transcriptText": "네 맞습니다.",
+      "confidence": null,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "segmentIndex": 2,
+      "startMs": 8000,
+      "endMs": 12000,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "동기가 여기에 6번 전화를 걸었는데 전화 걸기가 힘들다고 하더라고요. 동기 대신해서 제가 여쭤보려고 합니다.",
+      "confidence": null,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "segmentIndex": 3,
+      "startMs": 12000,
+      "endMs": 16000,
+      "speakerLabel": "SPK_1",
+      "transcriptText": "하이 미니어 아카데미의 (GTQ)(지티큐) 취득 과정에 대해서 물어보고 싶은 게 있어서요. 이게 고양에서 진행되는 거 맞죠?",
+      "confidence": null,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "segmentIndex": 4,
+      "startMs": 16000,
+      "endMs": 20000,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "네 고양 고용센터에서 진행되는 프로그램입니다.",
+      "confidence": null,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "segmentIndex": 5,
+      "startMs": 20000,
+      "endMs": 24000,
+      "speakerLabel": "SPK_1",
+      "transcriptText": "수강생 연령이 (언) 보통 어느 정도인지 알 수 있을까요?",
+      "confidence": null,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "segmentIndex": 6,
+      "startMs": 24000,
+      "endMs": 28000,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "저번에 어르신들만 있는 클래스에 들어갔어서 친구 1명 못 사귄게 아쉬워서요.",
+      "confidence": null,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "segmentIndex": 7,
+      "startMs": 28000,
+      "endMs": 32000,
+      "speakerLabel": "SPK_1",
+      "transcriptText": "확인해 보니 평균 연령이 27세입니다.",
+      "confidence": null,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "segmentIndex": 8,
+      "startMs": 32000,
+      "endMs": 36000,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "저랑 비슷하겠네요.",
+      "confidence": null,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "segmentIndex": 9,
+      "startMs": 36000,
+      "endMs": 40000,
+      "speakerLabel": "SPK_1",
+      "transcriptText": "기간은 21년 12월 22일에서 22년 1월 26일까지인 건 맞나요? 월수금에 진행되는 거죠?",
+      "confidence": null,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "segmentIndex": 10,
+      "startMs": 40000,
+      "endMs": 44000,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "네 맞습니다.",
+      "confidence": null,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "segmentIndex": 11,
+      "startMs": 44000,
+      "endMs": 48000,
+      "speakerLabel": "SPK_1",
+      "transcriptText": "이 수업을 하실 강사님이 보통 1주일 강의를 압축해서 1주일마다 1번씩 하신다던데",
+      "confidence": null,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "segmentIndex": 12,
+      "startMs": 48000,
+      "endMs": 52000,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "그럼 기간 동안 금요일마다 1번 해주시게 되는 걸까요?",
+      "confidence": null,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "segmentIndex": 13,
+      "startMs": 52000,
+      "endMs": 56000,
+      "speakerLabel": "SPK_1",
+      "transcriptText": "네 그렇습니다.",
+      "confidence": null,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "segmentIndex": 14,
+      "startMs": 56000,
+      "endMs": 60000,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "아 수업 시간대 알려주세요.",
+      "confidence": null,
+      "correctedText": null,
+      "needsReview": false
+    }
+  ],
+  "provider": "aihub",
+  "model": "phone"
+}

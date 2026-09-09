@@ -7,7 +7,7 @@ BE(persona-runtime.service.ts)의 검색+응답 로직을 로컬 파일 기준�
 실행:
     python -m pipeline.s5_chat.a_chat --subject 신금자
 
-읽는 파일 (output/<subject>/):
+읽는 파일 (input_and_output/<subject>/):
     s3_synthesis/b_persona.txt            페르소나 지침 (필수)
     s2_extraction/d_memory_segments.json  기억 조각 (memory_text, tags, id)
     s3_synthesis/c_embeddings.json        기억 임베딩 (id → vector)
@@ -340,7 +340,7 @@ def run_repl(args: argparse.Namespace) -> int:
 def main() -> None:
     parser = argparse.ArgumentParser(description="s5 로컬 대화 테스트기 (BE persona-runtime 복제)")
     parser.add_argument("--subject", required=True, help="대상자 폴더명 (예: 신금자)")
-    parser.add_argument("--root", default="output", help="output 루트 (기본 output)")
+    parser.add_argument("--root", default="input_and_output", help="대상자 폴더 루트 (기본 input_and_output)")
     parser.add_argument("--top-k", type=int, default=RUNTIME_MEMORY_LIMIT, help="주입할 기억 개수")
     parser.add_argument("--threshold", type=float, default=LOW_CONFIDENCE_THRESHOLD, help="유사도 임계값")
     parser.add_argument("--keep-history", action="store_true", help="멀티턴(이전 대화 주입, BE와 어긋남)")

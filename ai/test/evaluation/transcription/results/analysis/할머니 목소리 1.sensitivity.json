@@ -1,0 +1,32 @@
+{
+  "sensitivityFlags": [
+    {
+      "type": "health",
+      "description": "할머니의 코로나 예방주사 접종 및 접종 후 상태를 묻는 내용",
+      "sourceSegmentIds": [
+        124,
+        126,
+        130,
+        132,
+        136,
+        148,
+        149,
+        150,
+        151,
+        154
+      ]
+    },
+    {
+      "type": "thirdParty",
+      "description": "할머니가 동네 가정의학과에서 예방주사를 맞았다는 위치와 병원 관련 정보",
+      "sourceSegmentIds": [
+        124,
+        126,
+        130,
+        132,
+        148
+      ]
+    }
+  ],
+  "judgeDropped": []
+}

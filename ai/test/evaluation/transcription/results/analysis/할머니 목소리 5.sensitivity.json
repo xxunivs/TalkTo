@@ -1,0 +1,18 @@
+{
+  "sensitivityFlags": [
+    {
+      "type": "health",
+      "description": "할머니의 무릎 통증과 허리 상태, 주사 치료 및 코로나 예방주사 언급",
+      "sourceSegmentIds": [
+        34,
+        35,
+        36,
+        37,
+        38,
+        39,
+        41
+      ]
+    }
+  ],
+  "judgeDropped": []
+}

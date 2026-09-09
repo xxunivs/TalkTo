@@ -1,0 +1,42 @@
+{
+  "persons": [
+    {
+      "name": "이재산",
+      "relationToSubject": "배우자",
+      "mentions": [
+        "할아버지"
+      ],
+      "confidence": "confirmed",
+      "sourceSegmentIds": [
+        45
+      ],
+      "relationsToOthers": [],
+      "facts": [
+        {
+          "fact": "춥다고 하며 감기 들까 봐 난방을 제일 약하게 켜 놓고 나가자고 했다.",
+          "sourceSegmentIds": [
+            45,
+            49
+          ],
+          "confidence": "confirmed"
+        }
+      ]
+    }
+  ],
+  "unresolvedMentions": [
+    {
+      "mention": "성기",
+      "context": "상대가 누구를 가리키는지 가족 정보와 연결되지 않음",
+      "sourceSegmentIds": [
+        71
+      ]
+    }
+  ],
+  "validationDropped": {
+    "persons": 0,
+    "relations": 0,
+    "facts": 0,
+    "unresolved": 0,
+    "mentions": 0
+  }
+}
