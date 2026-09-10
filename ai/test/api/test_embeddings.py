@@ -41,11 +41,6 @@ class EmbeddingsTest(unittest.TestCase):
         self.assertEqual(out[0]["embedding"], [0.1, 0.2])
         self.assertEqual(out[1]["embedding"], [0.3, 0.4])
 
-
-if __name__ == "__main__":
-    unittest.main()
-
-
     @patch("infra.external_api.openai_client.OpenAI")
     def test_query_embedding_needs_only_text(self, mock_openai: MagicMock) -> None:
         """기억을 찾는 질문에는 job 도 segment id 도 없다. 그걸 요구하면 422 로 튕겨
@@ -61,3 +56,7 @@ if __name__ == "__main__":
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["embedding"], [0.1, 0.2])
+
+
+if __name__ == "__main__":
+    unittest.main()
