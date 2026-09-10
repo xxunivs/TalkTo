@@ -7,10 +7,10 @@ BE(persona-runtime.service.ts)의 검색+응답 로직을 로컬 파일 기준�
 실행:
     python -m pipeline.s5_chat.a_chat --subject 신금자
 
-읽는 파일 (input_and_output/<subject>/):
-    s3_synthesis/b_persona.txt            페르소나 지침 (필수)
-    s2_extraction/d_memory_segments.json  기억 조각 (memory_text, tags, id)
-    s3_synthesis/c_embeddings.json        기억 임베딩 (id → vector)
+읽는 파일 (output/<subject>/):
+    s3_synthesis/b_system_prompt.txt      페르소나 지침 (필수)
+    s2_extraction/*_memory.json           기억 조각 (설문·전사·따로 넣은 것)
+    s3_synthesis/c_memory_embedding.json  기억 임베딩 (id → vector)
     s4_voice/voice_id.txt                 클론 voice_id (--tts 때 사용)
 쓰는 파일:
     s5_chat/chat_YYMMDD_HHMM.json         대화 로그 (질문, 응답, 사용된 기억)
@@ -34,8 +34,8 @@ from infra.schema.persona import (
     PersonaContext,
     PersonaResponseRequest,
 )
-from pipeline.s3_synthesis.b_persona import generate_persona_response
-from pipeline.s3_synthesis.c_embeddings import embed_texts
+from pipeline.s3_synthesis.b_build_system_prompt import generate_persona_response
+from pipeline.s3_synthesis.c_build_memory_embedding import embed_texts
 
 logger = logging.getLogger(__name__)
 
@@ -94,7 +94,7 @@ def retrieve_memories(
 
 # ===== 로컬 파일 로더 (파이프라인 output 포맷에 관대하게) =====
 def load_persona_instructions(subject_dir: Path) -> str:
-    path = subject_dir / "s3_synthesis" / "b_persona.txt"
+    path = subject_dir / "s3_synthesis" / "b_system_prompt.txt"
     if not path.exists():
         raise FileNotFoundError(
             f"페르소나 지침이 없다: {path}\n"
@@ -115,17 +115,20 @@ def _first(record: dict, *keys, default=None):
 
 def load_memories(subject_dir: Path) -> list[dict]:
     """기억 조각 → [{id, title, text, tags}]. 없으면 빈 목록(기억 없이 대화)."""
-    path = subject_dir / "s2_extraction" / "d_memory_segments.json"
-    if not path.exists():
-        logger.warning("기억 파일 없음(%s) — 기억 없이 페르소나만으로 대화한다.", path)
+    # 기억은 출처가 여럿이다. 설문·전사·따로 넣은 것을 모두 모은다.
+    found = sorted((subject_dir / "s2_extraction").glob("*_memory.json"))
+    if not found:
+        logger.warning(
+            "기억 파일 없음(%s) — 기억 없이 페르소나만으로 대화한다.",
+            subject_dir / "s2_extraction" / "*_memory.json")
         return []
-    raw = json.loads(path.read_text(encoding="utf-8"))
-    if isinstance(raw, list):
-        items = raw
-    elif isinstance(raw, dict):
-        items = raw.get("memorySegments") or raw.get("memory_segments") or []
-    else:
-        items = []
+    items: list = []
+    for path in found:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        if isinstance(raw, list):
+            items.extend(raw)
+        elif isinstance(raw, dict):
+            items.extend(raw.get("memorySegments") or raw.get("memory_segments") or [])
     memories: list[dict] = []
     for i, item in enumerate(items):
         text = _first(item, "memoryText", "memory_text", "content", "text")
@@ -145,7 +148,7 @@ def load_memories(subject_dir: Path) -> list[dict]:
 
 def load_embeddings(subject_dir: Path) -> dict[str, list[float]]:
     """id → 벡터. 없으면 빈 dict(폴백 검색)."""
-    path = subject_dir / "s3_synthesis" / "c_embeddings.json"
+    path = subject_dir / "s3_synthesis" / "c_memory_embedding.json"
     if not path.exists():
         logger.warning("임베딩 파일 없음(%s) — 유사도 검색 대신 앞쪽 기억으로 폴백.", path)
         return {}
@@ -340,7 +343,7 @@ def run_repl(args: argparse.Namespace) -> int:
 def main() -> None:
     parser = argparse.ArgumentParser(description="s5 로컬 대화 테스트기 (BE persona-runtime 복제)")
     parser.add_argument("--subject", required=True, help="대상자 폴더명 (예: 신금자)")
-    parser.add_argument("--root", default="input_and_output", help="대상자 폴더 루트 (기본 input_and_output)")
+    parser.add_argument("--root", default="output", help="산출물 루트 (기본 output)")
     parser.add_argument("--top-k", type=int, default=RUNTIME_MEMORY_LIMIT, help="주입할 기억 개수")
     parser.add_argument("--threshold", type=float, default=LOW_CONFIDENCE_THRESHOLD, help="유사도 임계값")
     parser.add_argument("--keep-history", action="store_true", help="멀티턴(이전 대화 주입, BE와 어긋남)")

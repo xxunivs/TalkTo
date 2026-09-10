@@ -7,7 +7,7 @@ from pydantic import SecretStr
 
 from infra.setting import Settings
 from main import app
-from pipeline.s3_synthesis.b_persona import extract_memory_candidates
+from pipeline.s3_synthesis.b_build_system_prompt import extract_memory_candidates
 from infra.schema.persona import MemoryCandidateRequest
 
 

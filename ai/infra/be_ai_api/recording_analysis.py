@@ -4,12 +4,12 @@
 from uuid import UUID
 
 from infra.setting import Settings
-from pipeline.s2_extraction.c_linguistic_style import run_linguistic_style_analysis
-from pipeline.s2_extraction.a_persons import run_persons_analysis
-from pipeline.s2_extraction.b_sensitivity import run_sensitivity_analysis
+from pipeline.s2_extraction.c_extract_linguistic_style import run_linguistic_style_analysis
+from pipeline.s2_extraction.a_extract_persons import run_persons_analysis
+from pipeline.s2_extraction.b_extract_sensitivity import run_sensitivity_analysis
 from pipeline.s1_transcription.b_speaker_id import identify_subject_by_content
-from pipeline.s2_extraction.e_summary import aggregate_tags, summarize_recording
-from pipeline.s2_extraction.d_memory_segments import extract_memory_segments
+from pipeline.s2_extraction.f_extract_summary import aggregate_tags, summarize_recording
+from pipeline.s2_extraction.e_extract_memory import extract_memory_segments
 from infra.schema.memory import MemorySegment
 from infra.schema.recording_analysis import (
     AddressTerm,

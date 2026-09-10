@@ -1,6 +1,6 @@
 import unittest
 
-from pipeline.s2_extraction.d_memory_segments import validate_memory_payload
+from pipeline.s2_extraction.e_extract_memory import validate_memory_payload
 from infra.schema.transcript import TranscriptSegment
 
 

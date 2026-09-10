@@ -1,7 +1,7 @@
 import unittest
 
 from infra.schema.transcript import TranscriptSegment
-from pipeline.s2_extraction.b_sensitivity import (
+from pipeline.s2_extraction.b_extract_sensitivity import (
     SensitivityValidationError,
     apply_judge_decisions,
     validate_sensitivity_payload,

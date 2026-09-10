@@ -11,7 +11,7 @@ import re
 from infra.external_api.openai_client import create_openai_client
 
 from infra.setting import Settings
-from pipeline.s2_extraction.d_memory_segments import _ALLOWED_TAGS
+from pipeline.s2_extraction.e_extract_memory import _ALLOWED_TAGS
 from infra.schema.transcript import TranscriptSegment
 
 logger = logging.getLogger(__name__)

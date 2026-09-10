@@ -1,6 +1,6 @@
 import unittest
 
-from pipeline.s2_extraction.e_summary import aggregate_tags, sentence_count
+from pipeline.s2_extraction.f_extract_summary import aggregate_tags, sentence_count
 
 
 class SentenceCountTest(unittest.TestCase):

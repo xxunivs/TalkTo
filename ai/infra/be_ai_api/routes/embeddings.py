@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 
 from infra.be_ai_api.dependencies import SettingsDependency, require_internal_request
-from pipeline.s3_synthesis.c_embeddings import generate_embeddings
+from pipeline.s3_synthesis.c_build_memory_embedding import generate_embeddings
 from infra.schema.embedding import EmbeddingRequest, EmbeddingResponse
 
 
