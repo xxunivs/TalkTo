@@ -1,6 +1,6 @@
 # Render Blueprint — TalkTo
 # 대시보드 → Blueprints → 이 저장소를 연결하면 아래 서비스가 생성된다.
-#   persona-ai-ai : 자동화 파이프라인 (repo 루트 / Docker / torch·ECAPA)
+#   talkto-personaai-ai : 자동화 파이프라인 (repo 루트 / Docker / torch·ECAPA)
 #
 # 신금자 manual 페르소나(talkto-persona-ai)는 이 레포가 아니라 구 레포
 # MediLux-TalkTo/TalkTo_PersonaAI_AI 가 소유한다. 여기서 같은 이름을 선언하면
@@ -9,7 +9,7 @@
 services:
   # ── 1) Phase 2 자동화 파이프라인 (기존 그대로) ──
   - type: web
-    name: persona-ai-ai
+    name: talkto-personaai-ai
     runtime: docker
     dockerfilePath: ./Dockerfile
     # free는 유휴 시 스핀다운(콜드스타트 ~1분) — BE가 호출하는 내부 서비스라 starter 권장.
