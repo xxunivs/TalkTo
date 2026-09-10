@@ -16,7 +16,7 @@ class HealthEndpointTest(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
             response.json(),
-            {"status": "ok", "service": "talkto-app-ai"},
+            {"status": "ok", "service": "persona-ai-ai"},
         )
 
 if __name__ == "__main__":

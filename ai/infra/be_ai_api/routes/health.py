@@ -10,4 +10,4 @@ router = APIRouter(tags=["system"])
 
 @router.get("/health", response_model=HealthResponse)
 def health() -> HealthResponse:
-    return HealthResponse(status="ok", service="talkto-app-ai")
+    return HealthResponse(status="ok", service="persona-ai-ai")
