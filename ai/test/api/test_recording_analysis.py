@@ -4,7 +4,6 @@ from unittest.mock import MagicMock, patch
 
 from fastapi.testclient import TestClient
 
-from infra.be_ai_api.dependencies import require_internal_request
 from main import app
 
 
@@ -19,12 +18,7 @@ class RecordingAnalysisTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls) -> None:
-        app.dependency_overrides[require_internal_request] = lambda: None
         cls.client = TestClient(app)
-
-    @classmethod
-    def tearDownClass(cls) -> None:
-        app.dependency_overrides.pop(require_internal_request, None)
 
     @patch("infra.external_api.openai_client.OpenAI")
     def test_combined_analysis_maps_all_sections(self, mock_openai: MagicMock) -> None:
