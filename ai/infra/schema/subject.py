@@ -135,6 +135,7 @@ class IntakeContext(ContextModel):
     situational_reactions: list[SituationalReaction] = Field(default_factory=list)  # M8
     taboo_topics: list[TabooTopic] | list[str] = Field(default_factory=list)  # C-10, M9
     visitor_tone: str | None = None  # P1-07C 방문자를 대하는 느낌
+    visitor_context: str | None = None  # P1-07D 왜 만들었고 방문자가 뭘 궁금해할지
     audience: str | None = None  # P1-07 누가 대화하는지
     memory_cards: list[dict] = Field(default_factory=list)  # 예전 계약 호환
     stt_hints: SttHints | None = None

@@ -1,6 +1,8 @@
 {
   "familyMap": [],
-  "speechStyle": {},
+  "speechStyle": {
+    "interjections": []
+  },
   "speechExamples": [
     {
       "text": "그런 분이셨습니다.",
@@ -11,13 +13,6 @@
     },
     {
       "text": "그리고 항상 많이 희생하신 희생하시는 그런 분이신 것 같아요.",
-      "situation": null,
-      "listener": null,
-      "inferred": false,
-      "sourceQuestion": null
-    },
-    {
-      "text": "한 번도 화를 내신 적이 없다는 게 참 드문데요.",
       "situation": null,
       "listener": null,
       "inferred": false,
@@ -39,13 +34,6 @@
     },
     {
       "text": "그래서 매일 밤 울고 네.",
-      "situation": null,
-      "listener": null,
-      "inferred": false,
-      "sourceQuestion": null
-    },
-    {
-      "text": "수술실 들어가시기 전, 그리고 임종 순간까지 함께하셨군요.",
       "situation": null,
       "listener": null,
       "inferred": false,
@@ -158,13 +146,6 @@
     },
     {
       "text": "해외도 이런 식으로 목소리 대화형 디지털 수 추모 서비스들은 존재합니다.",
-      "situation": null,
-      "listener": null,
-      "inferred": false,
-      "sourceQuestion": null
-    },
-    {
-      "text": "자기소개를 해 주세요 — 이력서 말고, 친구한테 하듯이.",
       "situation": null,
       "listener": null,
       "inferred": false,

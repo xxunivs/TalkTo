@@ -9,9 +9,10 @@
 # 각 단계는 앞 단계 결과를 output/<subject>/ 에서 읽는다. 전사는 a_transcript.json 에
 # 이미 있는 녹음을 건너뛰어, 다시 돌려도 유료 API 를 부르지 않는다.
 #
-# 사람이 넣는 자료는 input/<대상자>/ 에 둔다. 파이프라인은 persona_intake.json 과
-# 음성/ 만 읽고, 손으로 쓴 자료(manual_ 로 시작하는 파일)는 읽지 않는다.
-# 매뉴얼 페르소나는 같은 입력을 쓰고 산출물만 output/<대상자>_manual/ 로 갈린다.
+# 사람이 넣는 자료는 input/<대상자>/ 에 둔다. 파이프라인이 자동으로 읽는 것은
+# persona_intake.json 과 음성/ 뿐이고, 나머지 자료(인터뷰 전사, 기억DB 등)는 사람이
+# 도구를 골라 넣는다. 매뉴얼 페르소나는 같은 입력을 쓰고 산출물만
+# output/<대상자>_manual/ 로 갈린다.
 
 import argparse
 import json
@@ -39,9 +40,10 @@ from pipeline.s2_extraction.c_extract_linguistic_style import run_linguistic_sty
 from pipeline.s2_extraction.d_merge_recording_prompt import merge_recording_prompt
 from pipeline.s2_extraction.e_extract_memory import extract_memory_segments
 from pipeline.s2_extraction.f_extract_summary import aggregate_tags, summarize_recording
-from pipeline.s3_synthesis.a_extract_insight import run_reflection
-from pipeline.s3_synthesis.b_build_system_prompt import assemble_persona_instructions
-from pipeline.s3_synthesis.c_build_memory_embedding import embed_texts
+from pipeline.s3_synthesis.a_merge_memory import merge_memory
+from pipeline.s3_synthesis.b_extract_insight import run_reflection
+from pipeline.s3_synthesis.c_build_system_prompt import assemble_persona_instructions
+from pipeline.s3_synthesis.d_build_memory_embedding import embed_texts
 
 logger = logging.getLogger(__name__)
 
@@ -50,13 +52,13 @@ AUDIO_EXTS = ("*.wav", "*.m4a", "*.mp3", "*.webm", "*.ogg", "*.flac")
 STEP_ORDER = [
     "s1_a", "s1_b", "s1_c",
     "s2_a", "s2_b", "s2_c", "s2_d", "s2_e", "s2_f",
-    "s3_a", "s3_b", "s3_c",
+    "s3_a", "s3_b", "s3_c", "s3_d",
 ]
 STEP_LABEL = {
     "s1_a": "전사", "s1_b": "화자 판별", "s1_c": "교정",
     "s2_a": "인물", "s2_b": "민감도", "s2_c": "말투",
     "s2_d": "프롬프트 재료 합치기", "s2_e": "기억", "s2_f": "요약과 태그",
-    "s3_a": "통찰", "s3_b": "프롬프트 조립", "s3_c": "임베딩",
+    "s3_a": "기억 모으기", "s3_b": "통찰", "s3_c": "프롬프트 조립", "s3_d": "임베딩",
 }
 
 
@@ -180,17 +182,10 @@ class Ctx:
         return self._sensitivity
 
     def memories(self, needed_by: str) -> list[dict]:
+        """s3_a 가 모아 둔 한 장을 본다. 출처별 파일을 직접 세지 않는다."""
         if self._memories is None:
-            # 기억 재료는 출처가 여럿이다. 설문(intake), 전사(recording), 따로 정리한
-            # 지식(seed) 를 모두 모아 하나로 본다.
-            found: list[dict] = []
-            for path in sorted((self.dir / "s2_extraction").glob("*_memory.json")):
-                found.extend(json.loads(path.read_text(encoding="utf-8")))
-            if not found:
-                raise NeedPriorStep(
-                    self.dir / "s2_extraction" / "*_memory.json", needed_by
-                )
-            self._memories = found
+            self._memories = _read_json(
+                self.dir / "s3_synthesis" / "a_memory.json", needed_by)
         return self._memories
 
     def prompt_material(self) -> tuple[IntakeContext, dict]:
@@ -229,7 +224,7 @@ class Ctx:
 
     def insights(self, needed_by: str) -> list[str]:
         if self._insights is None:
-            self._insights = _read_json(self.dir / "s3_synthesis" / "a_insight.json", needed_by)
+            self._insights = _read_json(self.dir / "s3_synthesis" / "b_insight.json", needed_by)
         return self._insights
 
     def speech_examples(self, needed_by: str) -> list[str]:
@@ -350,12 +345,19 @@ def step_s2_c(ctx: Ctx) -> str:
 
 
 def step_s2_d(ctx: Ctx) -> str:
-    """a·b·c 를 설문과 같은 칸 이름으로 옮겨 담는다. s3 는 이 파일 하나만 본다."""
-    style = _read_json(ctx.dir / "s2_extraction" / "c_recording_linguistic_style.json", "s2_d")
+    """a·b·c 를 설문과 같은 칸 이름으로 옮겨 담는다. s3 는 이 파일 하나만 본다.
+
+    a·b·c 는 각각 돈이 드는 단계라, 아직 안 돌린 것이 있을 수 있다. 없는 것은
+    빈 값으로 두고 있는 것만 담는다. 전사만 있어도 말투 예시는 나온다.
+    """
+    def maybe(filename: str) -> dict:
+        path = ctx.dir / "s2_extraction" / filename
+        return json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+
     merged = merge_recording_prompt(
-        persons=ctx.persons("s2_d"),
-        sensitivity=ctx.sensitivity("s2_d"),
-        linguistic_style=style,
+        persons=maybe("a_recording_persons.json"),
+        sensitivity=maybe("b_recording_sensitivity.json"),
+        linguistic_style=maybe("c_recording_linguistic_style.json"),
         speech_examples=ctx.speech_examples("s2_d"),
     )
     _write_json(ctx.dir / "s2_extraction" / "d_recording_prompt.json", merged)
@@ -418,7 +420,22 @@ def step_s2_f(ctx: Ctx) -> str:
 # ────────────────────────── s3 종합 ──────────────────────────
 
 def step_s3_a(ctx: Ctx) -> str:
-    memories = ctx.memories("s3_a")
+    """설문·전사·따로 넣은 기억을 한 장으로. 뒤 단계는 이 파일만 본다."""
+    merged = merge_memory(ctx.dir / "s2_extraction")
+    if not merged:
+        raise NeedPriorStep(ctx.dir / "s2_extraction" / "*_memory.json", "s3_a")
+    ctx._memories = merged
+    _write_json(ctx.dir / "s3_synthesis" / "a_memory.json", merged)
+    dupes = sum(1 for m in merged if m.get("duplicateOf"))
+    by_source: dict[str, int] = {}
+    for m in merged:
+        by_source[m["source"]] = by_source.get(m["source"], 0) + 1
+    detail = ", ".join(f"{k} {v}건" for k, v in by_source.items())
+    return f"기억 {len(merged)}건 ({detail})" + (f", 겹치는 것 {dupes}건" if dupes else "")
+
+
+def step_s3_b(ctx: Ctx) -> str:
+    memories = ctx.memories("s3_b")
     insights: list[str] = []
     if memories:
         result = run_reflection(
@@ -435,31 +452,31 @@ def step_s3_a(ctx: Ctx) -> str:
         )
         insights = [r.insight for r in result.reflections]
     ctx._insights = insights
-    _write_json(ctx.dir / "s3_synthesis" / "a_insight.json", insights)
+    _write_json(ctx.dir / "s3_synthesis" / "b_insight.json", insights)
     return f"통찰 {len(insights)}건"
 
 
-def step_s3_b(ctx: Ctx) -> str:
+def step_s3_c(ctx: Ctx) -> str:
     intake, recording = ctx.prompt_material()
     examples = [row["text"] for row in (recording.get("speechExamples") or []) if row.get("text")]
-    insights = ctx.insights("s3_b")
+    insights = ctx.insights("s3_c")
     assembled = assemble_persona_instructions(
         PersonaAssemblyRequest(
             subject_context=ctx.subject_context, intake_context=intake,
             speech_examples=examples[:40], persona_insights=insights))
-    path = ctx.dir / "s3_synthesis" / "b_system_prompt.txt"
+    path = ctx.dir / "s3_synthesis" / "c_system_prompt.txt"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(assembled.instructions, encoding="utf-8")
     return f"{len(assembled.instructions)}자 (말투 예시 {len(examples)}개, 통찰 {len(insights)}건)"
 
 
-def step_s3_c(ctx: Ctx) -> str:
-    memories = ctx.memories("s3_c")
+def step_s3_d(ctx: Ctx) -> str:
+    memories = ctx.memories("s3_d")
     rows = []
     if memories:
         vectors = embed_texts([m["memoryText"] for m in memories], settings=ctx.settings)
         rows = [{"id": m["id"], "embedding": vec} for m, vec in zip(memories, vectors)]
-    _write_json(ctx.dir / "s3_synthesis" / "c_memory_embedding.json", {"embeddings": rows})
+    _write_json(ctx.dir / "s3_synthesis" / "d_memory_embedding.json", {"embeddings": rows})
     return f"임베딩 {len(rows)}건"
 
 
@@ -467,7 +484,7 @@ STEP_FUNC = {
     "s1_a": step_s1_a, "s1_b": step_s1_b, "s1_c": step_s1_c,
     "s2_a": step_s2_a, "s2_b": step_s2_b, "s2_c": step_s2_c,
     "s2_d": step_s2_d, "s2_e": step_s2_e, "s2_f": step_s2_f,
-    "s3_a": step_s3_a, "s3_b": step_s3_b, "s3_c": step_s3_c,
+    "s3_a": step_s3_a, "s3_b": step_s3_b, "s3_c": step_s3_c, "s3_d": step_s3_d,
 }
 
 

@@ -1,6 +1,6 @@
 import unittest
 
-from pipeline.s3_synthesis.b_build_system_prompt import (
+from pipeline.s3_synthesis.c_build_system_prompt import (
     aggregate_taboo,
     collect_speech_examples,
     merge_persons,

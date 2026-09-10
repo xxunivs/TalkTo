@@ -243,17 +243,20 @@ def to_intake(answers: dict[str, Answer], *, name: str | None = None) -> dict:
     if grades and grades.rows:
         for cells in grades.rows:
             cells = cells + [""] * 3
-            if cells[0] and cells[1]:
+            topic, grade = _plain(cells[0]), _plain(cells[1])
+            if topic and grade:
                 taboo.append({
-                    "topic": cells[0], "grade": cells[1],
-                    "note": cells[2] or None, "sourceQuestion": "M9-01",
+                    "topic": topic, "grade": grade,
+                    "note": _plain(cells[2]), "sourceQuestion": "M9-01",
                 })
     hide = answers.get("M9-03")
     if hide and hide.rows:
         for cells in hide.rows:
-            if cells and cells[0]:
+            topic = _plain(cells[0]) if cells else None
+            if topic:
                 taboo.append({
-                    "topic": cells[0], "grade": (cells[1] if len(cells) > 1 else None) or "물으면만",
+                    "topic": topic,
+                    "grade": (_plain(cells[1]) if len(cells) > 1 else None) or "물으면만",
                     "sourceQuestion": "M9-03",
                 })
     for topic in many("T2-02"):
@@ -304,6 +307,7 @@ def to_intake(answers: dict[str, Answer], *, name: str | None = None) -> dict:
             },
             "audience": audience,
             "visitorTone": one("P1-07C"),
+            "visitorContext": one("P1-07D"),
             "speechStyle": {
                 "length": one("C-01"),
                 "manner": one("C-02"),
@@ -340,6 +344,8 @@ def to_intake(answers: dict[str, Answer], *, name: str | None = None) -> dict:
 
 def _plain(cell: str) -> str | None:
     cell = re.sub(r"[□■]\s*모름", "", cell).strip()
+    # 표에 직접 채우는 행이라는 표시. 답이 아니라 양식 메모라 프롬프트로 새면 안 된다.
+    cell = re.sub(r"^\(?직접\s*(입력|적기)\)?\s*(\(0~\d행\))?\s*", "", cell)
     cell = cell.strip("_ ").strip()
     return cell or None
 

@@ -8,9 +8,9 @@ BE(persona-runtime.service.ts)의 검색+응답 로직을 로컬 파일 기준�
     python -m pipeline.s5_chat.a_chat --subject 신금자
 
 읽는 파일 (output/<subject>/):
-    s3_synthesis/b_system_prompt.txt      페르소나 지침 (필수)
-    s2_extraction/*_memory.json           기억 조각 (설문·전사·따로 넣은 것)
-    s3_synthesis/c_memory_embedding.json  기억 임베딩 (id → vector)
+    s3_synthesis/c_system_prompt.txt      페르소나 지침 (필수)
+    s3_synthesis/a_memory.json            기억 조각 (설문·전사·따로 넣은 것을 모은 것)
+    s3_synthesis/d_memory_embedding.json  기억 임베딩 (id → vector)
     s4_voice/voice_id.txt                 클론 voice_id (--tts 때 사용)
 쓰는 파일:
     s5_chat/chat_YYMMDD_HHMM.json         대화 로그 (질문, 응답, 사용된 기억)
@@ -34,8 +34,8 @@ from infra.schema.persona import (
     PersonaContext,
     PersonaResponseRequest,
 )
-from pipeline.s3_synthesis.b_build_system_prompt import generate_persona_response
-from pipeline.s3_synthesis.c_build_memory_embedding import embed_texts
+from pipeline.s3_synthesis.c_build_system_prompt import generate_persona_response
+from pipeline.s3_synthesis.d_build_memory_embedding import embed_texts
 
 logger = logging.getLogger(__name__)
 
@@ -94,7 +94,7 @@ def retrieve_memories(
 
 # ===== 로컬 파일 로더 (파이프라인 output 포맷에 관대하게) =====
 def load_persona_instructions(subject_dir: Path) -> str:
-    path = subject_dir / "s3_synthesis" / "b_system_prompt.txt"
+    path = subject_dir / "s3_synthesis" / "c_system_prompt.txt"
     if not path.exists():
         raise FileNotFoundError(
             f"페르소나 지침이 없다: {path}\n"
@@ -115,20 +115,18 @@ def _first(record: dict, *keys, default=None):
 
 def load_memories(subject_dir: Path) -> list[dict]:
     """기억 조각 → [{id, title, text, tags}]. 없으면 빈 목록(기억 없이 대화)."""
-    # 기억은 출처가 여럿이다. 설문·전사·따로 넣은 것을 모두 모은다.
-    found = sorted((subject_dir / "s2_extraction").glob("*_memory.json"))
-    if not found:
-        logger.warning(
-            "기억 파일 없음(%s) — 기억 없이 페르소나만으로 대화한다.",
-            subject_dir / "s2_extraction" / "*_memory.json")
+    # 출처가 여럿인 기억은 s3_a 가 한 장으로 모아 둔다.
+    path = subject_dir / "s3_synthesis" / "a_memory.json"
+    if not path.exists():
+        logger.warning("기억 파일 없음(%s) — 기억 없이 페르소나만으로 대화한다.", path)
         return []
-    items: list = []
-    for path in found:
-        raw = json.loads(path.read_text(encoding="utf-8"))
-        if isinstance(raw, list):
-            items.extend(raw)
-        elif isinstance(raw, dict):
-            items.extend(raw.get("memorySegments") or raw.get("memory_segments") or [])
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    if isinstance(raw, list):
+        items = raw
+    elif isinstance(raw, dict):
+        items = raw.get("memorySegments") or raw.get("memory_segments") or []
+    else:
+        items = []
     memories: list[dict] = []
     for i, item in enumerate(items):
         text = _first(item, "memoryText", "memory_text", "content", "text")
@@ -148,7 +146,7 @@ def load_memories(subject_dir: Path) -> list[dict]:
 
 def load_embeddings(subject_dir: Path) -> dict[str, list[float]]:
     """id → 벡터. 없으면 빈 dict(폴백 검색)."""
-    path = subject_dir / "s3_synthesis" / "c_memory_embedding.json"
+    path = subject_dir / "s3_synthesis" / "d_memory_embedding.json"
     if not path.exists():
         logger.warning("임베딩 파일 없음(%s) — 유사도 검색 대신 앞쪽 기억으로 폴백.", path)
         return {}
