@@ -207,8 +207,11 @@ class Ctx:
 
         style = recording.get("speechStyle") or {}
         if isinstance(intake.speech_style, SpeechStyle):
-            if not intake.speech_style.interjections:
-                intake.speech_style.interjections = style.get("interjections", [])
+            # 감탄사는 여러 개를 모으는 칸이라 덮지 않고 합친다. 본인이 적은 것이
+            # 앞에 오고, 녹음에서 새로 나온 것이 뒤에 붙는다.
+            found = intake.speech_style.interjections
+            intake.speech_style.interjections = found + [
+                w for w in style.get("interjections", []) if w not in found]
             if not intake.speech_style.summary:
                 intake.speech_style.summary = style.get("summary")
         elif intake.speech_style is None and style:

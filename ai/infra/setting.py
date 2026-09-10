@@ -38,6 +38,12 @@ class Settings(BaseModel):
     # 말하는 속도(ElevenLabs speed). 1.0=기본, <1 느리게(대표 피드백: 조금 느리게).
     # 0.7~1.2 권장. 요청에서 speed로 오버라이드 가능.
     elevenlabs_speed: float = Field(default=1.0, ge=0.7, le=1.2)
+    # 목소리 결. 대상자마다 달라야 해서 요청에서 덮어쓸 수 있다. 여기 값은 기본값이다.
+    # 흔들림을 조금 허용해 표현을 살리고(0.3), 원본 음색은 유지하고(0.75),
+    # 과장 스타일은 끈다(0.0).
+    elevenlabs_stability: float = Field(default=0.3, ge=0.0, le=1.0)
+    elevenlabs_similarity_boost: float = Field(default=0.75, ge=0.0, le=1.0)
+    elevenlabs_style: float = Field(default=0.0, ge=0.0, le=1.0)
 
     # 화자 식별(ECAPA) 유사도 임계값 — 실통화 13건 캘리브레이션(대상자 0.605~0.948
     # vs 타화자 0.258~0.417, 중간점 0.511). 외부 데이터 테스트에서 재검증 대상
@@ -109,6 +115,9 @@ def load_settings(env_file: str | Path | None = ".env") -> Settings:
         elevenlabs_model=os.getenv("ELEVENLABS_MODEL"),
         elevenlabs_default_voice_id=os.getenv("ELEVENLABS_DEFAULT_VOICE_ID"),
         elevenlabs_speed=os.getenv("ELEVENLABS_SPEED", "1.0"),
+        elevenlabs_stability=os.getenv("ELEVENLABS_STABILITY", "0.3"),
+        elevenlabs_similarity_boost=os.getenv("ELEVENLABS_SIMILARITY_BOOST", "0.75"),
+        elevenlabs_style=os.getenv("ELEVENLABS_STYLE", "0.0"),
         speaker_id_threshold=os.getenv("SPEAKER_ID_THRESHOLD", "0.5"),
         speaker_model_dir=os.getenv("SPEAKER_MODEL_DIR"),
         stt_provider=os.getenv("STT_PROVIDER", "elevenlabs"),

@@ -18,7 +18,10 @@ class TTSResult:
 class TTSProvider(Protocol):
     """대상자 목소리 provider 경계: 합성(TTS) + 샘플로 클론 등록."""
 
-    def synthesize(self, text: str, *, voice_id: str, speed: float = 1.0) -> TTSResult: ...
+    def synthesize(
+        self, text: str, *, voice_id: str, speed: float = 1.0,
+        stability: float = 0.3, similarity_boost: float = 0.75, style: float = 0.0,
+    ) -> TTSResult: ...
 
     def clone_voice(self, name: str, audio_path: Path) -> str: ...
 
@@ -40,7 +43,10 @@ class ElevenLabsTTSProvider:
         self.model_id = model_id or _DEFAULT_MODEL
         self.timeout_seconds = timeout_seconds
 
-    def synthesize(self, text: str, *, voice_id: str, speed: float = 1.0) -> TTSResult:
+    def synthesize(
+        self, text: str, *, voice_id: str, speed: float = 1.0,
+        stability: float = 0.3, similarity_boost: float = 0.75, style: float = 0.0,
+    ) -> TTSResult:
         url = f"{ELEVENLABS_BASE}/v1/text-to-speech/{voice_id}"
         try:
             response = httpx.post(
@@ -49,12 +55,12 @@ class ElevenLabsTTSProvider:
                 json={
                     "text": text,
                     "model_id": self.model_id,
+                    # 값은 대상자마다 다르다. 부르는 쪽이 정하고, 여기 기본값은
+                    # 아무도 안 정했을 때만 쓰인다.
                     "voice_settings": {
-                        # 대표 피드백 반영: 흔들림을 조금 허용해 표현을 살리고(stability 0.3),
-                        # 원본 음색 유지는 그대로(0.75), 과장 스타일은 끔(style 0.0).
-                        "stability": 0.3,
-                        "similarity_boost": 0.75,
-                        "style": 0.0,
+                        "stability": stability,
+                        "similarity_boost": similarity_boost,
+                        "style": style,
                         "speed": speed,
                     },
                 },

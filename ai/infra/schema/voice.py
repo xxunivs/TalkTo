@@ -96,3 +96,7 @@ class SpeechSynthesisRequest(ApiModel):
     voice_id: str | None = Field(default=None, max_length=200)
     # 말하는 속도(0.7~1.2, 1.0=기본). 미지정 시 서버 ELEVENLABS_SPEED로 폴백.
     speed: float | None = Field(default=None, ge=0.7, le=1.2)
+    # 목소리 결. 대상자마다 다르다. 미지정 시 서버 기본값으로 폴백.
+    stability: float | None = Field(default=None, ge=0.0, le=1.0)
+    similarity_boost: float | None = Field(default=None, ge=0.0, le=1.0)
+    style: float | None = Field(default=None, ge=0.0, le=1.0)

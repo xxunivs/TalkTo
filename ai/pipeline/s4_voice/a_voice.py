@@ -74,9 +74,18 @@ def synthesize_speech(
         raise MissingVoiceError(
             "voiceId가 필요합니다 (요청의 voiceId 또는 ELEVENLABS_DEFAULT_VOICE_ID)."
         )
-    speed = request.speed if request.speed is not None else settings.elevenlabs_speed
+    def pick(asked: float | None, fallback: float) -> float:
+        return fallback if asked is None else asked
+
     provider = create_tts_provider(settings)
-    return provider.synthesize(request.text, voice_id=voice_id, speed=speed)
+    return provider.synthesize(
+        request.text,
+        voice_id=voice_id,
+        speed=pick(request.speed, settings.elevenlabs_speed),
+        stability=pick(request.stability, settings.elevenlabs_stability),
+        similarity_boost=pick(request.similarity_boost, settings.elevenlabs_similarity_boost),
+        style=pick(request.style, settings.elevenlabs_style),
+    )
 
 
 def _ffmpeg_normalize(src: Path, dst: Path, start_ms: int, end_ms: int) -> None:

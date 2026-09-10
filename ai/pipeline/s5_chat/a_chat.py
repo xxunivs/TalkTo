@@ -5,7 +5,8 @@ BE(persona-runtime.service.ts)의 검색+응답 로직을 로컬 파일 기준�
 파라미터를 BE와 동일하게 맞춰 프로덕션과 같은 결과를 본다.
 
 실행:
-    python -m pipeline.s5_chat.a_chat --subject 신금자
+    python -m pipeline.s5_chat.a_chat --subject 신금자              주고받기
+    python -m pipeline.s5_chat.a_chat --subject 신금자 --ask "안녕하세요"   한 마디만
 
 읽는 파일 (output/<subject>/):
     s3_synthesis/c_system_prompt.txt      페르소나 지침 (필수)
@@ -233,7 +234,25 @@ def _maybe_synthesize(text: str, voice_id: str | None, chat_dir: Path, turn: int
         return None
     out = chat_dir / f"reply_{turn:03d}.mp3"
     out.write_bytes(tts.audio)
+    _play(out)
     return str(out)
+
+
+def _play(path: Path) -> None:
+    """저장만 하면 매번 파일을 찾아 눌러야 한다. 있으면 바로 틀어준다."""
+    import shutil
+    import subprocess
+
+    player = next((p for p in ("afplay", "ffplay", "aplay") if shutil.which(p)), None)
+    if not player:
+        return
+    cmd = [player, str(path)]
+    if player == "ffplay":
+        cmd = [player, "-nodisp", "-autoexit", "-loglevel", "quiet", str(path)]
+    try:
+        subprocess.run(cmd, check=False)
+    except Exception as error:  # 재생 실패가 대화를 깨지 않게
+        logger.warning("재생 실패: %s", error)
 
 
 def run_repl(args: argparse.Namespace) -> int:
@@ -289,17 +308,28 @@ def run_repl(args: argparse.Namespace) -> int:
             encoding="utf-8",
         )
 
-    try:
-        turn = 0
+    def next_message(asked: list[str]):
+        """--ask 로 준 말을 먼저 쓰고, 다 쓰면 입력을 받는다."""
+        for text in asked:
+            yield text
+        if asked:  # 한 번만 물어보는 자리라 입력을 기다리지 않는다
+            return
         while True:
             try:
-                message = input("나 > ").strip()
+                yield input("나 > ")
             except EOFError:
-                break
+                return
+
+    try:
+        turn = 0
+        for raw in next_message(args.ask or []):
+            message = raw.strip()
             if not message:
                 continue
-            if message.lower() in {"exit", "quit", "종료"}:
+            if message.lower() in {"exit", "quit", "종료", ":q"}:
                 break
+            if args.ask:
+                print(f"나 > {message}")
 
             reply = answer(
                 message,
@@ -345,7 +375,9 @@ def main() -> None:
     parser.add_argument("--top-k", type=int, default=RUNTIME_MEMORY_LIMIT, help="주입할 기억 개수")
     parser.add_argument("--threshold", type=float, default=LOW_CONFIDENCE_THRESHOLD, help="유사도 임계값")
     parser.add_argument("--keep-history", action="store_true", help="멀티턴(이전 대화 주입, BE와 어긋남)")
-    parser.add_argument("--tts", action="store_true", help="응답을 대상자 목소리 mp3로 합성")
+    parser.add_argument("--tts", action="store_true", help="응답을 대상자 목소리로 합성해 바로 재생 (mp3도 저장)")
+    parser.add_argument("--ask", action="append", metavar="말",
+                        help="한 번만 묻고 끝낸다. 여러 번 주면 차례로 묻는다 (터미널 없이 쓸 때)")
     logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(message)s")
     sys.exit(run_repl(parser.parse_args()))
 
