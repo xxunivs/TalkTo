@@ -8,7 +8,13 @@ import logging
 
 from infra.setting import Settings
 from infra.external_api.openai_client import create_openai_client
-from infra.schema.embedding import EmbeddingRequest, EmbeddingResponse, EmbeddingResult
+from infra.schema.embedding import (
+    EmbeddingRequest,
+    EmbeddingResponse,
+    EmbeddingResult,
+    QueryEmbeddingRequest,
+    QueryEmbeddingResponse,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -45,3 +51,16 @@ def generate_embeddings(
         for item, vector in zip(request.items, vectors)
     ]
     return EmbeddingResponse(embeddings=results)
+
+
+def generate_query_embedding(
+    request: QueryEmbeddingRequest, *, settings: Settings
+) -> QueryEmbeddingResponse:
+    """기억을 찾을 질문 하나를 벡터로. 기억 벡터화와 같은 모델을 써야 서로 견줄 수 있다."""
+    vector = embed_texts([request.text], settings=settings)[0]
+    return QueryEmbeddingResponse(
+        provider=PROVIDER,
+        model=settings.openai_embedding_model,
+        dimensions=settings.openai_embedding_dimensions,
+        embedding=vector,
+    )

@@ -27,3 +27,16 @@ class EmbeddingResult(ApiModel):
 
 class EmbeddingResponse(ApiModel):
     embeddings: list[EmbeddingResult]
+
+
+class QueryEmbeddingRequest(ApiModel):
+    """기억을 찾을 때 쓰는 질문 하나. 기억 벡터화와 달리 job 도 segment 도 없다."""
+
+    text: str = Field(min_length=1, max_length=50_000)
+
+
+class QueryEmbeddingResponse(ApiModel):
+    provider: str
+    model: str
+    dimensions: int = Field(gt=0)
+    embedding: list[float] = Field(min_length=1)
