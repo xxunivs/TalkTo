@@ -3,7 +3,7 @@
 #   TalkTo_PersonaAI_AI : 자동화 파이프라인 (repo 루트 / Docker / torch·ECAPA)
 #
 # 옛 신금자 데모(talkto-persona-ai)는 구 레포
-# MediLux-TalkTo/TalkTo_PersonaAI_AI_demo_tobedeleteted 가 소유했고 지금은 정지해 뒀다.
+# MediLux-TalkTo/TalkTo_PersonaAI_AI_grandma_demo 가 소유했고 지금은 정지해 뒀다.
 # 여기서 같은 이름을 선언하면 그 서비스가 이쪽으로 갈아타므로 선언하지 않는다.
 # 시크릿(sync:false)은 커밋하지 않고 Render 대시보드/Secret에서 입력한다.
 services:
