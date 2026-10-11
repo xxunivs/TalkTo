@@ -8,7 +8,9 @@
 
 from uuid import UUID
 
-from pydantic import Field
+from typing import Literal
+
+from pydantic import Field, HttpUrl
 
 from infra.schema.field_rule import ApiModel
 from infra.schema.subject import SubjectContext
@@ -65,3 +67,50 @@ class RecordingAnalysisResponse(ApiModel):
     safety_flags: list[RecordingSafetyFlag] = Field(default_factory=list)
     provider: str
     model: str
+
+
+class SubjectSpeakerRequest(ApiModel):
+    """녹음 1건에서 누가 대상자인지 전사문 호칭·맥락으로 추천받는다.
+
+    참조 목소리(ECAPA)가 없을 때 화자 고르기 화면에 미리 골라 둘 값이다. 확정은 사람이 한다.
+    """
+
+    transcript_segments: list[PersistedTranscriptSegment] = Field(min_length=1)
+    subject_context: SubjectContext | None = None
+
+
+class SubjectSpeakerResponse(ApiModel):
+    # 등장한 화자 라벨 중 하나. 근거가 없으면 null.
+    subject_speaker_label: str | None = None
+
+
+class VoiceGroupRecording(ApiModel):
+    recording_id: str = Field(min_length=1, max_length=100)
+    # 녹음 오디오(presigned URL). 화자별 목소리 지문을 만들려고 내려받는다.
+    audio_url: HttpUrl
+    transcript_segments: list[PersistedTranscriptSegment] = Field(min_length=1)
+
+
+class VoiceGroupRequest(ApiModel):
+    """녹음 여러 개에 걸쳐 같은 사람의 목소리를 하나로 묶어 달라는 요청."""
+
+    recordings: list[VoiceGroupRecording] = Field(min_length=1, max_length=50)
+
+
+class VoiceGroupMember(ApiModel):
+    recording_id: str
+    speaker_label: str
+    speech_ms: int
+
+
+class VoiceGroup(ApiModel):
+    group_index: int
+    speech_ms: int
+    members: list[VoiceGroupMember]
+
+
+class VoiceGroupResponse(ApiModel):
+    # 말한 시간이 긴 순서
+    groups: list[VoiceGroup]
+    # ecapa = 목소리 지문으로 녹음 사이를 묶음 / per_recording = 지문을 못 써서 녹음별로만
+    method: Literal["ecapa", "per_recording"]

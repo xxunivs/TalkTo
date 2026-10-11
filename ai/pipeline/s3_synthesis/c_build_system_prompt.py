@@ -24,6 +24,8 @@ from infra.schema.persona import (
     PersonaResponseResult,
 )
 from infra.schema.transcript import TranscriptSegment
+from infra.external_api.tts import wants_emotion_hint
+from pipeline.s4_voice.b_emotion import EMOTION_INSTRUCTION, split_emotion
 
 logger = logging.getLogger(__name__)
 
@@ -100,6 +102,11 @@ def generate_persona_response(
     client = create_openai_client(settings, "persona response")
 
     messages = [{"role": "system", "content": request.persona.instructions}]
+    inline_emotion = settings.voice_emotion == "inline" and wants_emotion_hint(
+        request.persona.voice_id
+    )
+    if inline_emotion:
+        messages.append({"role": "system", "content": EMOTION_INSTRUCTION})
     memory_block = build_memory_block(request.memories)
     if memory_block:
         messages.append({"role": "system", "content": memory_block})
@@ -112,11 +119,15 @@ def generate_persona_response(
         messages=messages,
     )
     content = (response.choices[0].message.content or "").strip()
+    emotion = None
+    if inline_emotion:
+        emotion, content = split_emotion(content, deceased=request.persona.deceased)
 
     # 첫 컷: 주입한 기억 전부를 '사용됨'으로 반환. 실제 인용된 것만 추리는 정교화는 이후.
     return PersonaResponseResult(
         content=content,
         retrieved_memory_ids=[memory.id for memory in request.memories],
+        emotion=emotion,
         provider=PROVIDER,
         model=settings.openai_chat_model,
     )

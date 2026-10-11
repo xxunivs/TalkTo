@@ -80,3 +80,46 @@ class RecordingAnalysisTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SubjectSpeakerTest(unittest.TestCase):
+    """POST /v1/analysis/subject-speaker — 화자 고르기 화면에 미리 골라 둘 추천."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.client = TestClient(app)
+
+    def _segments(self, labels: list[str]) -> list[dict]:
+        return [
+            {"id": str(uuid.uuid4()), "segmentIndex": i, "startMs": i * 1000,
+             "endMs": i * 1000 + 900, "speakerLabel": label, "transcriptText": "밥은 먹었냐"}
+            for i, label in enumerate(labels)
+        ]
+
+    @patch("infra.external_api.openai_client.OpenAI")
+    def test_suggests_label_from_content(self, mock_openai: MagicMock) -> None:
+        client = MagicMock()
+        client.chat.completions.create.return_value = _chat_response('{"subjectSpeakerLabel": "SPK_0"}')
+        mock_openai.return_value = client
+        response = self.client.post("/v1/analysis/subject-speaker", json={
+            "transcriptSegments": self._segments(["SPK_0", "SPK_1"]),
+            "subjectContext": {"subject": {"name": "신금자", "addressTerm": "할머니"}},
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["subjectSpeakerLabel"], "SPK_0")
+
+    @patch("infra.external_api.openai_client.OpenAI")
+    def test_unknown_label_from_llm_is_dropped(self, mock_openai: MagicMock) -> None:
+        client = MagicMock()
+        client.chat.completions.create.return_value = _chat_response('{"subjectSpeakerLabel": "SPK_9"}')
+        mock_openai.return_value = client
+        response = self.client.post("/v1/analysis/subject-speaker", json={
+            "transcriptSegments": self._segments(["SPK_0", "SPK_1"])})
+        self.assertIsNone(response.json()["subjectSpeakerLabel"])
+
+    @patch("infra.external_api.openai_client.OpenAI")
+    def test_single_speaker_needs_no_llm(self, mock_openai: MagicMock) -> None:
+        response = self.client.post("/v1/analysis/subject-speaker", json={
+            "transcriptSegments": self._segments(["SPK_3", "SPK_3"])})
+        self.assertEqual(response.json()["subjectSpeakerLabel"], "SPK_3")
+        mock_openai.assert_not_called()

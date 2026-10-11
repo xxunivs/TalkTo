@@ -1,4 +1,4 @@
-"""채팅 음성 입출력 — 음성 메시지 STT(OpenAI) + 페르소나 답변 TTS(ElevenLabs).
+"""채팅 음성 입출력 — 음성 메시지 STT(OpenAI) + 페르소나 답변 TTS(ElevenLabs·MiniMax).
 
 녹음 분석용 전사(/analysis)와 별개: 여기는 가족이 페르소나에게 말한 짧은 음성 메시지를
 받아쓰고(STT), 페르소나 답변을 고인 목소리로 합성(TTS)한다. MVP 검증 로직 이식.
@@ -21,6 +21,7 @@ from infra.error import (
 from infra.external_api.audio import download_audio
 from infra.external_api.openai_client import create_openai_client
 from infra.external_api.tts import TTSResult, create_tts_provider
+from pipeline.s4_voice.b_emotion import strip_emotion_tags
 from infra.schema.memory import PersistedTranscriptSegment
 from infra.schema.voice import (
     SpeechSynthesisRequest,
@@ -77,14 +78,17 @@ def synthesize_speech(
     def pick(asked: float | None, fallback: float) -> float:
         return fallback if asked is None else asked
 
-    provider = create_tts_provider(settings)
+    # 감정 표시가 글에 남아 있으면 소리로 읽힌다. 예전에 저장된 대답에도 있을 수 있어 여기서 한 번 더 지운다.
+    text = strip_emotion_tags(request.text) or request.text
+    provider = create_tts_provider(settings, voice_id=voice_id)
     return provider.synthesize(
-        request.text,
+        text,
         voice_id=voice_id,
         speed=pick(request.speed, settings.elevenlabs_speed),
         stability=pick(request.stability, settings.elevenlabs_stability),
         similarity_boost=pick(request.similarity_boost, settings.elevenlabs_similarity_boost),
         style=pick(request.style, settings.elevenlabs_style),
+        emotion=request.emotion,
     )
 
 
@@ -257,7 +261,7 @@ def clone_voice_from_sample(
     두 방식: (1) sampleAudioUrl 단일 클립, (2) samples 다구간 — 화자 식별로 전 통화에서
     모은 대상자 구간들을 잘라 이어붙여 한 목소리로 학습(샘플 길이·다양성 확보).
     """
-    provider = create_tts_provider(settings)
+    provider = create_tts_provider(settings, provider=request.provider)
     if request.samples:
         # 누적 풀이 상한을 넘으면 긴 구간 우선으로 선별(앞 통화 편중 방지).
         selected = select_clone_samples(
@@ -269,7 +273,7 @@ def clone_voice_from_sample(
             voice_id = provider.clone_voice(request.name, sample_path)
         finally:
             shutil.rmtree(workdir, ignore_errors=True)
-        return VoiceCloneResponse(voice_id=voice_id, provider="elevenlabs")
+        return VoiceCloneResponse(voice_id=voice_id, provider=provider.name)
 
     audio_path = download_audio(
         str(request.sample_audio_url),
@@ -280,4 +284,4 @@ def clone_voice_from_sample(
         voice_id = provider.clone_voice(request.name, audio_path)
     finally:
         audio_path.unlink(missing_ok=True)
-    return VoiceCloneResponse(voice_id=voice_id, provider="elevenlabs")
+    return VoiceCloneResponse(voice_id=voice_id, provider=provider.name)

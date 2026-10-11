@@ -50,10 +50,10 @@ services:
       - key: ELEVENLABS_SPEED
         value: "0.7"
       # ── 모델(기본값 있음, 교체할 때만 지정) ──
-      # 페르소나 응답 생성 모델. 정확성 평가(3.8~4.1)를 gpt-5.4-mini로 검증했으므로
-      # 서빙도 동일 모델로 맞춤(config 기본값 gpt-4.1-mini보다 우선). 배포 후 대시보드
-      # Environment에서 값만 바꿔 교체 가능(재빌드 불필요).
+      # 페르소나 응답 생성 모델. 정확성 평가(3.8~4.1)는 gpt-5.4-mini 로 했고, 2026-10 에
+      # 비용 때문에 gpt-6-luna 로 바꿨다(입력 1/7.5, 출력 1/9). luna 로 평가를 다시 돌려야 한다.
+      # 배포 후 대시보드 Environment 에서 값만 바꿔 되돌릴 수 있다(재빌드 불필요).
       - key: OPENAI_CHAT_MODEL
-        value: gpt-5.4-mini
+        value: gpt-6-luna
       # OPENAI_ANALYSIS_MODEL / OPENAI_JUDGE_MODEL 등은 config 기본값 사용,
       # 바꿀 때만 여기에 추가.

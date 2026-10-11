@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import Field, HttpUrl, model_validator
 
 from infra.schema.field_rule import ApiModel
@@ -37,6 +39,9 @@ class VoiceCloneRequest(ApiModel):
     # (다구간) 대상자 화자 구간들 — AI가 각 구간을 잘라 이어붙여 한 목소리로 학습.
     # 화자 식별(subjectSpeakerLabel)로 전 통화에서 모은 대상자 구간을 넘기면 된다.
     samples: list[VoiceSampleSegment] | None = Field(default=None, max_length=100)
+    # 어디서 목소리를 만들지. BE 가 녹음을 보고 정한다(통화 녹음 → minimax, 일반 녹음 → elevenlabs).
+    # 비우면 서버 기본(TTS_PROVIDER).
+    provider: Literal["elevenlabs", "minimax"] | None = None
 
     @model_validator(mode="after")
     def _exactly_one_source(self) -> "VoiceCloneRequest":
@@ -100,3 +105,5 @@ class SpeechSynthesisRequest(ApiModel):
     stability: float | None = Field(default=None, ge=0.0, le=1.0)
     similarity_boost: float | None = Field(default=None, ge=0.0, le=1.0)
     style: float | None = Field(default=None, ge=0.0, le=1.0)
+    # 대답 감정(우리 이름: neutral, calm, happy, sad, surprised). None 이면 회사가 글을 보고 정한다.
+    emotion: Literal["neutral", "calm", "happy", "sad", "surprised"] | None = None

@@ -22,6 +22,8 @@ class PersonaContext(ApiModel):
     subject_id: str
     instructions: str = Field(min_length=1, max_length=50_000)
     voice_id: str | None = None
+    # 고인 페르소나인가. 감정 안전선에 쓴다. 모르면(None) 고인으로 본다.
+    deceased: bool | None = None
 
 
 class PersonaResponseRequest(ApiModel):
@@ -34,6 +36,8 @@ class PersonaResponseRequest(ApiModel):
 class PersonaResponseResult(ApiModel):
     content: str
     retrieved_memory_ids: list[str] = Field(default_factory=list)
+    # 대답 음성에 실을 감정(VOICE_EMOTION=inline 일 때만). None 이면 목소리 회사가 정한다.
+    emotion: str | None = None
     provider: str
     model: str
 

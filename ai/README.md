@@ -3,14 +3,14 @@
 TalkTo 페르소나를 만들고 대화하게 하는 AI 서버와 파이프라인입니다.
 
 ```
-프론트 → TalkTo_PersonaAI_BE → TalkTo_PersonaAI_AI (여기)
+프론트(TalkTo_PersonaAI_FE) → talkto_api_server → TalkTo_PersonaAI_AI (여기)
 ```
 
 BE 가 페르소나 프롬프트·기억·목소리 아이디를 요청에 실어 보내면, 이 서버는 받은 대로 답을 만들어 돌려줍니다. 누구의 페르소나인지는 모릅니다. 인증, DB 저장, 동의 판단은 BE 가 합니다.
 
 ## 두 가지로 쓴다
 
-**서버**: BE 가 부르는 API 입니다. 대화 응답, 음성 합성, 녹음 전사·분석, 기억 임베딩을 합니다.
+**서버**: BE 가 부르는 API 입니다. 대화 응답, 음성 합성, 녹음 전사·분석, 대상자 화자 추천(`/v1/analysis/subject-speaker`), 녹음 사이 같은 목소리 묶기(`/v1/analysis/voice-groups`, ECAPA), 기억 임베딩을 합니다.
 
 **파이프라인**: 녹음과 설문으로 페르소나를 만드는 단계들입니다. 로컬에서 대상자 폴더 단위로 돌립니다.
 
@@ -30,7 +30,7 @@ python3.11 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
 cp .env.example .env        # 값 채우기
-uvicorn main:app --reload --port 8000
+uvicorn main:app --reload --port 8001   # BE 가 8000 을 쓴다
 ```
 
 API 문서는 `http://localhost:8000/docs` 에 있습니다.
