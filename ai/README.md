@@ -1,27 +1,57 @@
 # TalkTo_PersonaAI_AI
 
-TalkTo 페르소나를 만들고 대화하게 하는 AI 서버와 파이프라인입니다.
+TalkTo 페르소나 제작과 대화를 위한 AI 서버
 
+녹음 분석, 프롬프트 생성, 기억 임베딩, 음성 합성 처리
+
+```text
+프론트 → TalkTo_PersonaAI_BE → TalkTo_PersonaAI_AI
 ```
-프론트 → TalkTo_PersonaAI_BE → TalkTo_PersonaAI_AI (여기)
+
+BE가 전달한 프롬프트, 검색한 기억, voice ID 사용
+
+사용자 인증, 동의 관리, 기억 검색과 운영 DB 저장은 BE 담당
+
+현재 텍스트 응답은 전체 생성 후 한 번에 반환하는 비스트리밍 방식
+
+## 제작 파이프라인
+
+단계별 도구 구성 완료
+
+자료 검토, 수동 수정, 운영 DB 반영은 수작업 필요
+
+| 단계 | 내용 |
+|---|---|
+| s0 설문 | 설문을 프롬프트 재료와 기억으로 변환 |
+| s1 전사 | 녹음 전사, 화자 분리와 대상자 식별, 고유명사 교정 |
+| s2 추출 | 인물, 민감도, 말투, 기억, 요약 분석 |
+| s3 종합 | 기억 병합, 통찰 추출, 프롬프트 조립, 임베딩 생성 |
+| s4 음성 | 대상자 음성 샘플 수집과 목소리 복제 |
+| s5 대화 | 로컬 대화 테스트 |
+
+통합 실행기 `pipeline.run_pipeline`의 실행 범위는 s1~s3
+
+s0과 s5는 별도 명령, s4는 API 또는 단계별 함수로 처리
+
+화자 라벨은 녹음별로 부여되므로 각 녹음에서 대상자 식별 필요
+
+## 폴더
+
+```text
+infra/                     서버 설정, API, 스키마, 외부 API 연동
+pipeline/                  s0~s5 단계별 도구
+input/<대상자>/             설문, 녹음, 인터뷰 등 원본 자료
+output/<대상자>/            파이프라인 산출물
+output/<대상자>_manual/     수동으로 제작하거나 검토, 수정한 산출물
+docs/                      설문 양식과 인계 문서
+test/                      자동 테스트와 품질 평가
 ```
 
-BE 가 페르소나 프롬프트·기억·목소리 아이디를 요청에 실어 보내면, 이 서버는 받은 대로 답을 만들어 돌려줍니다. 누구의 페르소나인지는 모릅니다. 인증, DB 저장, 동의 판단은 BE 가 합니다.
+`manual`도 같은 대상자의 입력 자료와 단계별 도구 사용
 
-## 두 가지로 쓴다
+기존 운영 DB에는 manual 제작 결과 반영
 
-**서버**: BE 가 부르는 API 입니다. 대화 응답, 음성 합성, 녹음 전사·분석, 기억 임베딩을 합니다.
-
-**파이프라인**: 녹음과 설문으로 페르소나를 만드는 단계들입니다. 로컬에서 대상자 폴더 단위로 돌립니다.
-
-```
-s0 설문    작성본을 읽어 프롬프트용과 기억용으로 가른다
-s1 전사    음성을 글자로, 누가 대상자인지 판별, 고유명사 교정
-s2 추출    인물·민감도·말투·기억·요약을 뽑는다
-s3 종합    기억을 모으고 통찰을 뽑고 프롬프트를 조립하고 임베딩한다
-s4 음성    목소리를 복제한다
-s5 대화    로컬에서 페르소나와 대화해본다
-```
+로컬 파일 수정 시 DB 자동 갱신 없음
 
 ## 실행
 
@@ -29,39 +59,71 @@ s5 대화    로컬에서 페르소나와 대화해본다
 python3.11 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
-cp .env.example .env        # 값 채우기
+cp .env.example .env  # API 키 등 입력
 uvicorn main:app --reload --port 8000
 ```
 
-API 문서는 `http://localhost:8000/docs` 에 있습니다.
+API 문서: `http://localhost:8000/docs`
 
-화자 식별(ECAPA)까지 쓰려면 `pip install -e ".[dev,speaker]"` 로 torch 를 같이 깝니다.
+목소리 기반 화자 식별에는 `pip install -e ".[dev,speaker]"`와 `ffmpeg` 필요
 
-## 파이프라인 돌리기
+음성 샘플 수집에는 `ffprobe`도 필요
+
+### 파이프라인 실행
+
+- 설문 위치: `input/<대상자>/Persona_Intake_*.md`
+- 녹음 위치: `input/<대상자>/음성/`
 
 ```bash
-python -m pipeline.s0_intake.b_split_intake --subject 신금자 --write   # 설문에서 뽑기
-python -m pipeline.run_pipeline --subject 신금자                      # s1~s3 전체
-python -m pipeline.run_pipeline --subject 신금자 --only s2_e          # 한 단계만
-python -m pipeline.run_pipeline --subject 신금자 --from s2 --to s3    # 구간만
-python -m pipeline.s5_chat.a_chat --subject 신금자 --tts              # 대화
+# 설문 변환 후 s1~s3 실행
+python -m pipeline.s0_intake.b_split_intake --subject 신금자 --subject-out 신금자 --write
+python -m pipeline.run_pipeline --subject 신금자
+
+# 앞 단계 결과가 준비된 상태에서 필요한 단계만 실행
+python -m pipeline.run_pipeline --subject 신금자 --only s2_e
+
+# 로컬 대화 테스트
+python -m pipeline.s5_chat.a_chat --subject 신금자 --tts
 ```
 
-전사는 이미 전사한 녹음을 건너뛰어, 다시 돌려도 유료 API 를 부르지 않습니다.
+설문 변환에서 `--subject-out` 생략 시 `<대상자>_manual`에 저장
 
-## 폴더
+`run_pipeline --subject 신금자_manual` 지정 시 아래 경로 사용
 
-```
-infra/              서버 기반. 설정, 인증, 스키마, BE 가 부르는 라우트, 외부 API 통로
-pipeline/           단계별 도구. s0_intake ~ s5_chat
-input/<대상자>/      사람이 넣는 자료. 음성, Persona Intake 작성본, 손으로 쓴 자료
-output/<대상자>/     단계별 산출물. <대상자>_manual/ 은 손으로 채운 판
-docs/               Persona Intake 양식과 문항분류, 인계사항
-test/               자동 테스트와 품질 평가
-외부데이터/          일반화 검증용 외부 녹음
-```
+- 입력: `input/신금자/`
+- 출력: `output/신금자_manual/`
 
-도구 이름과 산출물 이름을 맞춰 두었습니다. `pipeline/s2_extraction/c_extract_linguistic_style.py` 가 `output/<대상자>/s2_extraction/c_recording_linguistic_style.json` 을 냅니다.
+전사는 기존 파일명을 기준으로 캐시 사용
+
+다른 단계는 재실행 시 산출물을 덮어쓸 수 있으므로 수동 수정한 결과 확인 후 실행
+
+## 수동 제작
+
+1. 설문, 녹음, 인터뷰 자료 정리 후 필요한 단계별 도구 실행
+2. 대상자 화자, 사실, 말투, 기억 검토 후 manual 폴더의 결과 수정
+3. 최종 프롬프트, 기억, 임베딩, voice ID 준비 후 로컬 대화 검증
+4. 확정한 결과를 별도 업로드 작업으로 운영 DB에 반영
+
+## 사용 모델
+
+| 기능 | 모델 |
+|---|---|
+| 페르소나 응답 | 배포 설정 `gpt-5.4-mini` |
+| 녹음 분석과 기억 추출 | `gpt-5.4-mini` |
+| 전사문 교정 | `gpt-4.1-mini` |
+| 녹음 전사와 화자 분리 | ElevenLabs `scribe_v1` |
+| 대화 음성 전사 | OpenAI `whisper-1` |
+| 목소리 기반 화자 식별 | SpeechBrain ECAPA-TDNN |
+| 기억과 질문 임베딩 | `text-embedding-3-small`, 1536차원 |
+| 음성 합성 | ElevenLabs `eleven_multilingual_v2` |
+| 품질 평가용 채점 | `gpt-5.5` |
+
+모델은 환경변수로 변경 가능
+
+- 기본 설정: `infra/setting.py`
+- 응답 모델의 코드 기본값: `gpt-4.1-mini`
+
+페르소나는 파인튜닝 대신 프롬프트와 검색한 기억으로 제어
 
 ## 테스트
 
@@ -69,23 +131,8 @@ test/               자동 테스트와 품질 평가
 python -m unittest discover -s test -t .
 ```
 
-`-t .` 을 빼면 임포트가 깨집니다. 바깥 API 는 목킹돼 있어 돈이 들지 않습니다.
+자동 테스트는 외부 API 모킹
 
-`test/evaluation` 은 실제 오디오와 유료 API 로 품질 지표를 내는 곳인데, 예전 경로를 임포트하고 있어 지금은 돌아가지 않습니다.
+실제 API를 사용하는 품질 평가는 [평가 README](test/evaluation/README.md) 참고
 
-## 배포
-
-Render 팀 계정의 `TalkTo_PersonaAI_AI` 서비스입니다. 설정은 `render.yaml` 에 있고, main 에 푸시하면 자동으로 올라갑니다.
-
-```bash
-docker build -t talkto-personaai-ai .
-docker run --rm -p 8000:8000 --env-file .env talkto-personaai-ai
-```
-
-- 운영에서는 `AI_SERVER_TOKEN` 을 반드시 설정합니다. 비어 있으면 인증이 꺼집니다
-- BE 에 보내는 요청 모양이 바뀌면 이 레포를 BE 보다 먼저 푸시합니다. 이 서버는 모르는 필드를 거부해서, 순서가 뒤집히면 그 기능만 조용히 실패합니다
-- 이미지에 torch 가 들어가 첫 빌드가 20분 가까이 걸립니다. 의존성이 안 바뀌면 다음부터는 캐시로 빠릅니다
-
-## 로그 원칙
-
-로그에는 작업 ID, 처리 단계, 상태, 지연 시간 같은 운영 정보만 남깁니다. 사용자 원문, 전사문, 기억 내용, 음성, API 키, 토큰, 서명된 URL 은 남기지 않습니다.
+일부 평가 스크립트는 이전 경로가 남아 있어 수정 필요
