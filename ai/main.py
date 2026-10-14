@@ -3,7 +3,7 @@ from fastapi.exceptions import RequestValidationError
 
 from infra.be_ai_api.routes import analysis, embeddings, health, persona, voice
 from infra.setting import get_settings
-from infra.error import AppError, app_error_handler, validation_error_handler
+from infra.error import AppError, app_error_handler, provider_error_handler, validation_error_handler
 from infra.log import configure_logging
 
 
@@ -25,6 +25,11 @@ def create_app() -> FastAPI:
     )
     application.add_exception_handler(AppError, app_error_handler)
     application.add_exception_handler(RequestValidationError, validation_error_handler)
+    # OpenAI 크레딧·키·요청 한도 문제는 503 + 코드로(백엔드가 관리자 화면에 알린다)
+    import openai
+
+    for kind in (openai.RateLimitError, openai.AuthenticationError, openai.PermissionDeniedError):
+        application.add_exception_handler(kind, provider_error_handler)
     application.include_router(health.router)
     application.include_router(persona.router, prefix="/v1/persona")
     application.include_router(analysis.router, prefix="/v1/analysis")

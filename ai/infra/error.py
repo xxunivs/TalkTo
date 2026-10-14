@@ -138,3 +138,32 @@ async def validation_error_handler(
         for item in error.errors()
     ]
     return JSONResponse(status_code=422, content={"detail": detail})
+
+
+# AI 회사(OpenAI) 쪽에서 막힌 경우. 백엔드가 알아보고 관리자 화면에 알린다(고객에게는 차분한 문장).
+PROVIDER_QUOTA = "AI_PROVIDER_QUOTA"  # 크레딧·사용 한도가 다 됨(충전해야 풀린다)
+PROVIDER_AUTH = "AI_PROVIDER_AUTH"  # 키가 틀렸거나 막힘
+PROVIDER_BUSY = "AI_PROVIDER_BUSY"  # 잠깐 요청이 몰림(곧 풀린다)
+
+
+def provider_error_code(error: Exception) -> str:
+    """OpenAI 오류를 세 가지로 나눈다(본문의 error.code·type 을 본다)."""
+    body = getattr(error, "body", None)
+    detail = body.get("error", body) if isinstance(body, dict) else {}
+    detail = detail if isinstance(detail, dict) else {}
+    marks = {str(getattr(error, "code", "") or ""), str(detail.get("code") or ""), str(detail.get("type") or "")}
+    if marks & {"insufficient_quota", "credit_balance_exhausted", "billing_hard_limit_reached"}:
+        return PROVIDER_QUOTA
+    if getattr(error, "status_code", None) in (401, 403):
+        return PROVIDER_AUTH
+    return PROVIDER_BUSY
+
+
+async def provider_error_handler(_request: Request, error: Exception) -> JSONResponse:
+    """OpenAI 가 거절한 요청(429·401·403). 원문(키·결제 주소)은 돌려주지 않는다."""
+    code = provider_error_code(error)
+    return JSONResponse(
+        status_code=503,
+        content={"error": {"code": code, "message": "AI provider unavailable"}},
+    )
+
