@@ -5,8 +5,8 @@ BE(persona-runtime.service.ts)의 검색+응답 로직을 로컬 파일 기준�
 파라미터를 BE와 동일하게 맞춰 프로덕션과 같은 결과를 본다.
 
 실행:
-    python -m pipeline.s5_chat.a_chat --subject 신금자              주고받기
-    python -m pipeline.s5_chat.a_chat --subject 신금자 --ask "안녕하세요"   한 마디만
+    python -m pipeline.s5_chat.a_chat --subject <대상자폴더>              주고받기
+    python -m pipeline.s5_chat.a_chat --subject <대상자폴더> --ask "안녕하세요"   한 마디만
 
 읽는 파일 (output/<subject>/):
     s3_synthesis/c_system_prompt.txt      페르소나 지침 (필수)
@@ -370,7 +370,7 @@ def run_repl(args: argparse.Namespace) -> int:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="s5 로컬 대화 테스트기 (BE persona-runtime 복제)")
-    parser.add_argument("--subject", required=True, help="대상자 폴더명 (예: 신금자)")
+    parser.add_argument("--subject", required=True, help="대상자 폴더명 (input/ 아래 폴더 이름)")
     parser.add_argument("--root", default="output", help="산출물 루트 (기본 output)")
     parser.add_argument("--top-k", type=int, default=RUNTIME_MEMORY_LIMIT, help="주입할 기억 개수")
     parser.add_argument("--threshold", type=float, default=LOW_CONFIDENCE_THRESHOLD, help="유사도 임계값")

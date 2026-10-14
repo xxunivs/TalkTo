@@ -33,7 +33,7 @@ def _resolve_subject_speaker_label(
 ) -> str | None:
     """대상자 화자 라벨 확정: ECAPA 성문(provided) → LLM 의미 폴백 → 미확정(None).
 
-    발화량 최다 추정은 폐기(고인·상대 중 누가 더 말했는지는 신원 근거가 아님). 참조가
+    발화량으로 추정하지 않는다(고인·상대 중 누가 더 말했는지는 신원 근거가 아니다). 참조가
     없어 provided가 없으면 전사문 호칭·맥락으로 판정하고, 그래도 못 정하면 None으로 둔다.
     """
     if provided:

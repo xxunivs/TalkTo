@@ -17,7 +17,7 @@ def request_body(**overrides) -> dict:
         "audioUrl": "https://storage.example.com/recordings/test.m4a?sig=abc",
         "language": "ko",
         "speakerDiarization": True,
-        "glossary": ["향", "정읍"],
+        "glossary": ["윤", "남원"],
     }
     body.update(overrides)
     return body

@@ -16,7 +16,7 @@ _SEGMENTS = [
         transcriptText="아직 안 먹었다. 너는 먹었니?",
     ),
 ]
-_CONTEXT = SubjectContext(subject=SubjectInfo(name="신금자", addressTerm="할머니"))
+_CONTEXT = SubjectContext(subject=SubjectInfo(name="박영자", addressTerm="할머니"))
 
 
 def _mock_client(content: str) -> MagicMock:

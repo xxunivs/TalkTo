@@ -1,8 +1,7 @@
-"""subjectContext / intakeContext — 계약 2의 컨텍스트 입력 (시점별 2소스).
+"""subjectContext / intakeContext — 분석 요청에 실리는 컨텍스트 입력 (시점별 2소스).
 
 BE가 저장된 프로필·가족 용어집·Intake를 이 모양으로 변환해 분석 요청에
-실어 보낸다. intakeContext의 섹션 상세는 설문지 v1.0 문항 키 기준 부록에서
-확정 예정이라, 아직 정의되지 않은 키는 거부하지 않고 무시한다.
+실어 보낸다. 정의되지 않은 키는 거부하지 않고 무시한다.
 """
 
 from pydantic import ConfigDict, Field

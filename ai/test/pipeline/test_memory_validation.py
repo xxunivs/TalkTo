@@ -149,13 +149,13 @@ class RelatedPeopleGateTest(unittest.TestCase):
                     {
                         "memoryText": "손주가 감사 인사를 했다",
                         "sourceSegmentIds": [0],
-                        "relatedPeople": ["이준혁", "신금자"],
+                        "relatedPeople": ["이도윤", "박영자"],
                         "confidence": "confirmed",
                     }
                 ]
             },
             SEGMENTS,
-            subject_name="신금자",
+            subject_name="박영자",
         )
 
-        self.assertEqual(result["memorySegments"][0]["relatedPeople"], ["이준혁"])
+        self.assertEqual(result["memorySegments"][0]["relatedPeople"], ["이도윤"])

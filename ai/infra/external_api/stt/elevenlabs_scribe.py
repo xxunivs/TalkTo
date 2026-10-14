@@ -1,4 +1,4 @@
-"""ElevenLabs Scribe STT with built-in diarization (bake-off winner, 2026-07-04)."""
+"""ElevenLabs Scribe STT with built-in diarization."""
 
 import math
 import re
@@ -34,7 +34,7 @@ class STTProvider(Protocol):
 ELEVENLABS_BASE = "https://api.elevenlabs.io"
 
 # Scribe가 무음·소리를 텍스트로 서술하는 패턴 — tag_audio_events를 꺼도
-# 새어 나온다 (외부 데이터 일반화 테스트에서 발견: "(2초간 멈춤)", "(침묵)").
+# 새어 나온다 (예: "(2초간 멈춤)", "(침묵)").
 # 발화가 아니므로 전사에서 제거한다
 _NON_SPEECH_NOTE = re.compile(
     r"\(\s*(?:\d+\s*초[^)]*|침묵|멈춤|웃음|한숨|박수|기침|음악|잡음)[^)]*\)"

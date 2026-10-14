@@ -1,6 +1,6 @@
-"""Glossary-based transcript correction pass (spec ANL-005).
+"""Glossary-based transcript correction pass.
 
-Fixes proper nouns the STT misheard (e.g. "향아" → "영아") using the family
+Fixes proper nouns the STT misheard (e.g. "연아" → "윤아") using the family
 glossary. Corrections never touch meaning: only glossary terms are corrected,
 originals stay untouched, and uncertain cases are flagged needs_review instead
 of edited.
@@ -30,7 +30,7 @@ _JONGSEONG = [""] + list("ㄱㄲㄳㄴㄵㄶㄷㄹㄺㄻㄼㄽㄾㄿㅀㅁㅂㅄ
 _SYSTEM_PROMPT = """너는 한국어 통화 전사 교정기다. 고유명사 목록(가족 이름, 지명, 음식 등)을 참고해 전사문에서 잘못 받아쓴 고유명사만 교정한다.
 
 규칙:
-1. 목록의 단어와 발음이 유사하게 잘못 전사된 부분만 해당 단어로 교정한다 (호칭 활용형 포함: 목록에 "향"이 있으면 "영아"는 "향아"로).
+1. 목록의 단어와 발음이 유사하게 잘못 전사된 부분만 해당 단어로 교정한다 (호칭 활용형 포함: 목록에 "윤"이 있으면 "연아"는 "윤아"로).
 2. 문맥 조건: 그 자리가 실제로 사람을 부르거나 사람·지명을 가리키는 자리일 때만 교정한다. 발음이 비슷하다는 이유만으로 일반 단어·사투리를 이름으로 바꾸지 않는다.
 3. 그 외의 표현, 문법, 어미, 내용은 절대 바꾸지 않는다.
 4. 확신이 없으면 교정하지 말고 needsReview 배열에 세그먼트 번호를 넣는다.
@@ -184,7 +184,7 @@ def _edit_distance(left: str, right: str) -> int:
 
 _TRIM = ".,?!~… "
 # 성+이름 형태의 한글 실명 (2~4자) — 성을 뗀 이름만으로 부르는 게 일반적이라
-# 호칭 보정에는 이름 변형도 필요하다 (이종서 → 종서, 남향 → 향)
+# 호칭 보정에는 이름 변형도 필요하다 (이정우 → 정우, 남윤 → 윤)
 _KOREAN_FULL_NAME = re.compile(r"^[가-힣]{2,4}$")
 
 

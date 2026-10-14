@@ -40,7 +40,7 @@ class ReflectionTest(unittest.TestCase):
         response = self.client.post(
             "/v1/persona/reflection",
             json={
-                "subjectContext": {"subject": {"name": "김분남"}},
+                "subjectContext": {"subject": {"name": "최말순"}},
                 "memories": [
                     {"id": mem_a, "memoryText": "가족과 밥을 자주 먹었다."},
                     {"id": mem_b, "memoryText": "명절마다 가족이 모였다."},

@@ -15,9 +15,9 @@ def segment(index: int, text: str = "말") -> TranscriptSegment:
 
 
 SEGMENTS = [
-    segment(0, "어, 종서니? 밥은 먹었냐"),
+    segment(0, "어, 정우니? 밥은 먹었냐"),
     segment(1, "걔가 회사 다니잖니"),
-    segment(2, "영아, 잘 있었어"),
+    segment(2, "연아, 잘 있었어"),
 ]
 
 
@@ -27,9 +27,9 @@ class ValidatePersonsPayloadTest(unittest.TestCase):
             {
                 "persons": [
                     {
-                        "name": "종서",
+                        "name": "정우",
                         "relationToSubject": "아들",
-                        "mentions": ["종서니", "걔"],
+                        "mentions": ["정우니", "걔"],
                         "confidence": "confirmed",
                         "sourceSegmentIds": [0, 2],
                         "relationsToOthers": [],
@@ -69,15 +69,15 @@ class ValidatePersonsPayloadTest(unittest.TestCase):
             {
                 "persons": [
                     {
-                        "name": "종서",
+                        "name": "정우",
                         "confidence": "maybe",
                         "sourceSegmentIds": [0],
                     },
                     {
-                        "name": "향",
+                        "name": "윤",
                         "confidence": "confirmed",
                         "sourceSegmentIds": [0, 99],
-                        "mentions": ["영아"],
+                        "mentions": ["연아"],
                         "facts": [
                             {"fact": "근거 없음", "sourceSegmentIds": [99], "confidence": "confirmed"}
                         ],
@@ -88,7 +88,7 @@ class ValidatePersonsPayloadTest(unittest.TestCase):
         )
 
         self.assertEqual(len(result["persons"]), 1)
-        self.assertEqual(result["persons"][0]["name"], "향")
+        self.assertEqual(result["persons"][0]["name"], "윤")
         self.assertEqual(result["persons"][0]["sourceSegmentIds"], [0])
         self.assertEqual(result["persons"][0]["facts"], [])
         self.assertEqual(result["validationDropped"]["persons"], 1)
@@ -99,10 +99,10 @@ class ValidatePersonsPayloadTest(unittest.TestCase):
             {
                 "persons": [
                     {
-                        "name": "이종서",
+                        "name": "이정우",
                         "confidence": "confirmed",
                         "sourceSegmentIds": [0],
-                        "mentions": ["종서야"],
+                        "mentions": ["정우야"],
                     }
                 ]
             },
@@ -118,10 +118,10 @@ class ValidatePersonsPayloadTest(unittest.TestCase):
             {
                 "persons": [
                     {
-                        "name": "남향",
+                        "name": "남윤",
                         "confidence": "inferred",
                         "sourceSegmentIds": [2],
-                        "mentions": ["영아", "향아"],
+                        "mentions": ["연아", "윤아"],
                     }
                 ]
             },
@@ -129,7 +129,7 @@ class ValidatePersonsPayloadTest(unittest.TestCase):
         )
 
         self.assertEqual(len(result["persons"]), 1)
-        self.assertEqual(result["persons"][0]["mentions"], ["영아"])
+        self.assertEqual(result["persons"][0]["mentions"], ["연아"])
         self.assertEqual(result["validationDropped"]["mentions"], 1)
 
     def test_drops_subject_self_entries(self) -> None:
@@ -137,7 +137,7 @@ class ValidatePersonsPayloadTest(unittest.TestCase):
             {
                 "persons": [
                     {
-                        "name": "신금자",
+                        "name": "박영자",
                         "relationToSubject": None,
                         "confidence": "confirmed",
                         "sourceSegmentIds": [0],
@@ -153,7 +153,7 @@ class ValidatePersonsPayloadTest(unittest.TestCase):
                 ]
             },
             SEGMENTS,
-            subject_name="신금자",
+            subject_name="박영자",
         )
 
         self.assertEqual(result["persons"], [])

@@ -8,7 +8,7 @@ Persona Intake 작성본은 사람이 읽는 문서라 답이 여러 모양으�
     ■ 모름               모른다고 답한 것
     <!--dim-->           이 사람에게는 뜨지 않는 문항
 
-이 파서는 그것만 모아 돌려주고, 어느 칸으로 갈지는 b_to_intake 가 정한다.
+이 파서는 그것만 모아 돌려주고, 어느 칸으로 갈지는 b_split_intake 가 정한다.
 """
 
 from __future__ import annotations

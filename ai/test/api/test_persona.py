@@ -50,7 +50,7 @@ class PersonaAssemblyTest(unittest.TestCase):
         response = self.client.post(
             "/v1/persona/assembly",
             json={
-                "subjectContext": {"subject": {"name": "김순자", "addressTerm": "할머니"}},
+                "subjectContext": {"subject": {"name": "최순례", "addressTerm": "할머니"}},
                 "intakeContext": {
                     "basicProfile": {
                         "status": "사망",

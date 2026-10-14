@@ -53,7 +53,7 @@ class RecordingAnalysisTest(unittest.TestCase):
                     {"id": seg_id, "segmentIndex": 0, "startMs": 0, "endMs": 1000,
                      "speakerLabel": "SPK_1", "transcriptText": "회 좋아하지."},
                 ],
-                "subjectContext": {"subject": {"name": "김분남", "addressTerm": "할머니"}},
+                "subjectContext": {"subject": {"name": "최말순", "addressTerm": "할머니"}},
                 "conversationPartnerName": "지영",
             },
         )
@@ -103,7 +103,7 @@ class SubjectSpeakerTest(unittest.TestCase):
         mock_openai.return_value = client
         response = self.client.post("/v1/analysis/subject-speaker", json={
             "transcriptSegments": self._segments(["SPK_0", "SPK_1"]),
-            "subjectContext": {"subject": {"name": "신금자", "addressTerm": "할머니"}},
+            "subjectContext": {"subject": {"name": "박영자", "addressTerm": "할머니"}},
         })
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["subjectSpeakerLabel"], "SPK_0")

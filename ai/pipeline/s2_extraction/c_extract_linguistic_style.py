@@ -1,4 +1,4 @@
-"""2단계 ④ 언어 스타일 — LLM 제안 + 코드 검증(근거 실존).
+"""2단계 언어 스타일 — LLM 제안 + 코드 검증(근거 실존).
 
 인물 분석과 같은 정책: 안전 항목이 아니므로 구조 위반 항목은 예외 대신 조용히
 버린다(재현율보다 신뢰 가능한 것만 남기기). sentencePatterns는 관찰 일반화라
@@ -121,7 +121,7 @@ LINGUISTIC_STYLE_SYSTEM_PROMPT = """너는 가족 통화 전사문에서 **대�
 
 추출 항목:
 - recurringPhrases: 대상자가 반복해 쓰는 말버릇·입버릇·감탄사·접속 습관(예: "그러니끼", "아이고", "~잖냐"). 특징적이거나 두 번 이상 나온 것.
-- addressTerms: 대상자가 특정 인물을 **부르는 호칭**(호격). 대상자가 실제로 그렇게 부른 근거가 있을 때만(예: "준혁아", "우리 강아지").
+- addressTerms: 대상자가 특정 인물을 **부르는 호칭**(호격). 대상자가 실제로 그렇게 부른 근거가 있을 때만(예: "길동아", "우리 강아지").
 - sentencePatterns: 문장 스타일의 일반화(예: "짧은 단문", "접속어 없이 화제 전환", "끝을 흐리는 말끝", "되묻는 습관"). 관찰 요약이라 근거 세그먼트를 붙이지 않는다.
 - emotionalExpressions: 감정을 드러내는 특유의 방식(예: 애정을 "밥은 먹었냐"로 표현, 걱정을 "몸조심해라"로). emotion + 실제 표현.
 
@@ -135,7 +135,7 @@ LINGUISTIC_STYLE_SYSTEM_PROMPT = """너는 가족 통화 전사문에서 **대�
 {
   "linguisticStyle": {
     "recurringPhrases": [{ "phrase": "그러니끼", "sourceSegmentIds": [3, 17] }],
-    "addressTerms": [{ "person": "준혁", "term": "준혁아", "sourceSegmentIds": [5] }],
+    "addressTerms": [{ "person": "길동", "term": "길동아", "sourceSegmentIds": [5] }],
     "sentencePatterns": ["짧은 단문", "접속어 없는 화제 전환"],
     "emotionalExpressions": [{ "emotion": "애정", "expression": "밥은 먹었냐", "sourceSegmentIds": [8] }]
   }

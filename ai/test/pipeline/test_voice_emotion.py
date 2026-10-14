@@ -42,8 +42,8 @@ class SplitEmotionTest(unittest.TestCase):
         self.assertEqual(split_emotion("[감정:sad] 그래…", deceased=False)[0], "sad")
 
     def test_other_tag_shapes_are_removed(self) -> None:
-        # 실제로 [sad] 만 붙여 나와 소리로 읽힌 적이 있다(2026-10-10)
-        for raw, want in (("[sad] 준혁아, 보고 싶다.", "sad"), ("(감정: 기쁨) 잘됐다!", "happy"),
+        # [sad] 처럼 감정 이름만 붙은 꼴도 떼야 소리로 읽히지 않는다
+        for raw, want in (("[sad] 도윤아, 보고 싶다.", "sad"), ("(감정: 기쁨) 잘됐다!", "happy"),
                           ("[emotion: Calm] 괜찮아.", "calm"), ("【감정：happy】 그래!", "happy")):
             emotion, text = split_emotion(raw, deceased=False)
             self.assertEqual(emotion, want, raw)

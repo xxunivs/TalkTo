@@ -1,7 +1,7 @@
-"""3-B 임베딩 생성 — 기억 조각 텍스트 → 벡터 (text-embedding-3-small).
+"""임베딩 생성 — 기억 조각 텍스트 → 벡터 (text-embedding-3-small).
 
 검색·페르소나 RAG의 입력. 모델·차원은 env 주입(BE embeddings.dimensions
-호환). 입력은 redacted 기준(외부 API 전송, 명세 MASK-002·003).
+호환). 외부 API로 나가므로 입력은 redacted 텍스트를 쓴다.
 """
 
 import logging

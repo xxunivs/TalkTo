@@ -17,19 +17,19 @@ def segment(index: int, text: str) -> TranscriptSegment:
 
 class ApplyCorrectionsTest(unittest.TestCase):
     def test_fills_corrected_text_and_keeps_original(self) -> None:
-        chunk = [segment(0, "영아, 밥은 먹었냐")]
+        chunk = [segment(0, "연아, 밥은 먹었냐")]
 
         apply_corrections(
             chunk,
-            {"corrections": [{"segmentIndex": 0, "correctedText": "향아, 밥은 먹었냐"}]},
+            {"corrections": [{"segmentIndex": 0, "correctedText": "윤아, 밥은 먹었냐"}]},
         )
 
-        self.assertEqual(chunk[0].corrected_text, "향아, 밥은 먹었냐")
-        self.assertEqual(chunk[0].transcript_text, "영아, 밥은 먹었냐")
+        self.assertEqual(chunk[0].corrected_text, "윤아, 밥은 먹었냐")
+        self.assertEqual(chunk[0].transcript_text, "연아, 밥은 먹었냐")
         self.assertFalse(chunk[0].needs_review)
 
     def test_marks_needs_review(self) -> None:
-        chunk = [segment(0, "그 뭐냐 거기"), segment(1, "정업인가 정읍인가")]
+        chunk = [segment(0, "그 뭐냐 거기"), segment(1, "나뭔인가 남원인가")]
 
         apply_corrections(chunk, {"corrections": [], "needsReview": [1]})
 
@@ -76,13 +76,13 @@ class ApplyCorrectionsTest(unittest.TestCase):
 
 class PhoneticGuardTest(unittest.TestCase):
     def test_accepts_phonetically_similar_name_fix(self) -> None:
-        chunk = [segment(0, "어, 영아.")]
+        chunk = [segment(0, "어, 연아.")]
 
         apply_corrections(
-            chunk, {"corrections": [{"segmentIndex": 0, "correctedText": "어, 향아."}]}
+            chunk, {"corrections": [{"segmentIndex": 0, "correctedText": "어, 윤아."}]}
         )
 
-        self.assertEqual(chunk[0].corrected_text, "어, 향아.")
+        self.assertEqual(chunk[0].corrected_text, "어, 윤아.")
 
     def test_rejects_phonetically_distant_swap(self) -> None:
         chunk = [segment(0, "구려유. 할머니도 잘 자.")]
@@ -91,7 +91,7 @@ class PhoneticGuardTest(unittest.TestCase):
             chunk,
             {
                 "corrections": [
-                    {"segmentIndex": 0, "correctedText": "향아. 할머니도 잘 자."}
+                    {"segmentIndex": 0, "correctedText": "윤아. 할머니도 잘 자."}
                 ]
             },
         )
@@ -106,7 +106,7 @@ class PhoneticGuardTest(unittest.TestCase):
             chunk,
             {
                 "corrections": [
-                    {"segmentIndex": 0, "correctedText": "규하유. 할머니도 잘 자."}
+                    {"segmentIndex": 0, "correctedText": "지호유. 할머니도 잘 자."}
                 ]
             },
         )
@@ -128,17 +128,17 @@ class PhoneticGuardTest(unittest.TestCase):
 
 class CorrectSegmentsSkipTest(unittest.TestCase):
     def test_empty_glossary_skips_pass(self) -> None:
-        chunk = [segment(0, "영아, 밥은 먹었냐")]
+        chunk = [segment(0, "연아, 밥은 먹었냐")]
 
         result = correct_segments(chunk, glossary=[], settings=Settings())
 
         self.assertIsNone(result[0].corrected_text)
 
     def test_missing_api_key_skips_pass(self) -> None:
-        chunk = [segment(0, "영아, 밥은 먹었냐")]
+        chunk = [segment(0, "연아, 밥은 먹었냐")]
 
         result = correct_segments(
-            chunk, glossary=["향"], settings=Settings(openai_api_key=None)
+            chunk, glossary=["윤"], settings=Settings(openai_api_key=None)
         )
 
         self.assertIsNone(result[0].corrected_text)

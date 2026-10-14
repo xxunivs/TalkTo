@@ -44,7 +44,7 @@ class EmbeddingsTest(unittest.TestCase):
     @patch("infra.external_api.openai_client.OpenAI")
     def test_query_embedding_needs_only_text(self, mock_openai: MagicMock) -> None:
         """기억을 찾는 질문에는 job 도 segment id 도 없다. 그걸 요구하면 422 로 튕겨
-        기억 검색이 통째로 죽는다(운영에서 실제로 그랬다)."""
+        기억 검색이 통째로 죽는다."""
         resp = MagicMock()
         resp.data = [MagicMock(embedding=[0.1, 0.2])]
         client = MagicMock()
