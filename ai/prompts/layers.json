@@ -1,0 +1,22 @@
+{
+  "_comment": "페르소나 프롬프트의 층 구성. static 은 페르소나마다 고정(프롬프트 앞쪽, 캐시됨), runtime 은 턴마다 바뀌어 기억 블록 뒤에 붙는다. when 의 조건이 전부 맞을 때만 모듈을 넣고, 내용이 비면 모듈은 저절로 빠진다. 조건 이름은 pipeline/persona_prompt/layers.py 참고.",
+  "static": [
+    {"layer": "L1", "module": "common_rules"},
+    {"layer": "L2", "module": "opening"},
+    {"layer": "L2", "module": "basic_info"},
+    {"layer": "L2", "module": "character"},
+    {"layer": "L2", "module": "situations"},
+    {"layer": "L2", "module": "topics"},
+    {"layer": "L3", "module": "family_table", "when": ["private"]},
+    {"layer": "L3", "module": "visitors", "when": ["public"]},
+    {"layer": "L4", "module": "style"},
+    {"layer": "L4", "module": "style_card"},
+    {"layer": "L4", "module": "quotes"},
+    {"layer": "L4", "module": "shots", "when": ["shots_in_system"]}
+  ],
+  "runtime": [
+    {"module": "current_speaker", "when": ["private", "speaker_known"]},
+    {"module": "unknown_speaker", "when": ["private", "family", "speaker_unknown"]},
+    {"module": "already_said", "when": ["long_conversation"]}
+  ]
+}

@@ -11,13 +11,23 @@ __pycache__/
 .env.*
 !.env.example
 
-# 비공개 데이터·평가 산출물 (프로덕션 이미지에 불필요)
+# 비공개 데이터·실험·테스트 (프로덕션 이미지에 불필요)
 data/
-evaluation/
-tests/
+input/
+output/
+.oss/
+**/voice_lab/
+**/*.wav
+**/*.m4a
+**/*.mp3
+personas_local/
+외부데이터/
+experiments/
+test/
 docs/
+.scratch/
 
-# 문서·잡파일 (README.md는 pyproject readme라 유지)
+# 문서·잡파일 (README.md는 pyproject readme라 유지). 루트의 md 만 막는다 — prompts/rules/*.md 는 이미지에 들어가야 한다
 *.md
 !README.md
 .DS_Store

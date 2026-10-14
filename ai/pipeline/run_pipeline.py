@@ -1,10 +1,10 @@
 # 로컬 실행 (input/<대상자> 를 읽어 output/<대상자>/sN 에 쓴다). 전체 또는 단계만 골라 돌린다.
 # 같은 단계 순서가 infra/be_ai_api/recording_analysis.py 에도 있다. 순서를 바꾸면 둘 다 확인할 것.
 #
-#     python -m pipeline.run_pipeline --subject 신금자                # 전체
-#     python -m pipeline.run_pipeline --subject 신금자 --only s2      # s2 전체
-#     python -m pipeline.run_pipeline --subject 신금자 --only s2_e    # 기억 추출만
-#     python -m pipeline.run_pipeline --subject 신금자 --from s2 --to s3
+#     python -m pipeline.run_pipeline --subject <대상자폴더>                # 전체
+#     python -m pipeline.run_pipeline --subject <대상자폴더> --only s2      # s2 전체
+#     python -m pipeline.run_pipeline --subject <대상자폴더> --only s2_e    # 기억 추출만
+#     python -m pipeline.run_pipeline --subject <대상자폴더> --from s2 --to s3
 #
 # 각 단계는 앞 단계 결과를 output/<subject>/ 에서 읽는다. 전사는 a_transcript.json 에
 # 이미 있는 녹음을 건너뛰어, 다시 돌려도 유료 API 를 부르지 않는다.
@@ -404,8 +404,8 @@ def step_s2_e(ctx: Ctx) -> str:
 def step_s2_f(ctx: Ctx) -> str:
     segments = ctx.segments("s2_f")
     memories = ctx.memories("s2_f")
-    # 기억이 어느 통화에서 나왔는지는 s2_e 가 recording 필드로 남긴다. 그 필드가 없는
-    # 옛 결과라면 녹음별로 나눌 수 없어 전체 기억으로 태그를 낸다(근사).
+    # 기억이 어느 통화에서 나왔는지는 s2_e 가 recording 필드로 남긴다. 그 필드가 없으면
+    # 녹음별로 나눌 수 없어 전체 기억으로 태그를 낸다(근사).
     tagged_by_recording = any(m.get("recording") for m in memories)
     note = "" if tagged_by_recording else " (기억에 통화 구분이 없어 전체 기준으로 태그. s2_e 를 다시 돌리면 통화별로 나뉜다)"
 
@@ -460,6 +460,8 @@ def step_s3_b(ctx: Ctx) -> str:
 
 
 def step_s3_c(ctx: Ctx) -> str:
+    if ctx.settings.persona_prompt_builder == "layered":
+        return _step_s3_c_layered(ctx)
     intake, recording = ctx.prompt_material()
     examples = [row["text"] for row in (recording.get("speechExamples") or []) if row.get("text")]
     insights = ctx.insights("s3_c")
@@ -471,6 +473,20 @@ def step_s3_c(ctx: Ctx) -> str:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(assembled.instructions, encoding="utf-8")
     return f"{len(assembled.instructions)}자 (말투 예시 {len(examples)}개, 통찰 {len(insights)}건)"
+
+
+def _step_s3_c_layered(ctx: Ctx) -> str:
+    """4층 프롬프트(PERSONA_PROMPT_BUILDER=layered): 설문 → 전사 재료 빈칸 → 말투 카드·실제 주고받기 → 렌더.
+    인터뷰 후보는 사람이 확인해야 해서 여기서는 넣지 않는다(python -m pipeline.persona_prompt build --interview …)."""
+    from pipeline.persona_prompt import build
+    death_talk = build.TOGGLE[ctx.settings.persona_death_talk]
+    spec, log = build.for_local(ctx.dir, ctx.input_dir, death_talk=death_talk)
+    text = build.prompt(spec)
+    out = ctx.dir / "s3_synthesis"
+    out.mkdir(parents=True, exist_ok=True)
+    (out / "persona_spec.json").write_text(spec.model_dump_json(indent=1), encoding="utf-8")
+    (out / "c_system_prompt.txt").write_text(text, encoding="utf-8")
+    return f"{len(text)}자 (4층, 말투 주고받기 {len(spec.style.shots)}개, 판단 기록 {len(spec.notes)}줄)"
 
 
 def step_s3_d(ctx: Ctx) -> str:
@@ -521,7 +537,7 @@ def run(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="파이프라인 로컬 실행 (input/<대상자> -> output/<대상자>/sN)")
-    parser.add_argument("--subject", required=True, help="대상자 폴더명 (예: 신금자)")
+    parser.add_argument("--subject", required=True, help="대상자 폴더명 (input/ 아래 폴더 이름)")
     parser.add_argument("--root", default="output", help="산출물 루트 (기본 output)")
     parser.add_argument("--input-root", default="input", help="입력 루트 (기본 input)")
     parser.add_argument("--limit", type=int, default=None, help="음성 파일 최대 개수(빠른 테스트용)")

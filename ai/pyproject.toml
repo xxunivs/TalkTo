@@ -11,6 +11,8 @@ requires-python = ">=3.11"
 dependencies = [
   "fastapi>=0.115,<1.0",
   "httpx>=0.27,<1.0",
+  # 목소리 재료 품질 재기(c_sample_quality). 화자 식별 없이도 서버가 뜨게 기본에 둔다.
+  "numpy>=1.24",
   "openai>=1.0,<3.0",
   "pydantic>=2.8,<3.0",
   "python-dotenv>=1.0,<2.0",
@@ -19,6 +21,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# 중간계층 사전 판정·가드의 한국어 형태소 분석(ORCHESTRATOR_PRECHECK=coverage 일 때 필요)
+orchestrator = [
+  "kiwipiepy>=0.20,<1.0",
+]
 dev = [
   "pytest>=8.0,<9.0",
 ]
@@ -31,7 +37,7 @@ speaker = [
 ]
 
 [tool.setuptools.packages.find]
-include = ["infra*", "pipeline*"]
+include = ["infra*", "pipeline*", "orchestrator*"]
 
 [tool.pytest.ini_options]
 testpaths = ["test"]
@@ -39,7 +45,3 @@ addopts = "-q"
 
 [tool.ruff]
 line-length = 100
-
-[tool.ruff.lint.per-file-ignores]
-# eval 스크립트는 압축된 누적 표현(a; b)을 의도적으로 씀. app/ 서비스 코드는 엄격 유지.
-"evaluation/**" = ["E702"]

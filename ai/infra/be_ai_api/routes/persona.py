@@ -18,6 +18,7 @@ from infra.schema.persona import (
     PersonaResponseResult,
 )
 from infra.schema.insight import ReflectionRequest, ReflectionResponse
+from orchestrator.service import orchestrate_persona_response
 
 
 router = APIRouter(tags=["persona"])
@@ -28,8 +29,10 @@ InternalRequest = Annotated[None, Depends(require_internal_request)]
 def create_persona_assembly(
     request: PersonaAssemblyRequest,
     _authorized: InternalRequest,
+    settings: SettingsDependency,
 ) -> PersonaAssemblyResponse:
-    return assemble_persona_instructions(request)
+    # 기능 플래그: PERSONA_PROMPT_BUILDER=layered 면 4층 프롬프트, 아니면 기존 조립(요청·응답 계약 동일)
+    return assemble_persona_instructions(request, settings)
 
 
 @router.post("/responses", response_model=PersonaResponseResult)
@@ -38,6 +41,9 @@ def create_persona_response(
     _authorized: InternalRequest,
     settings: SettingsDependency,
 ) -> PersonaResponseResult:
+    # 기능 플래그: PERSONA_ORCHESTRATOR=1 이면 중간계층, 아니면 기존 경로(요청·응답 계약 동일)
+    if settings.persona_orchestrator:
+        return orchestrate_persona_response(request, settings=settings)
     return generate_persona_response(request, settings=settings)
 
 

@@ -1,0 +1,74 @@
+{
+  "_comment": "공통 규칙(L1) 모듈 순서. 세트 legacy = 모듈로 나누기 전 공통 규칙과 같은 출력(골든 8개, 기존 조립기·중간계층이 씀). 세트 layered = 4층 프롬프트의 L1(페르소나 이름 없음 → 모든 페르소나가 같은 앞머리). 모듈 파일은 이 폴더의 <이름>.md",
+  "sets": {
+    "legacy": [
+      [
+        "# 대화 흐름 원칙",
+        [
+          "greeting",
+          "care_repeat",
+          "comfort",
+          "praise",
+          "family_conflict",
+          "unknown_facts"
+        ]
+      ],
+      [
+        "# 안전 가드레일 (최우선)",
+        [
+          "confidential",
+          "self_harm",
+          "death",
+          "no_advice",
+          "identity",
+          "unknown_user"
+        ]
+      ]
+    ],
+    "layered": [
+      [
+        "# 대화 흐름 원칙",
+        [
+          "greeting",
+          "user_identification",
+          "care_repeat",
+          "comfort",
+          "praise",
+          "family_conflict",
+          "age_fit",
+          "unknown_facts",
+          "relay_news"
+        ]
+      ],
+      [
+        "# 세상을 떠난 뒤의 대화",
+        [
+          "afterlife"
+        ]
+      ],
+      [
+        "# 기억을 쓰는 법",
+        [
+          "memory_use"
+        ]
+      ],
+      [
+        "# 말하는 형식",
+        [
+          "output_format"
+        ]
+      ],
+      [
+        "# 안전 가드레일 (최우선)",
+        [
+          "confidential",
+          "self_harm",
+          "death",
+          "no_advice",
+          "identity",
+          "unknown_user"
+        ]
+      ]
+    ]
+  }
+}
