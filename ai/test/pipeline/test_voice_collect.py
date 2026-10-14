@@ -90,5 +90,44 @@ class SelectCloneSamplesTest(unittest.TestCase):
         self.assertEqual(urls, {"https://x/a.wav", "https://x/b.wav"})
 
 
+class MultiSampleUpfrontDownloadTest(unittest.TestCase):
+    """다구간 클론: 자르기 전에 녹음마다 한 번씩 먼저 다 받고, 실패하면 임시 폴더를 지운다(ffmpeg 없이)."""
+
+    def test_downloads_all_sources_before_first_cut_and_cleans_up(self) -> None:
+        import subprocess
+        from pathlib import Path
+        from unittest import mock
+
+        from pipeline.s4_voice import a_voice
+
+        a, b = "https://x/a.wav", "https://x/b.wav"
+        segments = [
+            VoiceSampleSegment(audio_url=url, start_ms=0, end_ms=3000) for url in (a, b, a)
+        ]
+        events: list[str] = []
+        workdirs: list[Path] = []
+
+        def fake_download(url, *, timeout_seconds, max_bytes, temp_dir):
+            events.append(f"download {url}")
+            workdirs.append(Path(temp_dir))
+            path = Path(temp_dir) / f"src_{len(events)}.wav"
+            path.write_bytes(b"RIFF")
+            return path
+
+        def fake_cut(src, dst, start_ms, end_ms, *, loudnorm=False):
+            events.append("cut")
+            raise subprocess.CalledProcessError(1, "ffmpeg", stderr=b"bad")
+
+        settings = mock.Mock(audio_download_timeout_seconds=10, max_audio_bytes=None)
+        with mock.patch.object(a_voice.shutil, "which", return_value="ffmpeg"), \
+                mock.patch.object(a_voice, "download_audio", fake_download), \
+                mock.patch.object(a_voice, "_ffmpeg_normalize", fake_cut), \
+                self.assertRaises(InvalidVoiceSampleError):
+            a_voice._build_multi_sample(segments, settings=settings)
+
+        self.assertEqual(events, [f"download {a}", f"download {b}", "cut"])
+        self.assertFalse(workdirs[0].exists())  # 실패 시 임시 폴더 정리(이전과 같음)
+
+
 if __name__ == "__main__":
     unittest.main()

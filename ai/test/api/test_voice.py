@@ -1,6 +1,8 @@
+import json
 import unittest
 from unittest.mock import MagicMock, patch
 
+import httpx
 from fastapi.testclient import TestClient
 
 from main import app
@@ -94,6 +96,7 @@ class ElevenLabsModelTest(unittest.TestCase):
         from infra.external_api.tts.elevenlabs import ElevenLabsTTSProvider
 
         ElevenLabsTTSProvider._v4_cache.clear()
+        ElevenLabsTTSProvider._v4_checked_at.clear()
 
     def _provider(self, model_id: str):
         from infra.external_api.tts.elevenlabs import ElevenLabsTTSProvider
@@ -253,3 +256,127 @@ class CloneProviderChoiceTest(unittest.TestCase):
         self.assertEqual(response.status_code, 200, response.text)
         self.assertEqual(response.json()["provider"], "minimax")
         self.assertTrue(response.json()["voiceId"].startswith("TalkTo"))
+
+
+class VoiceDeleteTest(unittest.TestCase):
+    """POST /v1/voice/delete — 목소리를 만든 회사에서 지운다(MiniMax 는 가짜 전송으로)."""
+
+    def setUp(self) -> None:
+        from infra.setting import Settings, get_settings
+
+        app.dependency_overrides[get_settings] = lambda: Settings(
+            tts_provider="elevenlabs", elevenlabs_api_key="e", minimax_api_key="m")
+        self.addCleanup(app.dependency_overrides.pop, get_settings, None)
+        self.sent: list[httpx.Request] = []
+
+    def _fake_post(self, body: dict):
+        """httpx.post 대역. 실제 요청 모양을 MockTransport 로 만들어 모아 두고 정한 답을 준다."""
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            self.sent.append(request)
+            return httpx.Response(200, json=body)
+
+        def post(url, **kwargs):
+            with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+                return client.post(url, **kwargs)
+
+        return post
+
+    def test_minimax_provider_deletes_cloned_voice(self) -> None:
+        from infra.external_api.tts.minimax import MiniMaxTTSProvider
+
+        ok = {"base_resp": {"status_code": 0, "status_msg": "success"}}
+        with patch("infra.external_api.tts.minimax.httpx.post", self._fake_post(ok)):
+            MiniMaxTTSProvider(api_key="k").delete_voice("TalkToabc")
+        request = self.sent[0]
+        self.assertEqual(str(request.url), "https://api.minimax.io/v1/delete_voice")
+        self.assertEqual(request.headers["Authorization"], "Bearer k")
+        self.assertEqual(
+            json.loads(request.content), {"voice_type": "voice_cloning", "voice_id": "TalkToabc"})
+
+    def test_minimax_error_inside_200_is_raised(self) -> None:
+        from infra.error import TTSProviderError
+        from infra.external_api.tts.minimax import MiniMaxTTSProvider
+
+        bad = {"base_resp": {"status_code": 2054, "status_msg": "voice not found"}}
+        with (
+            patch("infra.external_api.tts.minimax.httpx.post", self._fake_post(bad)),
+            self.assertRaises(TTSProviderError),
+        ):
+            MiniMaxTTSProvider(api_key="k").delete_voice("TalkToabc")
+
+    def test_route_uses_minimax_when_asked(self) -> None:
+        ok = {"base_resp": {"status_code": 0}}
+        with patch("infra.external_api.tts.minimax.httpx.post", self._fake_post(ok)):
+            response = TestClient(app).post(
+                "/v1/voice/delete", json={"voiceId": "TalkToabc", "provider": "minimax"})
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(json.loads(self.sent[0].content)["voice_id"], "TalkToabc")
+
+    @patch("pipeline.s4_voice.d_pvc.delete")
+    def test_route_defaults_to_elevenlabs(self, mock_delete: MagicMock) -> None:
+        response = TestClient(app).post("/v1/voice/delete", json={"voiceId": "aBcD1234efGH5678ijKL"})
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(mock_delete.call_args.args[0], "aBcD1234efGH5678ijKL")
+        bad = TestClient(app).post("/v1/voice/delete", json={"voiceId": "x", "provider": "other"})
+        self.assertIn(bad.status_code, (400, 422))
+
+
+class VoiceTranscriptionLimitTest(unittest.TestCase):
+    """음성 메시지는 25MiB 까지만 읽는다. 넘으면 받아쓰기를 부르지 않고 413 AUDIO_TOO_LARGE."""
+
+    def test_limit_is_25_mib_and_route_runs_in_threadpool(self) -> None:
+        import inspect
+
+        from infra.be_ai_api.routes import voice as voice_routes
+
+        self.assertEqual(voice_routes.VOICE_MESSAGE_MAX_BYTES, 25 * 1024 * 1024)
+        self.assertFalse(inspect.iscoroutinefunction(voice_routes.create_voice_transcription))
+
+    @patch("infra.be_ai_api.routes.voice.VOICE_MESSAGE_MAX_BYTES", 8)
+    @patch("infra.be_ai_api.routes.voice.transcribe_voice_message")
+    def test_over_limit_returns_413(self, mock_transcribe: MagicMock) -> None:
+        response = TestClient(app).post(
+            "/v1/voice/transcriptions",
+            files={"audio_file": ("msg.wav", b"123456789", "audio/wav")},
+        )
+        self.assertEqual(response.status_code, 413)
+        self.assertEqual(response.json()["error"]["code"], "AUDIO_TOO_LARGE")
+        mock_transcribe.assert_not_called()
+
+    @patch("infra.be_ai_api.routes.voice.VOICE_MESSAGE_MAX_BYTES", 8)
+    @patch("infra.be_ai_api.routes.voice.transcribe_voice_message")
+    def test_at_limit_is_transcribed_whole(self, mock_transcribe: MagicMock) -> None:
+        from infra.schema.voice import VoiceTranscriptionResponse
+
+        mock_transcribe.return_value = VoiceTranscriptionResponse(
+            text="응", provider="openai", model="whisper-1"
+        )
+        response = TestClient(app).post(
+            "/v1/voice/transcriptions",
+            files={"audio_file": ("msg.wav", b"12345678", "audio/wav")},
+        )
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(mock_transcribe.call_args.args[0], b"12345678")
+
+
+class MiniMaxCloneLogTest(unittest.TestCase):
+    """클론 기록에는 voice_id 만 남긴다(대상자 이름은 남기지 않는다)."""
+
+    @patch("infra.external_api.tts.minimax.httpx.post")
+    def test_clone_log_has_voice_id_but_not_name(self, mock_post) -> None:
+        import tempfile
+        from pathlib import Path
+
+        from infra.external_api.tts.minimax import MiniMaxTTSProvider
+
+        ok = lambda **extra: MagicMock(status_code=200, json=lambda: {"base_resp": {"status_code": 0}, **extra})  # noqa: E731
+        mock_post.side_effect = [ok(file={"file_id": 1}), ok(), ok(data={"audio": "00"})]
+        with tempfile.TemporaryDirectory() as tmp:
+            sample = Path(tmp) / "sample.wav"
+            sample.write_bytes(b"RIFF")
+            with self.assertLogs("infra.external_api.tts.minimax", level="INFO") as logs:
+                voice_id = MiniMaxTTSProvider(api_key="k").clone_voice("김할머니", sample)
+        text = "\n".join(logs.output)
+        self.assertIn(voice_id, text)
+        self.assertNotIn("김할머니", text)

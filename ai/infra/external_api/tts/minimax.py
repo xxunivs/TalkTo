@@ -107,8 +107,25 @@ class MiniMaxTTSProvider:
             model=self.model_id,
         )
 
+    def delete_voice(self, voice_id: str) -> None:
+        """복제한 목소리를 MiniMax 에서 지운다(대화 상대를 지울 때·목소리를 다시 만들 때)."""
+        try:
+            response = httpx.post(
+                f"{MINIMAX_BASE}/v1/delete_voice",
+                headers=self._headers,
+                json={"voice_type": "voice_cloning", "voice_id": voice_id},
+                timeout=self.timeout_seconds,
+            )
+        except httpx.HTTPError as error:
+            raise TTSProviderError(f"목소리 지우기 요청 실패: {error}") from error
+        _check(response, "목소리 지우기")
+        logger.info("minimax voice deleted voice_id=%s", voice_id)
+
     def clone_voice(self, name: str, audio_path: Path) -> str:
-        """샘플을 올리고 클론 목소리를 등록해 voice_id 를 돌려준다. name 은 기록용(로그)이다."""
+        """샘플을 올리고 클론 목소리를 등록해 voice_id 를 돌려준다.
+
+        name 은 다른 provider 와 맞춘 인자라 쓰지 않는다(대상자 이름이라 로그에도 남기지 않는다).
+        """
         try:
             with audio_path.open("rb") as audio_file:
                 uploaded = httpx.post(
@@ -132,8 +149,8 @@ class MiniMaxTTSProvider:
                 json={
                     "file_id": file_id,
                     "voice_id": voice_id,
-                    # 잡음 제거는 끈다. 할머니 테스트(2026-10)도 끈 채로 했고, 우리 쪽 잡음 제거
-                    # (noisereduce)는 귀로 들었을 때 나아지지 않았다.
+                    # 잡음 제거는 끈다. 끈 채로 청취 검증했고, 우리 쪽 잡음 제거
+                    # (noisereduce)도 귀로 들었을 때 나아지지 않았다.
                     "need_noise_reduction": False,
                     "need_volume_normalization": True,
                 },
@@ -142,7 +159,7 @@ class MiniMaxTTSProvider:
         except httpx.HTTPError as error:
             raise TTSProviderError(f"음성 클론 요청 실패: {error}") from error
         _check(cloned, "클론")
-        logger.info("minimax voice cloned name=%s voice_id=%s", name, voice_id)
+        logger.info("minimax voice cloned voice_id=%s", voice_id)
         # 7일 안에 쓰지 않으면 지워지므로 바로 한 번 쓴다. 실패해도 등록은 됐으니 넘어간다.
         try:
             self.synthesize(_ACTIVATE_TEXT, voice_id=voice_id)

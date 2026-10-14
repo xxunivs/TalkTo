@@ -55,7 +55,7 @@ class VoiceCloneRequest(ApiModel):
 class SubjectSampleCollectionRequest(ApiModel):
     """한 통화에서 대상자 구간만 뽑아 반환(클론하지 않음).
 
-    누적 풀(B안): BE가 통화가 들어올 때마다 이 계약으로 대상자 구간을 받아 대상자별 풀에
+    누적 풀: BE가 통화가 들어올 때마다 이 계약으로 대상자 구간을 받아 대상자별 풀에
     저장·누적한다. 클론은 쌓인 풀을 /voice/clone(samples[])에 넘겨 별도로 수행한다.
     """
 
@@ -77,7 +77,7 @@ class VoiceCloneFromTranscriptRequest(ApiModel):
 
     /voice/clone은 호출자가 samples[]를 직접 조립해야 하지만, 이 계약은 전사 산출물
     (화자 라벨이 붙은 구간들) + 확정된 subjectSpeakerLabel을 넘기면 AI가 대상자 구간을
-    골라 모아 클론한다. 여러 통화 누적은 후속(재료 풀)이고, 지금은 녹음 1건 단위다.
+    골라 모아 클론한다. 녹음 1건 단위다. 여러 통화 누적은 SubjectSampleCollectionRequest 로 모은다.
     """
 
     # 클론 음성 이름(대상자 식별용).
@@ -107,3 +107,59 @@ class SpeechSynthesisRequest(ApiModel):
     style: float | None = Field(default=None, ge=0.0, le=1.0)
     # 대답 감정(우리 이름: neutral, calm, happy, sad, surprised). None 이면 회사가 글을 보고 정한다.
     emotion: Literal["neutral", "calm", "happy", "sad", "surprised"] | None = None
+
+
+# ── Premium 정밀 목소리(ElevenLabs PVC). 상태는 BE 가 갖고, AI 서버는 ElevenLabs 를 부른다.
+
+
+class PvcCreateRequest(ApiModel):
+    name: str = Field(min_length=1, max_length=100)
+    language: str = Field(default="ko", min_length=2, max_length=5)
+
+
+class PvcCreateResponse(ApiModel):
+    voice_id: str
+
+
+class PvcSamplesRequest(ApiModel):
+    voice_id: str = Field(min_length=1, max_length=255)
+    # 그분 구간들(30분~3시간 분량). IVC 의 100개보다 훨씬 많다.
+    samples: list[VoiceSampleSegment] = Field(min_length=1, max_length=3000)
+
+
+class PvcSamplesResponse(ApiModel):
+    uploaded_seconds: int
+    files: int
+
+
+class PvcDocument(ApiModel):
+    url: HttpUrl
+    filename: str = Field(min_length=1, max_length=200)
+
+
+class PvcVerificationRequest(ApiModel):
+    voice_id: str = Field(min_length=1, max_length=255)
+    documents: list[PvcDocument] = Field(min_length=1, max_length=5)
+    note: str = Field(default="", max_length=2000)
+
+
+class PvcVoiceRequest(ApiModel):
+    voice_id: str = Field(min_length=1, max_length=255)
+
+
+class VoiceDeleteRequest(ApiModel):
+    voice_id: str = Field(min_length=1, max_length=255)
+    # 목소리를 만든 회사. 비우면 ElevenLabs(처음 만든 목소리·똑 닮은 목소리 모두).
+    provider: Literal["elevenlabs", "minimax"] = "elevenlabs"
+
+
+class PvcStatusResponse(ApiModel):
+    verification: Literal["pending", "verified", "rejected"]
+    training: Literal["not_started", "training", "done", "failed"]
+    progress: float | None = None
+    message: str | None = None
+
+
+class OkResponse(ApiModel):
+    ok: bool = True
+    model_id: str | None = None
