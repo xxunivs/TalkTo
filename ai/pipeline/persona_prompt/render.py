@@ -13,7 +13,7 @@ from collections.abc import Callable, Iterable
 
 from pipeline.persona_prompt.layers import ShotsMode, static_modules
 from pipeline.persona_prompt.spec import PersonaSpec, Relation
-from pipeline.s3_synthesis.common_rules import render_rules
+from pipeline.s3_synthesis.common_rules import family_guide, render_rules
 
 # 주제 등급 → 지시. 금지 문구는 상대에 따라 다르다(가족 / 공개 방문자).
 GRADE_TEXT = {
@@ -53,14 +53,23 @@ def relation_head(r: Relation) -> str:
     return f"{r.name} ({r.relation})"
 
 
-def relation_bits(r: Relation) -> list[str]:
+def relation_bits(r: Relation, *, listener_view: bool = True) -> list[str]:
+    """가족 표 한 줄의 칸들. listener_view=False 면 대화하는 사람 기준 칸(지금 대화하는 사람·사용자는 …라고
+    부름)을 뺀다 — 런타임 '지금 상대' 줄처럼 말하는 사람이 따로 정해질 때."""
     bits = []
+    if r.is_listener and listener_view:
+        bits.append("지금 대화하는 사람")
+    elif r.deceased and not r.is_listener:
+        bits.append("돌아가심")
     if r.calls_them:
         bits.append(f"부르는 말 \"{r.calls_them}\"")
     if r.self_ref:
         bits.append(f"이 사람 앞에서 나는 \"{r.self_ref}\"")
     if r.they_call:
         bits.append(f"이 사람은 나를 \"{r.they_call}\"라고 부름")
+    if r.listener_calls and not r.is_listener and listener_view:
+        said = particle(r.listener_calls, "이라고", "라고")
+        bits.append(f"사용자는 \"{r.listener_calls}\"{said} 부름")
     if r.speech_level:
         bits.append(r.speech_level)
     if r.tone:
@@ -69,6 +78,8 @@ def relation_bits(r: Relation) -> list[str]:
         bits.append(f"늘 걱정하던 것: {'·'.join(r.worries)}")
     if r.talks_with_persona is False:
         bits.append("이 사람과는 대화하지 않음")
+    if r.note:
+        bits.append(f"메모: {r.note}")
     return bits
 
 
@@ -97,12 +108,21 @@ def opening(spec: PersonaSpec) -> str:
             f"그를 대신해 방문자와 이야기한다. 1인칭으로 말한다.")
 
 
+def _listener(spec: PersonaSpec) -> Relation | None:
+    """가족 표에서 지금 대화하는 사람(웹앱 isListener). 공개 페르소나에는 없다."""
+    if spec.public:
+        return None
+    return next((r for r in spec.relations if r.is_listener), None)
+
+
 def basic_info(spec: PersonaSpec) -> str:
     c = spec.character
+    lr = _listener(spec)
     return _block(
         "# 기본 정보",
         f"- 이름: {spec.name}" + (f" — {c.one_line}" if c.one_line else ""),
         f"- 가족이 부르는 말: {spec.family_calls_subject}" if spec.family_calls_subject else None,
+        f"- 지금 대화하는 사람({lr.name})이 부르는 말: {lr.they_call}" if lr and lr.they_call else None,
         f"- 방문자를 부르는 말: {spec.visitor_address}" if spec.public and spec.visitor_address else None,
         f"- 어느 때의 모습인가: {spec.period}" if spec.period else None,
         f"- 이 페르소나가 여기 있는 이유: {spec.visitor_context}" if spec.public and spec.visitor_context else None,
@@ -158,7 +178,8 @@ def family_table(spec: PersonaSpec) -> str:
     for r in spec.relations:
         bits = relation_bits(r)
         rows.append(f"- {relation_head(r)}" + (": " + " / ".join(bits) if bits else ""))
-    return FAMILY_HEAD + "\n" + "\n".join(rows)
+    guide = family_guide(spec.relations)  # 대화하는 사람·돌아가신 분이 표에 있을 때만
+    return FAMILY_HEAD + "\n" + (guide + "\n" if guide else "") + "\n".join(rows)
 
 
 def visitors(spec: PersonaSpec) -> str:

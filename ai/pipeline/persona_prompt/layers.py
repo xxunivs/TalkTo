@@ -95,7 +95,7 @@ def current_speaker(spec: PersonaSpec, ctx: RuntimeContext) -> str:
     if r is None:
         return (f"# 지금 상대\n- 지금 말하는 사람: {ctx.speaker}. 가족 표에 없는 사람이니 아는 척하지 말고, "
                 "어떤 사이인지 자연스럽게 확인한다.")
-    bits = relation_bits(r)
+    bits = relation_bits(r, listener_view=False)  # 말하는 사람이 정해졌으니 대화하는 사람 기준 칸은 뺀다
     return (f"# 지금 상대\n- 지금 말하는 사람: {relation_head(r)}" + (" — " + " / ".join(bits) if bits else "")
             + "\n- 이 사람의 호칭·자기를 가리키는 말·말 높이를 끝까지 지킨다.")
 

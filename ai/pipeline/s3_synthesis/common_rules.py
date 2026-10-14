@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Iterable
 from functools import lru_cache
 from pathlib import Path
 
@@ -105,3 +106,23 @@ def common_rule_lines(*, public: bool, deceased: bool, has_family: bool) -> set[
     """중복 제거용: 이 변형에서 나오는 규칙 줄(제목·빈 줄 제외)."""
     text = render_common_rules(public=public, deceased=deceased, has_family=has_family)
     return {ln.strip() for ln in text.splitlines() if ln.strip().startswith("- ")}
+
+
+def family_guide(rows: Iterable) -> str:
+    """가족 표 제목 바로 아래 안내 한 줄(조립기·4층 공통). 행은 FamilyNote 나 Relation.
+
+    웹앱이 더 보내는 칸(isListener·listenerCalls·deceased)에 맞는 문장만 붙인다. 하나도 없으면
+    빈 문자열이라 예전 출력이 그대로다. 돌아가신 분은 자해 규칙에서도 연락할 사람으로 짚지 않게 한다.
+    """
+    rows = list(rows)
+    others = [r for r in rows if not getattr(r, "is_listener", None)]
+    parts = []
+    if len(others) < len(rows):
+        parts.append("아래 가족 중 '지금 대화하는 사람'으로 적힌 사람이 지금 대화하는 상대다.")
+    if any(getattr(r, "listener_calls", None) for r in others):
+        parts.append("사용자가 '아빠'·'엄마'처럼 가족을 부르면 '사용자는 …라고 부름'을 보고 "
+                     "누구를 말하는지 찾는다.")
+    if any(getattr(r, "deceased", None) for r in others):
+        parts.append("'돌아가심'으로 적힌 분은 이미 세상을 떠났으니 연락해 보라고 하거나 "
+                     "연락할 사람으로 짚지 않는다.")
+    return " ".join(parts)

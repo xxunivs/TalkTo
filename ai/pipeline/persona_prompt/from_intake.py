@@ -2,7 +2,8 @@
 
 설문 칸을 프롬프트로 옮길 때 지키는 것
   - 호칭: subject.addressTerm 이 가족 표의 '그분이 이 사람을 부르는 말'과 같으면(설문 P1-07A, 페르소나가 작성자를
-    부르는 말) 그분을 부르는 말로 쓰지 않는다.
+    부르는 말) 그분을 부르는 말로 쓰지 않는다. 가족 표에 지금 대화하는 사람(웹앱 isListener)이 그분을 부르는
+    말이 있으면 그 말을 그 사람 몫으로 쓴다.
   - 사망·임종 정책은 한 곳에서 정한다: 설문 M9-01 등급·T1-02(orchestrator.intake_policy.death_policy) → spec.death_policy.
     L1 의 사망 모듈 변형 하나로만 나가고, 주제 등급 목록에서는 사망·임종·장례 주제를 뺀다.
   - C-10 의 '먼저 꺼내기' 항목은 금지가 아니라 '물으면만'으로, '~말투' 항목은 피할 말투로 옮긴다.
@@ -67,14 +68,24 @@ def _relations(ic: IntakeContext) -> list[Relation]:
         out.append(Relation(
             name=f.name, relation=f.relation, calls_them=f.address_term_to, self_ref=f.self_reference,
             they_call=f.address_term_from, speech_level=f.speech_level, tone=f.tone,
-            worries=list(f.worries), talks_with_persona=f.talks_with_persona, source="intake:M2-01"))
+            worries=list(f.worries), talks_with_persona=f.talks_with_persona,
+            is_listener=f.is_listener, listener_calls=f.listener_calls, deceased=f.deceased, note=f.note,
+            source="intake:M2-01"))
     return out
 
 
 def _family_calls_subject(sc: SubjectContext, rels: list[Relation], public: bool) -> tuple[str | None, list[str]]:
     notes = []
     term = sc.subject.address_term if sc.subject else None
-    if public or not term:
+    if public:
+        return None, notes
+    # 대화하는 사람이 그분을 부르는 말을 알면 그 말이 앞선다(기본 정보에 그 사람 몫으로 따로 나간다)
+    listener = next((r for r in rels if r.is_listener and r.they_call), None)
+    if listener is not None:
+        notes.append(f"호칭: 지금 대화하는 사람({listener.name})이 그분을 부르는 말 '{listener.they_call}' 을 씀"
+                     " — 가족 모두가 부르는 말로는 두지 않음")
+        return None, notes
+    if not term:
         return None, notes
     if any(term == r.calls_them for r in rels):
         notes.append(f"호칭: subject.addressTerm '{term}' 은 가족 표에서 그분이 부르는 말과 같아(설문 P1-07A) 그분을 부르는 말로 쓰지 않음")

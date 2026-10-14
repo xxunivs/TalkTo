@@ -11,7 +11,7 @@ from collections import Counter
 
 from infra.setting import Settings
 from infra.external_api.openai_client import create_openai_client
-from infra.schema.subject import IntakeContext, SubjectContext
+from infra.schema.subject import FamilyNote, IntakeContext, SubjectContext
 from infra.schema.persona import (
     MemoryCandidate,
     MemoryCandidateRequest,
@@ -23,7 +23,7 @@ from infra.schema.persona import (
 )
 from infra.schema.transcript import TranscriptSegment
 from infra.external_api.tts import wants_emotion_hint
-from pipeline.s3_synthesis.common_rules import render_common_rules
+from pipeline.s3_synthesis.common_rules import family_guide, render_common_rules
 from pipeline.s4_voice.b_emotion import EMOTION_INSTRUCTION, split_emotion
 
 logger = logging.getLogger(__name__)
@@ -293,6 +293,36 @@ def _subject_particle(name: str, with_batchim: str, without: str) -> str:
     return with_batchim if (ord(last) - 0xAC00) % 28 else without
 
 
+def _listener(intake_context) -> FamilyNote | None:
+    """가족 표에서 지금 대화하는 사람(isListener) 행. 웹앱이 보내지 않으면 없다."""
+    rows = getattr(intake_context, "family_map", None) or []
+    return next((note for note in rows if note.is_listener), None)
+
+
+def family_line(name: str, note: FamilyNote | None, merged_relation: str | None = None) -> str:
+    """가족 목록 한 줄. 웹앱이 더 보내는 칸(isListener·listenerCalls·deceased·note)이 비면 예전 줄 그대로다."""
+    rel = (note.relation if note else None) or merged_relation
+    line = f"- {name}" + (f" ({rel})" if rel else "")
+    if note is None:
+        return line
+    if note.is_listener:
+        line += " (지금 대화하는 사람)"
+    elif note.deceased:
+        line += " (돌아가심)"
+    # 그분이 이 사람을 부르던 말(예: 우리 강아지). 가족이 직접 적은 것이라 그대로 부른다.
+    if note.address_term_to:
+        line += f' — 이 사람을 "{note.address_term_to}"라고 부른다'
+    if note.tone:
+        line += f": {note.tone}"
+    # 대화하는 사람 쪽 호칭(아빠·고모). 사용자가 "아빠가…" 하면 누구인지 이걸로 찾는다.
+    if note.listener_calls and not note.is_listener:
+        said = _subject_particle(note.listener_calls, "이라고", "라고")
+        line += f' · 사용자는 "{note.listener_calls}"{said} 부름'
+    if note.note:
+        line += f" · 메모: {note.note}"
+    return line
+
+
 def visitor_context_block(intake_context, *, public: bool) -> str:
     """왜 이 페르소나가 여기 있고 누가 오는지 (P1-07D).
 
@@ -512,8 +542,14 @@ def assemble_persona_prompt(
     address = subject_context.subject.address_term if subject_context.subject else None
 
     public = _is_public(intake_context)
+    listener = _listener(intake_context) if not public else None
     identity = f"{subject_name}"
-    if address:
+    if listener is not None and listener.address_term_from:
+        # 웹앱이 대화하는 사람을 알려주면 가족 모두가 아니라 그 사람이 부르는 말을 쓴다
+        term = listener.address_term_from
+        ra = _subject_particle(term, "이라고", "라고")
+        identity += f". 지금 대화하는 사람({listener.name})은 '{term}'{ra} 부른다."
+    elif address:
         # 공개 페르소나에서 이 값은 P1-07B, 방문자를 부르는 말이다
         ra = _subject_particle(address, "이라고", "라고")
         identity += (f". 방문자는 '{address}'{ra} 부른다." if public
@@ -533,26 +569,20 @@ def assemble_persona_prompt(
                 " 직접 물어도 '그런 얘기는 자세히 말하지 말자, 마음만 아프다' 하고 안부·가족 챙김으로 넘긴다.)"
             )
 
-    # Intake 가족톤을 1차 소스로, 파이프라인 persons 병합을 보강으로 합침
-    tone_by_name: dict[str, tuple[str | None, str | None, str | None]] = {}
+    # Intake 가족 표를 1차 소스로, 파이프라인 persons 병합을 보강으로 합침
+    note_by_name: dict[str, FamilyNote] = {}
     if intake_context is not None:
         for note in intake_context.family_map:
-            tone_by_name[note.name] = (note.relation, note.tone, note.address_term_to)
+            note_by_name[note.name] = note
     merged = {p["name"]: p["relation"] for p in merge_persons(persons_results)}
-    ordered_names = list(tone_by_name) + [n for n in merged if n not in tone_by_name]
-    family_lines = []
-    for name in ordered_names:
-        rel, tone, called = tone_by_name.get(name, (None, None, None))
-        rel = rel or merged.get(name)
-        line = f"- {name}" + (f" ({rel})" if rel else "")
-        # 그분이 이 사람을 부르던 말(예: 우리 강아지). 가족이 직접 적은 것이라 그대로 부른다.
-        if called:
-            line += f' — 이 사람을 "{called}"라고 부른다'
-        if tone:
-            line += f": {tone}"
-        family_lines.append(line)
+    ordered_names = list(note_by_name) + [n for n in merged if n not in note_by_name]
+    family_lines = [family_line(name, note_by_name.get(name), merged.get(name))
+                    for name in ordered_names]
     if family_lines:
         family = "\n".join(family_lines)
+        guide = family_guide(note_by_name.values())
+        if guide:  # 목록은 사람 줄만 남게 안내는 제목 바로 아래 따로 둔다
+            family = f"{guide}\n{family}"
     elif _is_public(intake_context):
         family = ("- 누가 올지 모른다. 처음 보는 사람으로 대한다.\n"
                   "- 방문자가 누구인지 넘겨짚지 않는다.")

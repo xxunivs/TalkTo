@@ -25,6 +25,10 @@ class Relation(BaseModel):
     tone: str | None = None
     worries: list[str] = Field(default_factory=list)
     talks_with_persona: bool | None = None
+    is_listener: bool | None = None  # 지금 페르소나와 대화하는 사람(웹앱이 보냄)
+    listener_calls: str | None = None  # 대화하는 사람이 이 사람을 부르는 말(아빠 / 고모)
+    deceased: bool | None = None  # 돌아가셨으면 True
+    note: str | None = None  # 가족이 적은 한 줄 메모
     source: str = "intake:M2-01"
 
 

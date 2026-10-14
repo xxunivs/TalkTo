@@ -4,7 +4,7 @@ BE가 저장된 프로필·가족 용어집·Intake를 이 모양으로 변환�
 실어 보낸다. 정의되지 않은 키는 거부하지 않고 무시한다.
 """
 
-from pydantic import ConfigDict, Field
+from pydantic import ConfigDict, Field, field_validator
 
 from infra.schema.field_rule import ApiModel
 
@@ -63,6 +63,17 @@ class FamilyNote(ContextModel):
     speech_level: str | None = None  # M2-01 반말 / 존댓말
     talks_with_persona: bool | None = None  # M2-01 이 사람도 페르소나와 대화하나요
     worries: list[str] = Field(default_factory=list)  # M2-02 걱정하시던 것
+    # 아래 넷은 웹앱이 더 보내는 칸이다. 비어 있으면 프롬프트는 예전과 같다.
+    is_listener: bool | None = None  # 지금 페르소나와 대화하는 사람인가 (BE 가 첫 행에 둔다)
+    listener_calls: str | None = None  # M2-01 나에게는: 대화하는 사람이 이 사람을 부르는 말 (아빠 / 고모)
+    deceased: bool | None = None  # M2-01 살아 계심 / 돌아가심 (돌아가셨으면 True)
+    note: str | None = None  # M2-01 한 줄 메모
+
+    @field_validator("listener_calls", "note")
+    @classmethod
+    def _one_line(cls, v: str | None) -> str | None:
+        """가족 표 한 줄에 들어가니 줄바꿈·겹친 공백을 펴고, 비면 없는 것으로 본다."""
+        return (" ".join(v.split()) or None) if v else None
 
 
 class SpeechStyle(ContextModel):

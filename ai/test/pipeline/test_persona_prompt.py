@@ -133,6 +133,89 @@ class IntakeSpecTest(unittest.TestCase):
         self.assertIsNone(topics["가족 갈등"].note)  # 전사 단서(사실)는 프롬프트로 안 보낸다
 
 
+LISTENER_SUBJECT = {"subject": {"name": "김순자", "addressTerm": "할머니"}}
+LISTENER_ROWS = [
+    {"name": "홍길동", "relation": "손자", "addressTermTo": "길동아", "addressTermFrom": "할머니", "tone": "…",
+     "talksWithPersona": True, "isListener": True},
+    {"name": "홍철수", "relation": "큰아들", "addressTermTo": "철수야", "listenerCalls": "아빠", "deceased": False,
+     "note": "막내라 늘 걱정하셨어요"},
+    {"name": "홍영감", "relation": "남편", "listenerCalls": "할아버지", "deceased": True},
+]
+OLD_LISTENER_ROWS = [{k: v for k, v in r.items() if k not in ("isListener", "listenerCalls", "deceased", "note")}
+                     for r in LISTENER_ROWS]
+# 바꾸기 전 코드로 OLD_LISTENER_ROWS 를 렌더해 얻은 그대로
+OLD_LAYERED_FAMILY = (
+    "# 가족 (이 표에 있는 사람만 안다. 상대가 누군지 밝히면 그 사람 줄을 따른다)\n"
+    "자기를 가리키는 말이 비어 있으면 \"내가\" 정도로 짧게 말한다. 반말로 적힌 사람에게는 예시 문장이 존대로 "
+    "적혀 있어도 어미를 반말로 바꿔 말한다.\n"
+    '- 홍길동 (손자): 부르는 말 "길동아" / 이 사람은 나를 "할머니"라고 부름 / 톤: …\n'
+    '- 홍철수 (큰아들): 부르는 말 "철수야"\n'
+    "- 홍영감 (남편)"
+)
+OLD_LAYERED_BASIC = "# 기본 정보\n- 이름: 김순자\n- 가족이 부르는 말: 할머니"
+
+
+def _listener_spec(rows):
+    return spec_from_intake(SubjectContext(**LISTENER_SUBJECT), IntakeContext(
+        **{"basicProfile": {"status": "사망"}, "audience": "나와 내가 초대한 사람만", "familyMap": rows}))
+
+
+class ListenerFamilyTableTest(unittest.TestCase):
+    def test_old_payload_renders_exactly_as_before(self) -> None:
+        text = render_layered_prompt(_listener_spec(OLD_LISTENER_ROWS))
+        self.assertIn("\n\n" + OLD_LAYERED_FAMILY + "\n\n", text)
+        self.assertIn("\n\n" + OLD_LAYERED_BASIC + "\n\n", text)
+
+    def test_falsy_new_fields_render_like_old_payload(self) -> None:
+        rows = [dict(r, isListener=False, deceased=False, listenerCalls=None, note="") for r in OLD_LISTENER_ROWS]
+        self.assertEqual(render_layered_prompt(_listener_spec(rows)),
+                         render_layered_prompt(_listener_spec(OLD_LISTENER_ROWS)))
+
+    def test_listener_calls_deceased_and_note_bits(self) -> None:
+        spec = _listener_spec(LISTENER_ROWS)
+        text = render_layered_prompt(spec)
+        self.assertIn('\n- 홍길동 (손자): 지금 대화하는 사람 / 부르는 말 "길동아" / 이 사람은 나를 "할머니"라고 부름'
+                      " / 톤: …\n", text)
+        self.assertIn('\n- 홍철수 (큰아들): 부르는 말 "철수야" / 사용자는 "아빠"라고 부름 / 메모: 막내라 늘 걱정하셨어요\n',
+                      text)
+        self.assertIn('\n- 홍영감 (남편): 돌아가심 / 사용자는 "할아버지"라고 부름', text)
+
+    def test_guide_line_after_family_head_only_when_relevant(self) -> None:
+        text = render_layered_prompt(_listener_spec(LISTENER_ROWS))
+        head = OLD_LAYERED_FAMILY.split("\n- ")[0]
+        guide = text[text.index(head) + len(head) + 1:].split("\n")[0]
+        self.assertIn("'지금 대화하는 사람'으로 적힌 사람이 지금 대화하는 상대다", guide)
+        self.assertIn("연락해 보라고 하거나 연락할 사람으로 짚지 않는다", guide)
+        self.assertNotIn("지금 대화하는 상대", render_layered_prompt(_listener_spec(OLD_LISTENER_ROWS)))
+
+    def test_listener_address_replaces_family_wide_address(self) -> None:
+        spec = _listener_spec(LISTENER_ROWS)
+        self.assertIsNone(spec.family_calls_subject)
+        self.assertTrue(any("지금 대화하는 사람(홍길동)" in n for n in spec.notes))
+        text = render_layered_prompt(spec)
+        self.assertIn("- 지금 대화하는 사람(홍길동)이 부르는 말: 할머니", text)
+        self.assertNotIn("가족이 부르는 말", text)
+        rows = [dict(LISTENER_ROWS[0], addressTermFrom=None)] + LISTENER_ROWS[1:]
+        self.assertEqual(_listener_spec(rows).family_calls_subject, "할머니")  # 모르면 예전 규칙대로
+
+    def test_runtime_speaker_line_drops_listener_view_bits(self) -> None:
+        from pipeline.persona_prompt.layers import RuntimeContext, current_speaker
+        spec = _listener_spec(LISTENER_ROWS)
+        line = current_speaker(spec, RuntimeContext(speaker="홍철수"))
+        self.assertIn('부르는 말 "철수야"', line)
+        self.assertNotIn("사용자는", line)
+        self.assertNotIn("지금 대화하는 사람", current_speaker(spec, RuntimeContext(speaker="홍길동")))
+
+    def test_assembly_flag_passes_new_fields(self) -> None:
+        req = PersonaAssemblyRequest(subject_context=SubjectContext(**LISTENER_SUBJECT),
+                                     intake_context=IntakeContext(familyMap=LISTENER_ROWS))
+        s = Settings(openai_api_key=SecretStr("sk-test"))
+        legacy = assemble_persona_instructions(req, s).instructions
+        layered = assemble_persona_instructions(req, s.model_copy(update={"persona_prompt_builder": "layered"}))
+        self.assertIn('· 사용자는 "아빠"라고 부름', legacy)
+        self.assertIn('/ 사용자는 "아빠"라고 부름', layered.instructions)
+
+
 def _seg(i, who, text):
     return TranscriptSegment(segment_index=i, start_ms=i, end_ms=i + 1, speaker_label=who, transcript_text=text)
 
