@@ -38,6 +38,25 @@ def request(**overrides) -> TranscriptionRequest:
     return TranscriptionRequest(**fields)
 
 
+class ReferenceSampleFailureTest(unittest.TestCase):
+    def test_expired_reference_sample_does_not_block_transcription(self) -> None:
+        from infra.error import AudioUrlExpiredError
+
+        provider = FakeProvider([segment(0, 0, 5_000)])
+        with patch(
+            "pipeline.s1_transcription.a_transcript.download_audio",
+            side_effect=[Path("/nonexistent/audio.m4a"), AudioUrlExpiredError()],
+        ):
+            response = transcribe_recording(
+                request(reference_voice_sample_url="https://storage.example.com/ref.m4a?sig=x"),
+                settings=Settings(),
+                provider=provider,
+            )
+
+        self.assertEqual(len(response.segments), 1)
+        self.assertIsNone(response.subject_speaker_label)
+
+
 @patch(
     "pipeline.s1_transcription.a_transcript.download_audio",
     return_value=Path("/nonexistent/audio.m4a"),

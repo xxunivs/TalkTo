@@ -1,4 +1,4 @@
-"""2단계 ⑤ 민감정보 플래그 — 안전 항목이라 실패 정책이 다르다.
+"""2단계 민감정보 플래그 — 안전 항목이라 실패 정책이 다르다.
 
 인물 분석과 달리 재현율이 최우선이므로 코드 게이트는 구조(enum·근거 실존)만
 검증하고 내용을 걸러내지 않는다. 구조 위반이 하나라도 있으면 조용히 버리는
@@ -50,7 +50,7 @@ def run_sensitivity_analysis(
     if result is None:
         raise last_error
 
-    # R5 이중 체크: 2차 판정이 "유형 정의에 명백히 부합하지 않는" 플래그만
+    # 이중 체크: 2차 판정이 "유형 정의에 명백히 부합하지 않는" 플래그만
     # 제거한다. 애매하면 유지 — 재현율은 1차, 정밀도는 2차가 담당
     if result["sensitivityFlags"]:
         judge_response = client.chat.completions.create(
@@ -88,10 +88,11 @@ def apply_judge_decisions(result: dict, judge_payload: dict) -> dict:
         else:
             kept.append(flag)
     if removed:
+        # 판정 이유는 원문을 담을 수 있어 로그에는 유형만 남긴다
         logger.info(
             "sensitivity judge dropped %d flags: %s",
             len(removed),
-            [f"{f['type']}:{f['judgeReason']}" for f in removed],
+            [f["type"] for f in removed],
         )
     return {"sensitivityFlags": kept, "judgeDropped": removed}
 
@@ -103,25 +104,30 @@ def validate_sensitivity_payload(
 
     enum 밖의 type이나 실존하지 않는 근거는 "덜 플래그된 것"이 아니라
     "산출을 신뢰할 수 없는 것"이므로 예외로 올린다.
+    오류 문구는 로그로 가므로 원문(설명·받은 값)을 넣지 않는다. 몇 번째·자료형·개수만.
     """
     valid_ids = {segment.segment_index for segment in segments}
     flags = []
-    for flag in payload.get("sensitivityFlags") or []:
+    for n, flag in enumerate(payload.get("sensitivityFlags") or []):
         if not isinstance(flag, dict):
-            raise SensitivityValidationError(f"flag is not an object: {flag!r}")
+            raise SensitivityValidationError(
+                f"flag {n} is not an object ({type(flag).__name__})"
+            )
         flag_type = flag.get("type")
         if flag_type not in SENSITIVITY_TYPES:
-            raise SensitivityValidationError(f"unknown sensitivity type: {flag_type!r}")
+            raise SensitivityValidationError(
+                f"flag {n} has unknown sensitivity type ({type(flag_type).__name__})"
+            )
         description = str(flag.get("description") or "").strip()
         if not description:
-            raise SensitivityValidationError("flag description is empty")
+            raise SensitivityValidationError(f"flag {n} description is empty")
         source_ids = flag.get("sourceSegmentIds")
         if not isinstance(source_ids, list) or not source_ids:
-            raise SensitivityValidationError(f"flag has no source ids: {description}")
+            raise SensitivityValidationError(f"flag {n} ({flag_type}) has no source ids")
         cleaned_ids = [i for i in source_ids if isinstance(i, int) and i in valid_ids]
         if not cleaned_ids:
             raise SensitivityValidationError(
-                f"flag cites nonexistent segments: {description} ({source_ids})"
+                f"flag {n} ({flag_type}) cites nonexistent segments ({len(source_ids)} ids)"
             )
         flags.append(
             {

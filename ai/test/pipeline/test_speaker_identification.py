@@ -42,7 +42,7 @@ class SpeakerIdentificationTest(unittest.TestCase):
 
     @patch("pipeline.s1_transcription.a_transcript.download_audio")
     @patch("pipeline.s1_transcription.b_speaker_id.identify_subject")
-    @patch("pipeline.s1_transcription.b_speaker_id.SpeakerEmbedder")
+    @patch("pipeline.s1_transcription.b_speaker_id.shared_embedder")
     def test_matched_speaker_returned(
         self, mock_embedder: MagicMock, mock_identify: MagicMock, mock_download: MagicMock
     ) -> None:
@@ -59,7 +59,7 @@ class SpeakerIdentificationTest(unittest.TestCase):
 
     @patch("pipeline.s1_transcription.a_transcript.download_audio")
     @patch("pipeline.s1_transcription.b_speaker_id.identify_subject")
-    @patch("pipeline.s1_transcription.b_speaker_id.SpeakerEmbedder")
+    @patch("pipeline.s1_transcription.b_speaker_id.shared_embedder")
     def test_below_threshold_returns_none(
         self, mock_embedder: MagicMock, mock_identify: MagicMock, mock_download: MagicMock
     ) -> None:
@@ -73,6 +73,27 @@ class SpeakerIdentificationTest(unittest.TestCase):
             Path("/tmp/rec.m4a"), _SEGMENTS, _request("https://storage/ref.m4a"), self.settings
         )
         self.assertIsNone(label)
+
+    @patch("pipeline.s1_transcription.a_transcript.download_audio")
+    @patch("pipeline.s1_transcription.b_speaker_id.shared_embedder")
+    def test_reference_download_failure_returns_none(
+        self, mock_embedder: MagicMock, mock_download: MagicMock
+    ) -> None:
+        # 참조 샘플 주소가 만료돼도 전사를 막지 않는다. 로그에는 오류 코드만(주소는 남기지 않는다).
+        from infra.error import AudioUrlExpiredError
+
+        mock_download.side_effect = AudioUrlExpiredError()
+        with self.assertLogs("pipeline.s1_transcription.a_transcript", level="WARNING") as logs:
+            label = _identify_subject_speaker(
+                Path("/tmp/rec.m4a"),
+                _SEGMENTS,
+                _request("https://storage/ref.m4a?sig=SECRETSIG"),
+                self.settings,
+            )
+        self.assertIsNone(label)
+        self.assertIn("AUDIO_URL_EXPIRED", "\n".join(logs.output))
+        self.assertNotIn("SECRETSIG", "\n".join(logs.output))
+        mock_embedder.assert_not_called()
 
 
 if __name__ == "__main__":

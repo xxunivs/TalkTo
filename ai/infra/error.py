@@ -3,6 +3,7 @@
 from typing import Any
 
 from fastapi import Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 
@@ -57,6 +58,15 @@ class EmptyTranscriptError(AppError):
             code="EMPTY_TRANSCRIPT",
             message="No speech was recognized in the recording.",
             status_code=422,
+        )
+
+
+class AudioTooLargeError(AppError):
+    def __init__(self, max_bytes: int) -> None:
+        super().__init__(
+            code="AUDIO_TOO_LARGE",
+            message=f"Audio exceeds the {max_bytes} byte limit.",
+            status_code=413,
         )
 
 
@@ -117,3 +127,14 @@ async def app_error_handler(_request: Request, error: AppError) -> JSONResponse:
     if error.details:
         body["error"]["details"] = error.details
     return JSONResponse(status_code=error.status_code, content=body)
+
+
+async def validation_error_handler(
+    _request: Request, error: RequestValidationError
+) -> JSONResponse:
+    """요청 형식 오류. 받은 값(input)은 되돌려 주지 않는다(원문·서명된 주소가 담길 수 있다)."""
+    detail = [
+        {"type": item.get("type"), "loc": list(item.get("loc") or ()), "msg": item.get("msg")}
+        for item in error.errors()
+    ]
+    return JSONResponse(status_code=422, content={"detail": detail})

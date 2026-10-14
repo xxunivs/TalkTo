@@ -10,7 +10,7 @@ from urllib.parse import urlparse
 
 import httpx
 
-from infra.error import AppError, AudioDownloadFailedError, AudioUrlExpiredError
+from infra.error import AudioDownloadFailedError, AudioUrlExpiredError
 
 _MIME_SUFFIXES = {
     "audio/m4a": ".m4a",
@@ -47,30 +47,30 @@ def download_audio(
     )
     path = Path(target.name)
     try:
-        written = 0
-        with httpx.stream(
-            "GET", url, timeout=timeout_seconds, follow_redirects=True
-        ) as response:
-            if response.status_code in (400, 401, 403):
-                raise AudioUrlExpiredError()
-            if response.status_code != 200:
-                raise AudioDownloadFailedError(f"storage returned {response.status_code}")
-            for chunk in response.iter_bytes():
-                written += len(chunk)
-                if max_bytes is not None and written > max_bytes:
-                    raise AudioDownloadFailedError(
-                        f"audio exceeds the {max_bytes} byte limit"
-                    )
-                target.write(chunk)
-        if written == 0:
-            raise AudioDownloadFailedError("storage returned an empty body")
-    except AppError:
+        try:
+            written = 0
+            with httpx.stream(
+                "GET", url, timeout=timeout_seconds, follow_redirects=True
+            ) as response:
+                if response.status_code in (400, 401, 403):
+                    raise AudioUrlExpiredError()
+                if response.status_code != 200:
+                    raise AudioDownloadFailedError(f"storage returned {response.status_code}")
+                for chunk in response.iter_bytes():
+                    written += len(chunk)
+                    if max_bytes is not None and written > max_bytes:
+                        raise AudioDownloadFailedError(
+                            f"audio exceeds the {max_bytes} byte limit"
+                        )
+                    target.write(chunk)
+            if written == 0:
+                raise AudioDownloadFailedError("storage returned an empty body")
+        except httpx.HTTPError as error:
+            raise AudioDownloadFailedError(type(error).__name__) from error
+        target.close()  # 마지막 버퍼를 쓰다 디스크가 차도 아래에서 지운다
+    except BaseException:
+        # 어떤 실패든(디스크·중단 포함) 받다 만 임시 파일을 남기지 않는다
         target.close()
         path.unlink(missing_ok=True)
         raise
-    except httpx.HTTPError as error:
-        target.close()
-        path.unlink(missing_ok=True)
-        raise AudioDownloadFailedError(type(error).__name__) from error
-    target.close()
     return path

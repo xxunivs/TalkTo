@@ -1,5 +1,7 @@
 # 비밀값 — 절대 커밋하지 않는다
 .env
+.env.*
+!.env.example
 
 # 가상환경·캐시·빌드 산물
 .venv/
@@ -18,8 +20,28 @@ build/
 *.log
 tmp/
 
-# AI Hub 원본(9.8GB)으로 가는 바로가기. 실체는 레포 밖에 있어 받는 쪽에서는 깨진다.
-외부데이터/aihub_원본
+# 중간계층 실행 결과·추적 로그(대화 원문 포함)
+experiments/orchestrator/results/
+orchestrator_traces/
 
-# GitHub 파일 한도(100MB)를 넘는 원본. 같은 녹음이 음성/ 에 m4a 로 올라가 있다.
-input/*/음성_원본/
+# 로컬 전용 데이터(녹음·전사·페르소나 등록부 등 개인 정보) — 커밋하지 않는다
+input/
+output/
+personas_local/
+외부데이터/
+experiments/prompt_compare/data/
+experiments/prompt_compare/variants/
+experiments/prompt_compare/results/
+
+# 로컬 도구 작업 폴더
+.scratch/
+.wrangler/
+
+# 녹음·실험 파일은 올리지 않는다(이미 올라간 것은 그대로 남는다)
+.oss/
+.sr/
+.vf/
+**/voice_lab/
+*.wav
+*.m4a
+*.mp3

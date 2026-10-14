@@ -2,7 +2,7 @@ import logging
 from pathlib import Path
 
 from infra.setting import Settings
-from infra.error import AudioTooShortError, EmptyTranscriptError
+from infra.error import AppError, AudioTooShortError, EmptyTranscriptError
 from infra.external_api.stt import STTProvider
 from infra.schema.transcript import (
     TranscriptionRequest,
@@ -30,25 +30,32 @@ def _identify_subject_speaker(
     if request.reference_voice_sample_url is None:
         return None
     try:
-        from pipeline.s1_transcription.b_speaker_id import SpeakerEmbedder, identify_subject
+        from pipeline.s1_transcription.b_speaker_id import (
+            EMBED_LOCK,
+            identify_subject,
+            shared_embedder,
+        )
     except ImportError:
         logger.warning("speaker_id 패키지 미설치 — 대상자 화자 식별 생략")
         return None
 
-    ref_path = download_audio(
-        str(request.reference_voice_sample_url),
-        timeout_seconds=settings.audio_download_timeout_seconds,
-        max_bytes=settings.max_audio_bytes,
-        temp_dir=settings.temp_dir,
-    )
     try:
-        embedder = SpeakerEmbedder(
-            cache_dir=Path(settings.speaker_model_dir)
-            if settings.speaker_model_dir
-            else None
+        ref_path = download_audio(
+            str(request.reference_voice_sample_url),
+            timeout_seconds=settings.audio_download_timeout_seconds,
+            max_bytes=settings.max_audio_bytes,
+            temp_dir=settings.temp_dir,
         )
-        reference = embedder.embed_clip(ref_path)
-        speakers = embedder.embed_speakers(audio_path, segments)
+    except AppError as error:  # 참조 샘플을 못 받아도 전사는 그대로 진행한다(대상자 미확정)
+        logger.warning("reference voice sample download failed: %s", error.code)
+        return None
+    try:
+        embedder = shared_embedder(
+            Path(settings.speaker_model_dir) if settings.speaker_model_dir else None
+        )
+        with EMBED_LOCK:
+            reference = embedder.embed_clip(ref_path)
+            speakers = embedder.embed_speakers(audio_path, segments)
         match = identify_subject(
             speakers, reference, threshold=settings.speaker_id_threshold
         )

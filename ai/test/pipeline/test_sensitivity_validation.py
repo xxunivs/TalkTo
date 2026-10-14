@@ -122,6 +122,44 @@ class ApplyJudgeDecisionsTest(unittest.TestCase):
         self.assertEqual(len(result["sensitivityFlags"]), 2)
         self.assertEqual(result["judgeDropped"], [])
 
+    def test_drop_log_lists_types_only(self) -> None:
+        # 판정 이유·설명은 원문을 담을 수 있어 로그에 남기지 않는다(결과에는 남긴다)
+        with self.assertLogs(
+            "pipeline.s2_extraction.b_extract_sensitivity", level="INFO"
+        ) as logs:
+            result = apply_judge_decisions(
+                self.flags,
+                {"decisions": [{"index": 1, "verdict": "drop", "reason": "생일 미역국은 death 아님"}]},
+            )
+        text = "\n".join(logs.output)
+        self.assertIn("death", text)
+        self.assertNotIn("미역국", text)
+        self.assertEqual(result["judgeDropped"][0]["judgeReason"], "생일 미역국은 death 아님")
+
+
+class ContentFreeValidationErrorTest(unittest.TestCase):
+    """구조 오류 문구는 로그로 간다. LLM 설명·받은 값 원문은 넣지 않는다(몇 번째·자료형·개수만)."""
+
+    SECRET = "할머니 당뇨 투약"
+
+    def _message(self, flag: object) -> str:
+        with self.assertRaises(SensitivityValidationError) as caught:
+            validate_sensitivity_payload({"sensitivityFlags": [flag]}, SEGMENTS)
+        return str(caught.exception)
+
+    def test_messages_do_not_contain_content(self) -> None:
+        cases = [
+            self.SECRET,  # 객체가 아님
+            {"type": self.SECRET, "description": self.SECRET, "sourceSegmentIds": [0]},
+            {"type": "health", "description": self.SECRET, "sourceSegmentIds": []},
+            {"type": "health", "description": self.SECRET, "sourceSegmentIds": [99, self.SECRET]},
+        ]
+        for flag in cases:
+            message = self._message(flag)
+            self.assertNotIn(self.SECRET, message)
+            self.assertNotIn("99", message)
+            self.assertIn("flag 0", message)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -17,16 +17,18 @@ class Settings(BaseModel):
     ai_server_token: SecretStr | None = None
 
     openai_api_key: SecretStr | None = None
-    # 대화·분석·교정은 gpt-6-luna 하나로 쓴다(2026-10 기준 최신 세대 중 가장 싸다:
-    # 입력 $0.10 / 출력 $0.50, 1M 토큰). 대화 1턴 1.1초로 gpt-4.1-mini(3.7초)보다 빠르다.
+    # 대화·분석·교정은 gpt-6-luna 하나로 쓴다. 싸고(1M 토큰당 입력 $0.10 / 출력 $0.50)
+    # 대화 1턴 1.1초로 gpt-4.1-mini(3.7초)보다 빠르다.
     openai_chat_model: str = "gpt-6-luna"
+    # 대답 생성의 추론 정도(reasoning_effort). 기본값(빈 값)이면 모델이 답 전에 ~200토큰 생각해
+    # 1턴이 3초가 넘는다. none 이면 1.5초 안팎(low 도 가끔 100토큰 넘게 생각한다, 2026-10-13 측정).
+    openai_chat_reasoning_effort: Literal["none", "low", "medium", "high"] | None = "none"
     openai_analysis_model: str = "gpt-6-luna"
     # 평가 채점(LLM judge)용 상위 모델 — 채점 대상 모델보다 강한 모델 사용 원칙
     openai_judge_model: str = "gpt-5.5"
     openai_stt_model: str = "whisper-1"
     openai_correction_model: str = "gpt-6-luna"
-    # 교정 발음 유사도 게이트(자모 편집거리 비율 상한). 초기값은 실통화 13건
-    # 캘리브레이션 — 외부 데이터 일반화 테스트에서 재조정 대상
+    # 교정 발음 유사도 게이트(자모 편집거리 비율 상한). 실통화 13건으로 맞춘 초기값
     correction_max_jamo_ratio: float = Field(default=0.45, gt=0, le=1)
     openai_embedding_model: str = "text-embedding-3-small"
     openai_embedding_dimensions: int = Field(default=1536, gt=0)
@@ -35,11 +37,11 @@ class Settings(BaseModel):
 
     tts_provider: str = "elevenlabs"
     elevenlabs_api_key: SecretStr | None = None
-    # 기본은 v4 Turbo: 목소리가 조금 달라도 감정 표현이 좋고 AI 느낌이 덜하다(2026-10 대표 청취).
+    # 기본은 v4 Turbo: 목소리가 조금 달라도 감정 표현이 좋고 AI 느낌이 덜하다(청취 비교로 정함).
     # v4 학습이 안 된 PVC 는 provider 가 v2 로 되돌린다.
     elevenlabs_model: str | None = "eleven_v4_turbo"
     elevenlabs_default_voice_id: str | None = None
-    # 말하는 속도(ElevenLabs speed). 1.0=기본, <1 느리게(대표 피드백: 조금 느리게).
+    # 말하는 속도(ElevenLabs speed). 1.0=기본, <1 느리게.
     # 0.7~1.2 권장. 요청에서 speed로 오버라이드 가능.
     elevenlabs_speed: float = Field(default=1.0, ge=0.7, le=1.2)
     # 목소리 결. 대상자마다 달라야 해서 요청에서 덮어쓸 수 있다. 여기 값은 기본값이다.
@@ -57,14 +59,14 @@ class Settings(BaseModel):
     minimax_emotion: str | None = None
     # 목소리 결: +면 부드럽게, -면 힘 있게(-100~100). 0 이면 보내지 않는다.
     minimax_intensity: int = Field(default=0, ge=-100, le=100)
-    # 대답 음성 감정: off = 목소리 회사가 글을 보고 정함(기존 동작), inline = 대답 LLM 이
+    # 대답 음성 감정: off = 목소리 회사가 글을 보고 정함, inline = 대답 LLM 이
     # 같은 호출에서 감정을 하나 골라 붙인다(pipeline/s4_voice/b_emotion.py).
     voice_emotion: Literal["off", "inline"] = "off"
 
-    # 화자 식별(ECAPA) 유사도 임계값 — 실통화 13건 캘리브레이션(대상자 0.605~0.948
-    # vs 타화자 0.258~0.417, 중간점 0.511). 외부 데이터 테스트에서 재검증 대상
+    # 화자 식별(ECAPA) 유사도 임계값 — 실통화 13건으로 맞춘 값(대상자 0.605~0.948
+    # vs 타화자 0.258~0.417, 중간점 0.511)
     speaker_id_threshold: float = Field(default=0.5, gt=0, lt=1)
-    # ECAPA 모델 캐시 경로(이미지에 베이크한 위치). None이면 speechbrain 기본 캐시.
+    # ECAPA 모델 폴더. 도커 이미지는 /opt/ecapa 에 미리 받아 둔다(Dockerfile). None이면 speechbrain 기본 캐시.
     speaker_model_dir: str | None = None
 
     stt_provider: str = "elevenlabs"
@@ -77,6 +79,34 @@ class Settings(BaseModel):
     max_audio_bytes: int | None = Field(default=None, gt=0)
     temp_dir: Path | None = None
 
+    # 중간계층(orchestrator/) — /v1/persona/responses 를 중간계층으로 처리. 꺼져 있으면 기존 경로.
+    persona_orchestrator: bool = False
+    # 턴별 추적 jsonl 위치(대화 원문 포함 → git 제외 경로). None 이면 안 남김.
+    orchestrator_trace_dir: Path | None = None
+    # 조립기: legacy(기존과 동일) | structured(공통 규칙 md + 페르소나 + 말투 재료)
+    orchestrator_assembler: Literal["legacy", "structured"] = "legacy"
+    # structured 조립의 공통 규칙: legacy = 예전 규칙(+사인 정책 절) / layered = 4층 L1 모듈(사인 정책은 모듈 변형으로)
+    orchestrator_rules: Literal["legacy", "layered"] = "legacy"
+    # structured 조립에서 실제 주고받기를 넣는 곳: system(지시문 안 글) / messages(기억 뒤 대화 메시지)
+    orchestrator_shots: Literal["system", "messages"] = "system"
+    # 페르소나 지시문 조립(/v1/persona/assembly, 로컬 s3_c): legacy = assemble_persona_prompt / layered = 4층(pipeline/persona_prompt)
+    persona_prompt_builder: Literal["legacy", "layered"] = "legacy"
+    # 사인·임종 질문 기본 설정(요청에 deathTalk 가 없을 때): intake = 설문 그대로 / off = 끔 / on = 켬
+    persona_death_talk: Literal["intake", "off", "on"] = "intake"
+    # 페르소나 등록부(profile.json·말투 카드·실제 발화). None 이면 지시문에서 추정만.
+    orchestrator_persona_dir: Path | None = None
+    # 사전 판정: noop | coverage(질문 화제어 커버율 < 임계면 "모른다·되묻기" 지시, kiwipiepy 필요)
+    orchestrator_precheck: Literal["noop", "coverage", "coverage_v11"] = "noop"
+    orchestrator_precheck_threshold: float = Field(default=0.6, gt=0, le=1)
+    # 사후 가드. v1 이면 structured 조립기가 근거 헤더를 요구하고 가드가 검사한다.
+    orchestrator_guard: Literal["pass", "v1", "v11"] = "pass"
+    # 언어 누출 가드(orchestrator/lang_guard.py): off / flag(기록만) / fix(걸린 문장 삭제)
+    orchestrator_lang_guard: Literal["off", "flag", "fix"] = "off"
+    # 기억 선택: passthrough(BE 가 보낸 그대로) | tiered(장기 전부 + 단기만 분해 단서 top-k, 단기 임베딩은 AI 서버가 함)
+    orchestrator_selector: Literal["passthrough", "tiered"] = "passthrough"
+    orchestrator_selector_st_top_k: int = Field(default=5, ge=0, le=50)
+    orchestrator_selector_threshold: float = Field(default=0.18, ge=-1, le=1)
+
     @field_validator(
         "ai_server_token",
         "openai_api_key",
@@ -85,6 +115,8 @@ class Settings(BaseModel):
         "elevenlabs_default_voice_id",
         "max_audio_bytes",
         "temp_dir",
+        "orchestrator_trace_dir",
+        "orchestrator_persona_dir",
         mode="before",
     )
     @classmethod
@@ -102,6 +134,11 @@ class Settings(BaseModel):
             raise ValueError(f"LOG_LEVEL must be one of {sorted(allowed)}")
         return normalized
 
+    @property
+    def deployed(self) -> bool:
+        """배포 환경(staging·production). 토큰이 없으면 막고 API 문서를 닫는다."""
+        return self.app_env in ("staging", "production")
+
 
 def load_settings(env_file: str | Path | None = ".env") -> Settings:
     if env_file is not None:
@@ -113,6 +150,7 @@ def load_settings(env_file: str | Path | None = ".env") -> Settings:
         ai_server_token=os.getenv("AI_SERVER_TOKEN"),
         openai_api_key=os.getenv("OPENAI_API_KEY"),
         openai_chat_model=os.getenv("OPENAI_CHAT_MODEL", "gpt-6-luna"),
+        openai_chat_reasoning_effort=os.getenv("OPENAI_CHAT_REASONING_EFFORT", "none").strip() or None,
         openai_analysis_model=os.getenv("OPENAI_ANALYSIS_MODEL", "gpt-6-luna"),
         openai_judge_model=os.getenv("OPENAI_JUDGE_MODEL", "gpt-5.5"),
         openai_stt_model=os.getenv("OPENAI_STT_MODEL", "whisper-1"),
@@ -151,6 +189,21 @@ def load_settings(env_file: str | Path | None = ".env") -> Settings:
         min_speech_ms=os.getenv("MIN_SPEECH_MS", "3000"),
         max_audio_bytes=os.getenv("MAX_AUDIO_BYTES"),
         temp_dir=os.getenv("TEMP_DIR"),
+        persona_orchestrator=os.getenv("PERSONA_ORCHESTRATOR", "false").strip() or "false",
+        orchestrator_trace_dir=os.getenv("ORCHESTRATOR_TRACE_DIR"),
+        orchestrator_assembler=os.getenv("ORCHESTRATOR_ASSEMBLER", "legacy").strip() or "legacy",
+        orchestrator_rules=os.getenv("ORCHESTRATOR_RULES", "legacy").strip() or "legacy",
+        orchestrator_shots=os.getenv("ORCHESTRATOR_SHOTS", "system").strip() or "system",
+        persona_prompt_builder=os.getenv("PERSONA_PROMPT_BUILDER", "legacy").strip() or "legacy",
+        persona_death_talk=os.getenv("PERSONA_DEATH_TALK", "intake").strip() or "intake",
+        orchestrator_persona_dir=os.getenv("ORCHESTRATOR_PERSONA_DIR"),
+        orchestrator_precheck=os.getenv("ORCHESTRATOR_PRECHECK", "noop").strip() or "noop",
+        orchestrator_precheck_threshold=os.getenv("ORCHESTRATOR_PRECHECK_THRESHOLD", "0.6"),
+        orchestrator_guard=os.getenv("ORCHESTRATOR_GUARD", "pass").strip() or "pass",
+        orchestrator_lang_guard=os.getenv("ORCHESTRATOR_LANG_GUARD", "off").strip() or "off",
+        orchestrator_selector=os.getenv("ORCHESTRATOR_SELECTOR", "passthrough").strip() or "passthrough",
+        orchestrator_selector_st_top_k=os.getenv("ORCHESTRATOR_SELECTOR_ST_TOPK", "5"),
+        orchestrator_selector_threshold=os.getenv("ORCHESTRATOR_SELECTOR_THRESHOLD", "0.18"),
     )
 
 

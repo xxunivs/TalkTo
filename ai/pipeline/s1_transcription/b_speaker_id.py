@@ -8,6 +8,7 @@ torch/speechbrain은 무거운 선택 의존성이라 모듈 import 시점이 �
 사용 시점에 로드한다 — 미설치 환경에서도 서버는 뜬다.
 """
 
+import threading
 import json
 import logging
 from dataclasses import dataclass
@@ -43,11 +44,15 @@ class SpeakerEmbedder:
     def _load(self):
         if self._model is None:
             from speechbrain.inference.speaker import EncoderClassifier
+            from speechbrain.utils.fetching import LocalStrategy
 
             self._model = EncoderClassifier.from_hparams(
                 source="speechbrain/spkrec-ecapa-voxceleb",
                 savedir=str(self._cache_dir) if self._cache_dir else None,
                 run_opts={"device": "cpu"},
+                # 기본(SYMLINK)은 savedir 에 캐시로 가는 바로가기를 만든다. 윈도는 권한이 없어 실패하고,
+                # 도커에서는 root 로 받은 캐시를 앱 사용자가 못 읽는다. 파일을 그대로 복사해 둔다.
+                local_strategy=LocalStrategy.COPY,
             )
         return self._model
 
@@ -129,9 +134,9 @@ def cosine_similarity(left: list[float], right: list[float]) -> float:
 def load_mono_16k(audio_path: Path):
     """오디오 → mono 16kHz 텐서(1, samples).
 
-    torchaudio.load는 버전에 따라 torchcodec을 요구해 컨테이너에서 실패한다(실측:
-    "TorchCodec is required for load_with_torchcodec"). 그래서 ffmpeg으로 16kHz mono
-    float32 PCM으로 디코딩해 numpy→torch로 직접 읽는다 — torchaudio 백엔드/torchcodec
+    torchaudio.load는 버전에 따라 torchcodec을 요구해 컨테이너에서 실패한다
+    ("TorchCodec is required for load_with_torchcodec"). 그래서 ffmpeg으로 16kHz mono
+    float32 PCM으로 디코딩해 바이트에서 바로 텐서로 읽는다 — torchaudio 백엔드/torchcodec
     의존 없이 m4a/mp3/wav 등 어떤 포맷이든 안전.
     """
     import subprocess
@@ -225,3 +230,18 @@ def identify_subject_by_content(
     if isinstance(label, str) and label in valid_labels:
         return label
     return None
+
+
+_SHARED: dict[str, SpeakerEmbedder] = {}
+_SHARED_LOCK = threading.Lock()
+# 한 번에 하나만 임베딩한다. 녹음 하나에 화자당 60초씩 넣어 한 번에 1GB 가까이 쓴다(배포 메모리).
+EMBED_LOCK = threading.Lock()
+
+
+def shared_embedder(cache_dir: Path | None) -> SpeakerEmbedder:
+    """프로세스당 모델 하나. 요청마다 새로 불러오면 매번 0.3초 + 메모리가 든다."""
+    key = str(cache_dir or "")
+    with _SHARED_LOCK:
+        if key not in _SHARED:
+            _SHARED[key] = SpeakerEmbedder(cache_dir=cache_dir)
+        return _SHARED[key]

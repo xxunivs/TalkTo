@@ -4,8 +4,8 @@
 사람이어도 알 수 없다. 화자마다 ECAPA 목소리 지문(b_speaker_id.SpeakerEmbedder)을 만들어
 서로 비슷한 것끼리 묶으면, 사람이 녹음마다 고르지 않고 "목소리" 하나만 고르면 된다.
 
-임계값은 b_speaker_id 와 같은 캘리브레이션(실통화 13건: 같은 사람 0.605~0.948, 다른 사람
-0.258~0.417)을 따른다. 한 녹음 안에서 둘로 나뉜 화자는 더 비슷해야 합친다. 다른 사람을
+녹음 사이 임계값은 화자 식별과 같은 settings.speaker_id_threshold 다(실통화 실측: 같은 사람
+0.605~0.948, 다른 사람 0.258~0.417). 한 녹음 안에서 둘로 나뉜 화자는 더 비슷해야 합친다. 다른 사람을
 같은 사람으로 묶는 것이 더 위험해서다(엉뚱한 목소리가 복제된다).
 
 torch·speechbrain 이 없거나 지문을 못 만들면 녹음마다 화자를 따로 둔다(method=per_recording).
@@ -103,32 +103,44 @@ def group_voices(
             items.append(SpeakerItem(recording_id, label, ms))
 
     try:
-        from pipeline.s1_transcription.b_speaker_id import SpeakerEmbedder
+        from pipeline.s1_transcription.b_speaker_id import EMBED_LOCK, shared_embedder
     except ImportError:
         logger.warning("speaker_id 패키지 미설치 — 목소리를 녹음별로만 나눈다")
         return cluster_speakers(items, threshold=2.0), "per_recording"
 
-    embedder = SpeakerEmbedder(
-        cache_dir=Path(settings.speaker_model_dir) if settings.speaker_model_dir else None
+    embedder = shared_embedder(
+        Path(settings.speaker_model_dir) if settings.speaker_model_dir else None
     )
     by_key = {(i.recording_id, i.speaker_label): i for i in items}
     embedded = 0
+    failures = 0
     for recording_id, audio_url, segments in recordings:
-        path = download_audio(
-            audio_url,
-            timeout_seconds=settings.audio_download_timeout_seconds,
-            max_bytes=settings.max_audio_bytes,
-            temp_dir=settings.temp_dir,
-        )
+        path = None
         try:
-            for label, vector in embedder.embed_speakers(path, segments).items():
+            # 내려받기도 안에 둔다. 주소 하나가 만료돼도 나머지 녹음은 묶는다.
+            path = download_audio(
+                audio_url,
+                timeout_seconds=settings.audio_download_timeout_seconds,
+                max_bytes=settings.max_audio_bytes,
+                temp_dir=settings.temp_dir,
+            )
+            with EMBED_LOCK:
+                vectors = embedder.embed_speakers(path, segments)
+            for label, vector in vectors.items():
                 by_key[(recording_id, label)].embedding = vector
                 embedded += 1
-        except Exception as error:  # 한 녹음이 실패해도 나머지는 묶는다
-            logger.warning("voice embedding failed for a recording: %s", type(error).__name__)
+        except Exception:  # 한 녹음이 실패해도 나머지는 묶는다
+            failures += 1
+            logger.exception("voice embedding failed for recording %s", recording_id)
         finally:
-            path.unlink(missing_ok=True)
+            if path is not None:
+                path.unlink(missing_ok=True)
 
     if not embedded:
+        if failures:
+            # 모델을 못 불러온 경우가 대부분이다(인터넷 없음·권한). 녹음마다 따로 나누는 것으로 버틴다.
+            logger.error(
+                "voice grouping fell back to per_recording: all %d recordings failed", failures
+            )
         return cluster_speakers(items, threshold=2.0), "per_recording"
     return cluster_speakers(items, threshold=settings.speaker_id_threshold), "ecapa"
