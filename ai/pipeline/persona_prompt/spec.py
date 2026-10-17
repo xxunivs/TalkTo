@@ -26,6 +26,8 @@ class Relation(BaseModel):
     worries: list[str] = Field(default_factory=list)
     talks_with_persona: bool | None = None
     is_listener: bool | None = None  # 지금 페르소나와 대화하는 사람(웹앱이 보냄)
+    is_owner: bool | None = None  # 이 대화 상대를 만든 가족(가족 공유 때 웹앱이 보냄)
+    is_member: bool | None = None  # 가족 공유로 들어온 가족(듣는 사람 줄, 가족 공유 때 웹앱이 보냄)
     listener_calls: str | None = None  # 대화하는 사람이 이 사람을 부르는 말(아빠 / 고모)
     deceased: bool | None = None  # 돌아가셨으면 True
     note: str | None = None  # 가족이 적은 한 줄 메모

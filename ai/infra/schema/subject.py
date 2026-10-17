@@ -63,8 +63,10 @@ class FamilyNote(ContextModel):
     speech_level: str | None = None  # M2-01 반말 / 존댓말
     talks_with_persona: bool | None = None  # M2-01 이 사람도 페르소나와 대화하나요
     worries: list[str] = Field(default_factory=list)  # M2-02 걱정하시던 것
-    # 아래 넷은 웹앱이 더 보내는 칸이다. 비어 있으면 프롬프트는 예전과 같다.
+    # 아래 여섯은 웹앱이 더 보내는 칸이다. 비어 있으면 프롬프트는 예전과 같다.
     is_listener: bool | None = None  # 지금 페르소나와 대화하는 사람인가 (BE 가 첫 행에 둔다)
+    is_owner: bool | None = None  # 이 대화 상대를 만든 가족인가 (가족 공유: 함께 쓰는 가족의 조립본에만 온다)
+    is_member: bool | None = None  # 가족 공유로 들어온 가족인가 (함께 쓰는 가족의 조립본, 듣는 사람 줄에만 온다)
     listener_calls: str | None = None  # M2-01 나에게는: 대화하는 사람이 이 사람을 부르는 말 (아빠 / 고모)
     deceased: bool | None = None  # M2-01 살아 계심 / 돌아가심 (돌아가셨으면 True)
     note: str | None = None  # M2-01 한 줄 메모

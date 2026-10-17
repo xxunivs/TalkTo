@@ -55,12 +55,15 @@ def relation_head(r: Relation) -> str:
 
 def relation_bits(r: Relation, *, listener_view: bool = True) -> list[str]:
     """가족 표 한 줄의 칸들. listener_view=False 면 대화하는 사람 기준 칸(지금 대화하는 사람·사용자는 …라고
-    부름)을 뺀다 — 런타임 '지금 상대' 줄처럼 말하는 사람이 따로 정해질 때."""
+    부름)을 뺀다 — 런타임 '지금 상대' 줄처럼 말하는 사람이 따로 정해질 때.
+    is_owner(가족 공유: 함께 쓰는 가족의 조립본에만 오는 주인 줄)는 그 줄 첫 칸에 '이 대화 상대를 만든 가족'."""
     bits = []
     if r.is_listener and listener_view:
         bits.append("지금 대화하는 사람")
     elif r.deceased and not r.is_listener:
         bits.append("돌아가심")
+    elif r.is_owner and not r.is_listener:
+        bits.append("이 대화 상대를 만든 가족")
     if r.calls_them:
         bits.append(f"부르는 말 \"{r.calls_them}\"")
     if r.self_ref:

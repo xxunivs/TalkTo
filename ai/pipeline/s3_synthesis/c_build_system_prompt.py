@@ -300,7 +300,7 @@ def _listener(intake_context) -> FamilyNote | None:
 
 
 def family_line(name: str, note: FamilyNote | None, merged_relation: str | None = None) -> str:
-    """가족 목록 한 줄. 웹앱이 더 보내는 칸(isListener·listenerCalls·deceased·note)이 비면 예전 줄 그대로다."""
+    """가족 목록 한 줄. 웹앱이 더 보내는 칸(isListener·isOwner·listenerCalls·deceased·note)이 비면 예전 줄 그대로다."""
     rel = (note.relation if note else None) or merged_relation
     line = f"- {name}" + (f" ({rel})" if rel else "")
     if note is None:
@@ -309,6 +309,8 @@ def family_line(name: str, note: FamilyNote | None, merged_relation: str | None 
         line += " (지금 대화하는 사람)"
     elif note.deceased:
         line += " (돌아가심)"
+    elif note.is_owner:  # 가족 공유: 함께 쓰는 가족의 조립본에만 오는 주인 줄
+        line += " (이 대화 상대를 만든 가족)"
     # 그분이 이 사람을 부르던 말(예: 우리 강아지). 가족이 직접 적은 것이라 그대로 부른다.
     if note.address_term_to:
         line += f' — 이 사람을 "{note.address_term_to}"라고 부른다'

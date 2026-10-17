@@ -111,8 +111,11 @@ def common_rule_lines(*, public: bool, deceased: bool, has_family: bool) -> set[
 def family_guide(rows: Iterable) -> str:
     """가족 표 제목 바로 아래 안내 한 줄(조립기·4층 공통). 행은 FamilyNote 나 Relation.
 
-    웹앱이 더 보내는 칸(isListener·listenerCalls·deceased)에 맞는 문장만 붙인다. 하나도 없으면
-    빈 문자열이라 예전 출력이 그대로다. 돌아가신 분은 자해 규칙에서도 연락할 사람으로 짚지 않게 한다.
+    웹앱이 더 보내는 칸(isListener·listenerCalls·deceased·isOwner·isMember)에 맞는 문장만 붙인다. 하나도
+    없으면 빈 문자열이라 예전 출력이 그대로다. 돌아가신 분은 자해 규칙에서도 연락할 사람으로 짚지 않게 한다.
+    isOwner 줄·isMember 칸은 가족 공유에서 함께 쓰는 가족의 조립본에만 온다(주인 조립본에는 없다).
+    isOwner 줄이 있으면 표·예시 속 애칭과 옛일이 만든 가족 것임을 알린다. 그 줄이 있거나 듣는 사람 줄이
+    isMember 이고(나 자신 대화 상대에는 주인 줄이 없다), 듣는 사람이 존댓말이면 어미를 높이게 한다.
     """
     rows = list(rows)
     others = [r for r in rows if not getattr(r, "is_listener", None)]
@@ -125,4 +128,17 @@ def family_guide(rows: Iterable) -> str:
     if any(getattr(r, "deceased", None) for r in others):
         parts.append("'돌아가심'으로 적힌 분은 이미 세상을 떠났으니 연락해 보라고 하거나 "
                      "연락할 사람으로 짚지 않는다.")
+    owner = next((r for r in others if getattr(r, "is_owner", None)), None)
+    if owner is not None:
+        # render 가 이 모듈을 불러서 안에서 부른다
+        from pipeline.persona_prompt.render import particle
+        n = owner.name
+        parts.append(f"가족 표의 부르는 말·상황별 말·실제로 하던 말은 '이 대화 상대를 만든 가족'인 "
+                     f"{n}{particle(n, '이', '가')} 적었다. 그 속의 애칭이나 옛일은 {n}의 것이니, "
+                     "지금 대화하는 사람에게는 그 사람 줄의 부르는 말과 말 높이를 쓰고 "
+                     f"{n}{particle(n, '과', '와')}의 옛일을 지금 대화하는 사람과 함께한 일처럼 말하지 않는다.")
+    listener = next((r for r in rows if getattr(r, "is_listener", None)), None)
+    shared = owner is not None or getattr(listener, "is_member", None)  # 함께 쓰는 가족의 조립본
+    if shared and (getattr(listener, "speech_level", None) or "").strip() == "존댓말":
+        parts.append("지금 대화하는 사람에게는 예시 문장이 반말로 적혀 있어도 어미를 존댓말로 바꿔 말한다.")
     return " ".join(parts)

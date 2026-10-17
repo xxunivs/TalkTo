@@ -18,6 +18,7 @@ from pathlib import Path
 from orchestrator.contracts import MemoryItem, MemorySelection, PrecheckResult, SessionState, TurnInput
 from orchestrator.persona import subject_name_from
 from orchestrator.restricted import redact_instructions
+from orchestrator.text import listener_speech_level
 
 SYNONYMS_PATH = Path(__file__).resolve().parents[1] / "prompts" / "topic_synonyms.json"
 
@@ -104,12 +105,18 @@ def load_synonyms(path: Path = SYNONYMS_PATH) -> dict[str, tuple[str, ...]]:
     return {k: tuple(v) for k, v in raw.items() if not k.startswith("_")}
 
 
-def _directive(terms: list[str], public: bool) -> str:
+def _directive(terms: list[str], public: bool, polite: bool = False) -> str:
+    """polite: 가족 표의 '지금 대화하는 사람' 줄이 존댓말(orchestrator.text.listener_speech_level)."""
     topic = "·".join(terms[:4])
     if public:
         return ("# 이번 질문에 대해 (코드 판정)\n"
                 f"방문자가 물은 것({topic})은 기억에 없다. 지어내지 말고 \"그건 제가 잘 모르겠네요\"처럼 "
                 "모른다고 짧게 말한 뒤, 방문자에게 어떤 이야기인지 되물어라. 장소·날짜·이름 같은 세부를 만들지 않는다.")
+    if polite:
+        return ("# 이번 질문에 대해 (코드 판정)\n"
+                f"가족이 물은 것({topic})은 기억에 없다. 지어내지 말고 \"글쎄요, 그건 기억이 잘 안 나네요\"처럼 "
+                "모른다고 짧게 말한 뒤, \"이야기 좀 해 주실래요?\"처럼 존댓말로 가족에게 되물어라. "
+                "장소·날짜·이름 같은 세부를 만들지 않는다.")
     return ("# 이번 질문에 대해 (코드 판정)\n"
             f"가족이 물은 것({topic})은 기억에 없다. 지어내지 말고 \"글쎄, 그건 기억이 잘 안 나네\"처럼 "
             "모른다고 짧게 말한 뒤, \"네가 얘기 좀 해 줄래?\"처럼 가족에게 되물어라. "
@@ -163,7 +170,12 @@ class CoveragePrecheck:
         known = best >= self.threshold
         public = bool(self.profiles and self.profiles.profile_for(turn).public)
         return PrecheckResult(known=known, coverage=round(best, 3), topic_terms=terms,
-                              directive=None if known else _directive(terms, public))
+                              directive=None if known else _directive(terms, public, polite=_polite(turn)))
+
+
+def _polite(turn: TurnInput) -> bool:
+    """지금 대화하는 사람에게 존댓말을 쓰는가(가족 표 그 사람 줄). 반말·모름이면 예전 되묻기 그대로."""
+    return listener_speech_level(turn.persona_instructions) == "존댓말"
 
 
 def _doc_text(m: MemoryItem) -> str:
@@ -264,4 +276,4 @@ class CoveragePrecheckV11(CoveragePrecheck):
         known = best >= self.threshold
         public = bool(self.profiles and self.profiles.profile_for(turn).public)
         return PrecheckResult(known=known, coverage=round(best, 3), topic_terms=terms,
-                              directive=None if known else _directive(terms, public))
+                              directive=None if known else _directive(terms, public, polite=_polite(turn)))

@@ -15,6 +15,7 @@ GuardV1(ORCHESTRATOR_GUARD=v1) — 규칙은 서로 독립인 순수 함수, 아
             그 밖엔 문장 삭제.
   4. 챙김   밥·건강 챙김 문장은 세션당 care_limit 번까지(모델은 절반 넘는 턴에 넣는다). 넘으면 그 문장 삭제(다른 문장이 남을 때만).
 되묻기 문구는 같은 세션에서 연속이면 짧은 '모름'으로 바꾼다(취조처럼 들리지 않게).
+가족 표의 '지금 대화하는 사람' 줄이 존댓말이면 높인 되묻기(family_polite)를 쓴다(가드 문구는 모델을 거치지 않는다).
 GuardV11(ORCHESTRATOR_GUARD=v11): v1 의 오차단을 줄인 판정(아래 클래스 설명).
 """
 from __future__ import annotations
@@ -25,6 +26,7 @@ from orchestrator.contracts import Generation, GuardResult, MemoryItem, MemorySe
 from orchestrator.persona import subject_name_from
 from orchestrator.precheck import is_question, profile_section, strip_preamble
 from orchestrator.restricted import redact_instructions
+from orchestrator.text import listener_speech_level
 
 
 class PassGuard:
@@ -86,6 +88,7 @@ NUM = re.compile(r"\d+")
 SENT = re.compile(r"(?<=[.!?…~])\s+|\n+")
 ASK_BACK = {
     "family": ("글쎄, 그건 기억이 잘 안 나네. 네가 얘기 좀 해 줄래?", "그건 잘 모르겠다."),
+    "family_polite": ("글쎄요, 그건 기억이 잘 안 나네요. 이야기 좀 해 주실래요?", "그건 잘 모르겠어요."),
     "public": ("그건 제가 잘 모르겠네요. 어떤 이야기인지 조금 더 말씀해 주실래요?", "그 부분은 제가 잘 모르겠어요."),
 }
 
@@ -160,7 +163,8 @@ class GuardV1:
               selection: MemorySelection) -> GuardResult:
         prof = self.profiles.profile_for(turn)
         restricted = prof.restricted
-        kind = "public" if prof.public else "family"
+        kind = "public" if prof.public else (
+            "family_polite" if listener_speech_level(turn.persona_instructions) == "존댓말" else "family")
         streak = state.counters.get("ask_back_streak", 0)
         ask_back = ASK_BACK[kind][1 if streak >= 1 else 0]
         reasons: list[str] = []

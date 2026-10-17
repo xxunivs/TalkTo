@@ -69,8 +69,8 @@ def _relations(ic: IntakeContext) -> list[Relation]:
             name=f.name, relation=f.relation, calls_them=f.address_term_to, self_ref=f.self_reference,
             they_call=f.address_term_from, speech_level=f.speech_level, tone=f.tone,
             worries=list(f.worries), talks_with_persona=f.talks_with_persona,
-            is_listener=f.is_listener, listener_calls=f.listener_calls, deceased=f.deceased, note=f.note,
-            source="intake:M2-01"))
+            is_listener=f.is_listener, is_owner=f.is_owner, is_member=f.is_member,
+            listener_calls=f.listener_calls, deceased=f.deceased, note=f.note, source="intake:M2-01"))
     return out
 
 

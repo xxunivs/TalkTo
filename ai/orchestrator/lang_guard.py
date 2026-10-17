@@ -8,6 +8,7 @@
 가족이 영어로 말하고 있으면(가족 말·앞 대화에 영어 낱말 3개 이상) 영어 답은 문제 삼지 않는다.
 무슨 언어로 답할지는 프롬프트(L1 말하는 형식)가 정하고, 이 가드는 맥락에서 튀어나온 것만 본다.
 모드(ORCHESTRATOR_LANG_GUARD): off(기본) / flag(답은 그대로, 이유만 기록) / fix(걸린 문장을 지운다).
+fix 에서 문장이 다 지워지면 되묻는다. 가족 표의 '지금 대화하는 사람' 줄이 존댓말이면 높인 되묻기(family_polite).
 """
 from __future__ import annotations
 
@@ -15,6 +16,7 @@ import re
 import unicodedata
 
 from orchestrator.contracts import Generation, GuardResult, MemorySelection, SessionState, TurnInput
+from orchestrator.text import listener_speech_level
 
 LANG_GUARD_MODES = ("off", "flag", "fix")
 
@@ -29,7 +31,8 @@ LEAK_WEAK = re.compile(r"^\s*(?:wait\b|okay\b|alright\b|hmm+\b|let me\b|let's\b|
 ENGLISH_DIALOGUE_WORDS = 3
 # 맥락에 없어도 넘길 영어 약어(대화에서 흔한 것만)
 ALLOWED_LATIN = {"ok", "tv", "pc", "sns", "ktx", "kt", "lg", "sk"}
-ASK_BACK = {"family": "응? 다시 말해 줄래?", "public": "네? 다시 한 번 말씀해 주시겠어요?"}
+ASK_BACK = {"family": "응? 다시 말해 줄래?", "family_polite": "네? 다시 한 번 말해 주실래요?",
+            "public": "네? 다시 한 번 말씀해 주시겠어요?"}
 
 
 def script_of(ch: str) -> str | None:
@@ -129,5 +132,6 @@ class LanguageGuard:
         kept = [s for s in sents if not sentence_hit(s, hits, english)]
         if kept:
             return res.model_copy(update={"text": " ".join(kept), "action": "trim", "reasons": reasons})
-        kind = "public" if prof.public else "family"
+        kind = "public" if prof.public else (
+            "family_polite" if listener_speech_level(turn.persona_instructions) == "존댓말" else "family")
         return res.model_copy(update={"text": ASK_BACK[kind], "action": "ask_back", "reasons": reasons})
