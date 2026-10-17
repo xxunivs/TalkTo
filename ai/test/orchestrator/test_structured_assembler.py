@@ -5,12 +5,12 @@ from pathlib import Path
 from pydantic import SecretStr
 
 from infra.setting import Settings
-from orchestrator.assembler import StructuredAssembler, dedupe_rules
+from orchestrator.assembler import StructuredAssembler, adopt_death_rule, death_rule_lead, dedupe_rules
 from orchestrator.contracts import MemoryItem, MemorySelection, PrecheckResult, SessionState, Turn, TurnInput
 from orchestrator.persona import PersonaRegistry, infer_profile
 from orchestrator.service import build_default
 from pipeline.s3_synthesis.c_build_system_prompt import fixed_rules
-from pipeline.s3_synthesis.common_rules import common_rule_lines
+from pipeline.s3_synthesis.common_rules import DEATH_POLICIES, common_rule_lines, render_rules
 
 PERSONAS = Path(__file__).parent / "fixtures" / "personas"
 
@@ -85,6 +85,37 @@ class StructuredAssemblerTest(unittest.TestCase):
         b = _assemble(TurnInput(subject_id="s", message="m", persona_instructions=PRIVATE,
                                 history=[Turn(role="user", content="BE")]), state=state)
         self.assertEqual([s.content for s in b.sections if s.name.startswith("history")], ["BE"])
+
+    def test_instructions_death_rule_wins_without_registry_policy(self) -> None:
+        # 가져온 대화 상대(guarded)처럼 L1 을 이미 품은 지시문: 등록부 정책이 없으면 런타임 L1 이 deny 로
+        # 렌더되지만, 사망 규칙은 지시문이 고른 한 줄만 남아야 한다(서로 다른 두 줄이 함께 남지 않게).
+        answer = "그렇게 됐다"
+        for policy in ("ask_only", "brief", "open"):
+            own = render_rules("layered", public=False, deceased=True, has_family=True, death_policy=policy,
+                               vars={"family_list": "아래 가족 목록", "death_answer": answer})
+            instructions = own + "\n\n# 연결\n- 위 규칙을 따른다.\n\n" + PRIVATE
+            own_line = next(ln for ln in own.splitlines() if ln.startswith(death_rule_lead()))
+            for rules in ("layered", "legacy"):
+                with self.subTest(policy=policy, rules=rules):
+                    a = StructuredAssembler(PersonaRegistry(None), rules=rules)
+                    turn = TurnInput(subject_id="s", message="안녕", persona_instructions=instructions)
+                    head = a.assemble(turn, SessionState(session_id=None, subject_id="s"),
+                                      MemorySelection(memories=[], strategy="t"), PrecheckResult()).sections[0].content
+                    death = [ln for ln in head.splitlines() if ln.strip().startswith(death_rule_lead())]
+                    self.assertEqual(death, [own_line])
+                    self.assertLess(head.index(own_line), head.index("# 페르소나\n"))
+
+    def test_death_rule_lead_and_noop_cases(self) -> None:
+        lead = death_rule_lead()
+        self.assertGreaterEqual(len(lead), 20)
+        for policy in DEATH_POLICIES:
+            text = render_rules("layered", public=False, deceased=True, has_family=True, death_policy=policy,
+                                vars={"death_answer": "-"})
+            self.assertEqual(sum(ln.startswith(lead) for ln in text.splitlines()), 1)
+        alive = render_rules("layered", public=False, deceased=False, has_family=True)
+        dead = render_rules("layered", public=False, deceased=True, has_family=True, death_policy="open")
+        self.assertEqual(adopt_death_rule(alive, dead), alive)  # 생존이면 사망 줄을 들이지 않는다
+        self.assertEqual(adopt_death_rule(dead, PRIVATE), dead)  # 지시문에 사망 줄이 없으면 그대로
 
     def test_setting_selects_assembler(self) -> None:
         s = Settings(openai_api_key=SecretStr("k"), orchestrator_assembler="structured")

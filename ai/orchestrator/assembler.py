@@ -7,7 +7,9 @@ StructuredAssembler: 공통 규칙 → 페르소나 → 말투 → 기억 → �
 """
 from __future__ import annotations
 
+import os
 import re
+from functools import lru_cache
 from types import SimpleNamespace
 
 from orchestrator.contracts import (
@@ -17,7 +19,9 @@ from pipeline.s3_synthesis.c_build_system_prompt import build_memory_block
 from orchestrator.guard import HEADER_RULE, header_block
 from orchestrator.restricted import brief_rule, redact_instructions
 from pipeline.persona_prompt.layers import SHOTS_MODES, RuntimeContext, runtime_section
-from pipeline.s3_synthesis.common_rules import common_rule_lines, render_common_rules, render_rules
+from pipeline.s3_synthesis.common_rules import (
+    DEATH_POLICIES, RULES_DIR, render_block_file, render_common_rules, render_rules,
+)
 
 
 def legacy_memory_block(memories: list[MemoryItem]) -> str:
@@ -73,6 +77,39 @@ def dedupe_rules(instructions: str, rule_lines: set[str]) -> str:
     return re.sub(r"\n{3,}", "\n\n", text).strip()
 
 
+@lru_cache(maxsize=1)
+def death_rule_lead() -> str:
+    """공통 규칙 death 모듈 줄(사망 정책 네 변형)의 같은 앞부분 — 이 글로 시작하는 줄이 사망·임종 규칙이다."""
+    lines = [ln.strip() for p in DEATH_POLICIES
+             for ln in render_block_file(RULES_DIR / "death.md", {"deceased", f"death_{p}"}, {"death_answer": "-"})]
+    lead = os.path.commonprefix(lines) if lines else ""
+    return lead if len(lead) >= 20 else ""  # 변형이 서로 너무 달라지면 알아보지 않는다(아무 줄이나 잡지 않게)
+
+
+def adopt_death_rule(rules: str, instructions: str) -> str:
+    """지시문이 사망·임종 규칙 줄을 이미 갖고 있으면 공통 규칙의 그 줄을 지시문의 줄로 바꾼다.
+
+    가져온 대화 상대(BE '페르소나 가져오기' guarded)·4층 지시문은 고른 사망 정책으로 L1 을 이미 품는다. 등록부에
+    정책이 없으면 여기서는 deny 로 렌더하는데, dedupe_rules 는 글자까지 같은 줄만 지우므로 서로 다른 사망 규칙
+    두 줄이 한 메시지에 남는다. 지시문의 줄을 쓰면 dedupe 가 지시문 쪽 줄을 지워 한 줄만 남는다.
+    공통 규칙에 사망 줄이 없으면(생존) 그대로 둔다.
+    """
+    lead = death_rule_lead()
+    own = list(dict.fromkeys(ln.strip() for ln in instructions.splitlines() if lead and ln.strip().startswith(lead)))
+    if not own:
+        return rules
+    out: list[str] = []
+    placed = False
+    for ln in rules.split("\n"):
+        if ln.strip().startswith(lead):
+            if not placed:
+                out.extend(own)
+                placed = True
+            continue
+        out.append(ln)
+    return "\n".join(out)
+
+
 def shots_text(shots, self_label: str | None) -> str:
     who = self_label or "대상자"
     lines = [f"# 실제 통화에서 {who}가 한 말 (말투만 참고, 내용은 따라 하지 말 것)"]
@@ -119,12 +156,14 @@ class StructuredAssembler:
                                  death_policy=(r.policy if r is not None and prof.deceased else "deny"),
                                  vars={"death_answer": (r.brief_answer if r is not None else None) or "그렇게 됐지",
                                        "family_list": "아래 가족 표"})
-            rule_lines = {ln.strip() for ln in rules.splitlines() if ln.strip().startswith("- ")}
             extra = None  # 사인 정책은 L1 사망 모듈 변형이 맡는다
         else:
             rules = render_common_rules(**flags)
-            rule_lines = common_rule_lines(**flags)
             extra = brief_rule(prof.restricted)
+        if prof.restricted is None:
+            # 등록부가 사망 정책을 주지 않았으면 지시문이 이미 고른 사망 규칙을 쓴다(위 deny 는 기본값일 뿐)
+            rules = adopt_death_rule(rules, instructions)
+        rule_lines = {ln.strip() for ln in rules.splitlines() if ln.strip().startswith("- ")}
         persona = dedupe_rules(instructions, rule_lines)
         # legacy 머리말은 측정한 프롬프트와 글자까지 같게 둔다
         label = "prompts/rules" if self.rules == "layered" else "shared_rules.md"

@@ -25,6 +25,7 @@ prompts/
   layers.json               상황별 층 구성(정적 L1~L4 + 런타임 절)
   topic_synonyms.json       사전 판정용 동의어
 experiments/prompt_compare/ 프롬프트 비교 실험 도구(코드만, 데이터는 로컬)
+tools/                      로컬 도구. export_manual_persona.py = 수동 제작 페르소나 → 관리자 가져오기 묶음
 docs/                       Persona Intake 설문 양식과 문항 분류
 test/                       자동 테스트(외부 API 호출 없음)
 ```
@@ -137,6 +138,17 @@ python -m pipeline.s5_chat.a_chat --subject <대상자> --tts
 2. 대상자 화자, 사실, 말투, 기억을 검토하고 manual 폴더의 결과를 고친다.
 3. 최종 프롬프트, 기억, 임베딩, voice ID 를 준비한 뒤 로컬 대화로 확인한다.
 4. 확정한 결과를 별도 업로드 작업으로 운영 DB 에 반영한다.
+
+돌아가신 분의 수동 제작 페르소나(옛 프롬프트 + 장기기억)는 묶음 JSON 으로 만들어 BE 관리자 화면 '페르소나 가져오기'(`/admin/import`)에 올린다. 묶음 모양의 정본은 BE `app/schemas/persona_import.py` 다.
+
+```bash
+python tools/export_manual_persona.py --src output/<대상자>_manual --voice-id-file <Fish 모델 id 파일> --out <git 레포 밖>/<대상자>_bundle.json
+```
+
+- 읽는 것: `s3_synthesis/c_system_prompt.txt`(줄바꿈만 LF), `s2_extraction/e_recording_memory.json`(장기기억 전부), `s3_synthesis/d_memory_embedding.json`(확인용 옛 벡터 3건 — 입력이 "제목: 본문" 인 옛 목록 모양일 때만. 지금 파이프라인의 `{"embeddings": …}` 는 읽되 싣지 않는다). 단기기억·설문 기억은 넣지 않는다.
+- 지금 L1 공통 규칙(layered·비공개·고인·가족 있음)과 사망 정책별 규칙 줄, 짧은 연결 문단을 함께 싣는다. 지침은 BE 가 가져올 때 짠다(guarded·verbatim, 사망 정책·한마디, 지금 대화하는 사람). 옛 글에 사인을 묻는 질문의 답·예시가 있어도 연결 문단이 위 사망 규칙을 따르라고 짚는다(옛 글은 고치지 않는다).
+- 중간계층 structured 조립기는 등록부에 사망 정책이 없으면 지시문이 이미 고른 사망 규칙 줄을 쓴다(`orchestrator/assembler.py` `adopt_death_rule`) — 서로 다른 사망 규칙 두 줄이 한 메시지에 남지 않게.
+- 파이프라인을 부르지 않고 원본을 고치지 않는다. 묶음은 가족 자료라 git 레포 안에는 쓰지 않는다(도구가 막는다). 화면에는 건수·글자 수·sha·경로만 찍는다.
 
 다른 단계는 다시 돌리면 산출물을 덮어쓸 수 있으니, 손으로 고친 결과를 확인한 뒤 돌린다.
 
