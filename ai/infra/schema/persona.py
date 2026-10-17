@@ -26,6 +26,10 @@ class PersonaContext(ApiModel):
     voice_id: str | None = None
     # 고인 페르소나인가. 감정 안전선에 쓴다. 모르면(None) 고인으로 본다.
     deceased: bool | None = None
+    # 손으로 만들어 가져온 지침(BE 페르소나 가져오기). 중간계층(사전 점검·근거 확인)을 거치지 않고
+    # 지침 + 참고 기억 + 대화로만 대답한다. 그 지침은 등록부·가족 사전 없이 만들어져, 사전 점검이
+    # 있는 기억도 '기억에 없다'로 판정해 모른다고 답하게 만들었다(2026-10-17 할머니 MVP 복원).
+    fixed_prompt: bool = False
 
 
 class PersonaResponseRequest(ApiModel):

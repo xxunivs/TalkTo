@@ -103,6 +103,21 @@ class RouteFlagTest(unittest.TestCase):
                                     "emotion": None, "provider": "openai",
                                     "model": _settings().openai_chat_model})
 
+    def test_fixed_prompt_skips_orchestrator_even_when_flag_on(self) -> None:
+        body = dict(REQUEST, persona=dict(REQUEST["persona"], fixedPrompt=True))
+        with patch("infra.be_ai_api.routes.persona.orchestrate_persona_response") as orch, \
+                patch("infra.external_api.openai_client.OpenAI") as cls:
+            cls.return_value = _mock_openai()
+            r = self._post(True, body)
+            messages = cls.return_value.chat.completions.create.call_args.kwargs["messages"]
+        self.assertEqual(r.status_code, 200)
+        orch.assert_not_called()
+        # 기존 경로: 지침 그대로 → 참고 기억 → 대화 → 질문. '기억에 없다' 지시는 없다.
+        self.assertEqual(messages[0], {"role": "system", "content": "당신은 홍길동이다."})
+        self.assertIn("남원", messages[1]["content"])
+        self.assertFalse(any("코드 판정" in m["content"] for m in messages))
+        self.assertEqual(r.json()["retrievedMemoryIds"], ["m1", "m2"])
+
     def test_new_optional_fields_accepted_by_legacy(self) -> None:
         with patch("infra.external_api.openai_client.OpenAI") as cls:
             cls.return_value = _mock_openai()

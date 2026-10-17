@@ -41,8 +41,9 @@ def create_persona_response(
     _authorized: InternalRequest,
     settings: SettingsDependency,
 ) -> PersonaResponseResult:
-    # 기능 플래그: PERSONA_ORCHESTRATOR=1 이면 중간계층, 아니면 기존 경로(요청·응답 계약 동일)
-    if settings.persona_orchestrator:
+    # 기능 플래그: PERSONA_ORCHESTRATOR=1 이면 중간계층, 아니면 기존 경로(요청·응답 계약 동일).
+    # 가져온 지침(fixedPrompt)은 늘 기존 경로다.
+    if settings.persona_orchestrator and not request.persona.fixed_prompt:
         return orchestrate_persona_response(request, settings=settings)
     return generate_persona_response(request, settings=settings)
 
