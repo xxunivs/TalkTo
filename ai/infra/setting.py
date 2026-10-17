@@ -35,13 +35,18 @@ class Settings(BaseModel):
     openai_timeout_seconds: float = Field(default=60, gt=0)
     openai_max_retries: int = Field(default=2, ge=0)
 
-    tts_provider: str = "elevenlabs"
+    # 목소리: 새 목소리는 늘 Fish Audio(drama-3)에서 만든다. 합성·지우기는 voice_id 로 만든 회사를
+    # 알아본다(fish_… → Fish, TalkTo… → MiniMax, 그 밖 → ElevenLabs). 예전 회사 목소리는 다시 만들기 전까지 쓴다.
+    fish_audio_api_key: SecretStr | None = None
+    # voice_id 없이 회사를 고를 때의 기본값. 새 목소리 만들기는 이 값과 무관하게 fish 다.
+    tts_provider: str = "fish"
+    # ElevenLabs: 녹음 전사(Scribe)와 예전 목소리 합성·지우기
     elevenlabs_api_key: SecretStr | None = None
     # 기본은 v4 Turbo: 목소리가 조금 달라도 감정 표현이 좋고 AI 느낌이 덜하다(청취 비교로 정함).
-    # v4 학습이 안 된 PVC 는 provider 가 v2 로 되돌린다.
+    # 즉시 복제 목소리(IVC)가 아니면 provider 가 v2 로 되돌린다.
     elevenlabs_model: str | None = "eleven_v4_turbo"
     elevenlabs_default_voice_id: str | None = None
-    # 말하는 속도(ElevenLabs speed). 1.0=기본, <1 느리게.
+    # 말하는 속도(ElevenLabs speed). 1.0=기본, <1 느리게. 예전 ElevenLabs·MiniMax 목소리에만 쓴다(Fish 는 안 씀).
     # 0.7~1.2 권장. 요청에서 speed로 오버라이드 가능.
     elevenlabs_speed: float = Field(default=1.0, ge=0.7, le=1.2)
     # 목소리 결. 대상자마다 달라야 해서 요청에서 덮어쓸 수 있다. 여기 값은 기본값이다.
@@ -50,8 +55,7 @@ class Settings(BaseModel):
     elevenlabs_stability: float = Field(default=0.3, ge=0.0, le=1.0)
     elevenlabs_similarity_boost: float = Field(default=0.75, ge=0.0, le=1.0)
     elevenlabs_style: float = Field(default=0.0, ge=0.0, le=1.0)
-    # MiniMax: 새로 만드는 목소리를 TTS_PROVIDER=minimax 로 둘 때. 합성은 voice_id 로
-    # 어느 회사 목소리인지 보고 보낸다(이미 만든 ElevenLabs 목소리도 계속 쓴다).
+    # MiniMax: 예전에 만든 목소리(TalkTo…)의 합성·지우기만. 새 목소리는 만들지 않는다.
     minimax_api_key: SecretStr | None = None
     # turbo: 대화는 첫 소리가 빨라야 해서. hd 는 더 곱지만 느리다.
     minimax_model: str = "speech-2.8-turbo"
@@ -70,7 +74,8 @@ class Settings(BaseModel):
     speaker_model_dir: str | None = None
 
     stt_provider: str = "elevenlabs"
-    elevenlabs_stt_model: str = "scribe_v1"
+    # scribe_v1 은 지원 종료(ElevenLabs 공지, 2026-07-09). v2 를 이름으로 고정한다.
+    elevenlabs_stt_model: str = "scribe_v2"
     stt_timeout_seconds: float = Field(default=1800, gt=0)
     audio_download_timeout_seconds: float = Field(default=120, gt=0)
     preview_window_ms: int = Field(default=180_000, gt=0)
@@ -110,6 +115,7 @@ class Settings(BaseModel):
     @field_validator(
         "ai_server_token",
         "openai_api_key",
+        "fish_audio_api_key",
         "elevenlabs_api_key",
         "elevenlabs_model",
         "elevenlabs_default_voice_id",
@@ -164,7 +170,9 @@ def load_settings(env_file: str | Path | None = ".env") -> Settings:
         ),
         openai_timeout_seconds=os.getenv("OPENAI_TIMEOUT_SECONDS", "60"),
         openai_max_retries=os.getenv("OPENAI_MAX_RETRIES", "2"),
-        tts_provider=os.getenv("TTS_PROVIDER", "elevenlabs"),
+        # 배포(BE deploy.py)는 os.getenv 에 글자 그대로 적힌 이름만 운영 비밀값으로 옮긴다. 변수로 만들지 않는다.
+        fish_audio_api_key=os.getenv("FISH_AUDIO_API_KEY") or None,
+        tts_provider=os.getenv("TTS_PROVIDER") or "fish",
         elevenlabs_api_key=os.getenv("ELEVENLABS_API_KEY"),
         elevenlabs_model=os.getenv("ELEVENLABS_MODEL") or "eleven_v4_turbo",
         elevenlabs_default_voice_id=os.getenv("ELEVENLABS_DEFAULT_VOICE_ID"),
@@ -180,7 +188,7 @@ def load_settings(env_file: str | Path | None = ".env") -> Settings:
         speaker_id_threshold=os.getenv("SPEAKER_ID_THRESHOLD", "0.5"),
         speaker_model_dir=os.getenv("SPEAKER_MODEL_DIR"),
         stt_provider=os.getenv("STT_PROVIDER", "elevenlabs"),
-        elevenlabs_stt_model=os.getenv("ELEVENLABS_STT_MODEL", "scribe_v1"),
+        elevenlabs_stt_model=os.getenv("ELEVENLABS_STT_MODEL") or "scribe_v2",
         stt_timeout_seconds=os.getenv("STT_TIMEOUT_SECONDS", "1800"),
         audio_download_timeout_seconds=os.getenv(
             "AUDIO_DOWNLOAD_TIMEOUT_SECONDS", "120"

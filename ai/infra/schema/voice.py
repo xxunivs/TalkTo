@@ -39,9 +39,8 @@ class VoiceCloneRequest(ApiModel):
     # (다구간) 대상자 화자 구간들 — AI가 각 구간을 잘라 이어붙여 한 목소리로 학습.
     # 화자 식별(subjectSpeakerLabel)로 전 통화에서 모은 대상자 구간을 넘기면 된다.
     samples: list[VoiceSampleSegment] | None = Field(default=None, max_length=100)
-    # 어디서 목소리를 만들지. BE 가 녹음을 보고 정한다(통화 녹음 → minimax, 일반 녹음 → elevenlabs).
-    # 비우면 서버 기본(TTS_PROVIDER).
-    provider: Literal["elevenlabs", "minimax"] | None = None
+    # 예전 BE 와 맞춘 칸(BE 는 "fish" 를 보낸다). 무엇을 보내도 새 목소리는 늘 Fish Audio 에서 만든다.
+    provider: Literal["fish", "elevenlabs", "minimax"] | None = None
 
     @model_validator(mode="after")
     def _exactly_one_source(self) -> "VoiceCloneRequest":
@@ -97,69 +96,26 @@ class VoiceCloneResponse(ApiModel):
 
 class SpeechSynthesisRequest(ApiModel):
     text: str = Field(min_length=1, max_length=20_000)
-    # 대상자 클론 음성 id. 미지정 시 ELEVENLABS_DEFAULT_VOICE_ID로 폴백.
+    # 대상자 클론 음성 id. 앞글자로 만든 회사를 고른다(fish_… → Fish, TalkTo… → MiniMax, 그 밖 → ElevenLabs).
+    # 미지정 시 ELEVENLABS_DEFAULT_VOICE_ID로 폴백.
     voice_id: str | None = Field(default=None, max_length=200)
+    # 아래 속도·결은 예전 ElevenLabs·MiniMax 목소리에만 쓴다(Fish drama-3 는 쓰지 않는다).
     # 말하는 속도(0.7~1.2, 1.0=기본). 미지정 시 서버 ELEVENLABS_SPEED로 폴백.
     speed: float | None = Field(default=None, ge=0.7, le=1.2)
     # 목소리 결. 대상자마다 다르다. 미지정 시 서버 기본값으로 폴백.
     stability: float | None = Field(default=None, ge=0.0, le=1.0)
     similarity_boost: float | None = Field(default=None, ge=0.0, le=1.0)
     style: float | None = Field(default=None, ge=0.0, le=1.0)
-    # 대답 감정(우리 이름: neutral, calm, happy, sad, surprised). None 이면 회사가 글을 보고 정한다.
+    # 대답 감정(우리 이름: neutral, calm, happy, sad, surprised). MiniMax 만 쓴다. None 이면 회사가 글을 보고 정한다.
     emotion: Literal["neutral", "calm", "happy", "sad", "surprised"] | None = None
-
-
-# ── Premium 정밀 목소리(ElevenLabs PVC). 상태는 BE 가 갖고, AI 서버는 ElevenLabs 를 부른다.
-
-
-class PvcCreateRequest(ApiModel):
-    name: str = Field(min_length=1, max_length=100)
-    language: str = Field(default="ko", min_length=2, max_length=5)
-
-
-class PvcCreateResponse(ApiModel):
-    voice_id: str
-
-
-class PvcSamplesRequest(ApiModel):
-    voice_id: str = Field(min_length=1, max_length=255)
-    # 그분 구간들(30분~3시간 분량). IVC 의 100개보다 훨씬 많다.
-    samples: list[VoiceSampleSegment] = Field(min_length=1, max_length=3000)
-
-
-class PvcSamplesResponse(ApiModel):
-    uploaded_seconds: int
-    files: int
-
-
-class PvcDocument(ApiModel):
-    url: HttpUrl
-    filename: str = Field(min_length=1, max_length=200)
-
-
-class PvcVerificationRequest(ApiModel):
-    voice_id: str = Field(min_length=1, max_length=255)
-    documents: list[PvcDocument] = Field(min_length=1, max_length=5)
-    note: str = Field(default="", max_length=2000)
-
-
-class PvcVoiceRequest(ApiModel):
-    voice_id: str = Field(min_length=1, max_length=255)
 
 
 class VoiceDeleteRequest(ApiModel):
     voice_id: str = Field(min_length=1, max_length=255)
-    # 목소리를 만든 회사. 비우면 ElevenLabs(처음 만든 목소리·똑 닮은 목소리 모두).
-    provider: Literal["elevenlabs", "minimax"] = "elevenlabs"
-
-
-class PvcStatusResponse(ApiModel):
-    verification: Literal["pending", "verified", "rejected"]
-    training: Literal["not_started", "training", "done", "failed"]
-    progress: float | None = None
-    message: str | None = None
+    # 목소리를 만든 회사. voice_id 앞글자(fish_… · TalkTo…)가 먼저다. 앞글자로 모를 때만 이 값을 보고,
+    # 비우면 ElevenLabs(예전 IVC·PVC 모두).
+    provider: Literal["fish", "elevenlabs", "minimax"] | None = None
 
 
 class OkResponse(ApiModel):
     ok: bool = True
-    model_id: str | None = None

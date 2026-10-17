@@ -28,7 +28,7 @@ class FakeProvider:
         self._segments = segments
 
     def transcribe(self, audio_path, *, language, speaker_diarization, num_speakers=None):
-        return STTResult(provider="elevenlabs", model="scribe_v1", segments=self._segments)
+        return STTResult(provider="elevenlabs", model="scribe_v2", segments=self._segments)
 
 
 SEGMENTS = [
@@ -70,7 +70,7 @@ class TranscriptionsEndpointTest(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         body = response.json()
         self.assertEqual(body["provider"], "elevenlabs")
-        self.assertEqual(body["model"], "scribe_v1")
+        self.assertEqual(body["model"], "scribe_v2")
         self.assertEqual(
             body["segments"][0],
             {

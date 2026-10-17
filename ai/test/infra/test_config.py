@@ -20,6 +20,30 @@ class ConfigTest(unittest.TestCase):
         )
         self.assertEqual(settings.openai_embedding_dimensions, 1536)
         self.assertIsNone(settings.openai_api_key)
+        self.assertIsNone(settings.fish_audio_api_key)
+        self.assertEqual(settings.tts_provider, "fish")
+        self.assertEqual(settings.elevenlabs_stt_model, "scribe_v2")
+
+    def test_voice_keys_and_models_from_environment(self) -> None:
+        env = {"FISH_AUDIO_API_KEY": "fish-key", "TTS_PROVIDER": "", "ELEVENLABS_STT_MODEL": ""}
+        with patch.dict(os.environ, env, clear=True):
+            settings = load_settings(env_file=None)
+        self.assertEqual(settings.fish_audio_api_key.get_secret_value(), "fish-key")
+        self.assertEqual(settings.tts_provider, "fish")  # 비워 두면 fish
+        self.assertEqual(settings.elevenlabs_stt_model, "scribe_v2")
+        with patch.dict(os.environ, {"FISH_AUDIO_API_KEY": " "}, clear=True):
+            self.assertIsNone(load_settings(env_file=None).fish_audio_api_key)
+
+    def test_deploy_can_find_the_fish_key(self) -> None:
+        # BE deploy.py 는 infra/setting.py 에 글자 그대로 적힌 os.getenv 이름만 운영 비밀값으로 옮긴다
+        import re
+        from pathlib import Path
+
+        import infra.setting
+
+        text = Path(infra.setting.__file__).read_text(encoding="utf-8")
+        names = set(re.findall(r'os\.(?:getenv|environ\.get)\(\s*"([A-Z0-9_]+)"', text))
+        self.assertTrue({"FISH_AUDIO_API_KEY", "ELEVENLABS_API_KEY", "MINIMAX_API_KEY"} <= names)
 
     def test_environment_overrides_are_validated(self) -> None:
         with patch.dict(

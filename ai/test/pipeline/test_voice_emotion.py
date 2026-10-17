@@ -100,3 +100,15 @@ class InlineEmotionResponseTest(unittest.TestCase):
         system = [m["content"] for m in client.chat.completions.create.call_args.kwargs["messages"]
                   if m["role"] == "system"]
         self.assertFalse(any("[감정:이름]" in s for s in system))
+
+    @patch("infra.external_api.openai_client.OpenAI")
+    def test_fish_voice_gets_no_emotion_instruction(self, mock_openai: MagicMock) -> None:
+        # drama-3 는 감정 표시 없이도 감정을 싣는다. [ ] 표시는 오히려 연기 지시로 읽힌다.
+        client = _openai_returning("아이고 장하다!")
+        mock_openai.return_value = client
+        settings = Settings(openai_api_key=SecretStr("k"), voice_emotion="inline")
+        result = generate_persona_response(self._request("fish_0123abcd"), settings=settings)
+        self.assertIsNone(result.emotion)
+        system = [m["content"] for m in client.chat.completions.create.call_args.kwargs["messages"]
+                  if m["role"] == "system"]
+        self.assertFalse(any("[감정:이름]" in s for s in system))

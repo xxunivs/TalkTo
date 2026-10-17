@@ -1,7 +1,7 @@
 """테스트는 외부 API 를 부르지 않는다. .env 가 없어도 돌도록 키 자리에 가짜 값을 넣는다(진짜 값이 있으면 그대로 둔다)."""
 import os
 
-for key in ("OPENAI_API_KEY", "ELEVENLABS_API_KEY"):
+for key in ("OPENAI_API_KEY", "ELEVENLABS_API_KEY", "FISH_AUDIO_API_KEY"):
     os.environ.setdefault(key, "test-key")
 
 # 기능 플래그는 테스트가 기본 동작(legacy)을 보게 고정한다. 로컬 .env 에서 4층·중간계층을 켜 둬도

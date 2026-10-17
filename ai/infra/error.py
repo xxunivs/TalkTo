@@ -108,6 +108,21 @@ class TTSProviderError(AppError):
         )
 
 
+# 목소리 회사(Fish Audio) 쪽에서 막힌 경우. OpenAI 의 AI_PROVIDER_* 와 따로 둔다 — 백엔드가 목소리용
+# 관리자 알림을 띄우고, 대화 전체가 멈춘 것으로 보지 않는다.
+VOICE_PROVIDER_KEY = "VOICE_PROVIDER_KEY"  # 키가 틀렸거나 막힘(401·403)
+VOICE_PROVIDER_CREDITS = "VOICE_PROVIDER_CREDITS"  # 잔액이 다 됨(402, 충전해야 풀린다)
+VOICE_PROVIDER_RATE_LIMIT = "VOICE_PROVIDER_RATE_LIMIT"  # 동시 요청 한도(429, 곧 풀린다)
+VOICE_PROVIDER_UNAVAILABLE = "VOICE_PROVIDER_UNAVAILABLE"  # 5xx·시간 초과·연결 실패
+
+
+class VoiceProviderError(AppError):
+    """목소리 회사가 거절·실패한 요청. AI_PROVIDER_* 처럼 503 + 코드로 답한다(회사 원문은 로그에만)."""
+
+    def __init__(self, code: str, message: str = "Voice provider unavailable") -> None:
+        super().__init__(code=code, message=message, status_code=503)
+
+
 class MissingVoiceError(AppError):
     def __init__(self, detail: str) -> None:
         super().__init__(

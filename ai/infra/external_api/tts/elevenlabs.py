@@ -1,7 +1,5 @@
 import logging
-import time
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Protocol
 
 import httpx
@@ -18,7 +16,13 @@ class TTSResult:
 
 
 class TTSProvider(Protocol):
-    """대상자 목소리 provider 경계: 합성(TTS) + 샘플로 클론 등록."""
+    """대상자 목소리 provider 경계: 합성(TTS) + 목소리 지우기.
+
+    새 목소리 만들기(clone_voice)는 Fish Audio 만 한다. ElevenLabs·MiniMax 는 예전에 만든 목소리를
+    다시 만들기 전까지 합성하고, 다시 만든 뒤에 지운다.
+    """
+
+    name: str
 
     def synthesize(
         self, text: str, *, voice_id: str, speed: float = 1.0,
@@ -26,7 +30,7 @@ class TTSProvider(Protocol):
         emotion: str | None = None,
     ) -> TTSResult: ...
 
-    def clone_voice(self, name: str, audio_path: Path) -> str: ...
+    def delete_voice(self, voice_id: str) -> None: ...
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +39,6 @@ _DEFAULT_MODEL = "eleven_multilingual_v2"
 # 모델마다 받는 voice_settings 가 다르다. v4 계열에는 style·speed 가 없다(문서·실측 확인).
 # 모르는 모델은 v2 처럼 다 보낸다.
 _V4_SETTINGS = ("stability", "similarity_boost")
-_NOT_READY_TTL = 30 * 60
 _ALL_SETTINGS = ("stability", "similarity_boost", "style", "speed")
 
 
@@ -47,23 +50,13 @@ def allowed_settings(model_id: str) -> tuple[str, ...]:
     return _V4_SETTINGS if _is_v4(model_id) else _ALL_SETTINGS
 
 
-def v4_ready(voice: dict, model_id: str) -> bool:
-    """이 목소리로 v4 합성을 해도 되는가.
+def v4_ready(voice: dict) -> bool:
+    """이 목소리로 v4 합성을 해도 되는가. 즉시 복제 목소리(IVC, cloned)만 그렇다.
 
-    PVC(professional)는 My Voices 에서 v4 '+' 로 추가 학습해야 v4 에서 제 목소리가 난다.
-    학습 상태(fine_tuning.state)에 v4 계열 fine_tuned 가 있어야 한다. IVC(cloned)는 따로
-    학습하는 단계가 없다. 그 밖의 종류는 확인하지 못했으니 쓰지 않는다.
+    IVC 는 따로 학습하는 단계가 없다. 예전 똑 닮은 목소리(PVC, professional)를 포함해 그 밖의 종류는
+    다시 만들기 전까지 v2 로 합성한다.
     """
-    category = voice.get("category")
-    if category == "cloned":
-        return True
-    if category == "professional":
-        state = (voice.get("fine_tuning") or {}).get("state") or {}
-        return any(
-            value == "fine_tuned" and (key == model_id or key.startswith("eleven_v4"))
-            for key, value in state.items()
-        )
-    return False
+    return voice.get("category") == "cloned"
 
 
 class ElevenLabsTTSProvider:
@@ -71,7 +64,6 @@ class ElevenLabsTTSProvider:
 
     name = "elevenlabs"
     _v4_cache: dict[str, bool] = {}
-    _v4_checked_at: dict[str, float] = {}
 
     def __init__(
         self,
@@ -89,18 +81,10 @@ class ElevenLabsTTSProvider:
         self._v4_ok = ElevenLabsTTSProvider._v4_cache
 
     def model_for(self, voice_id: str) -> str:
-        """이 목소리에 쓸 모델. v4 를 쓰라고 했어도 준비 안 된 목소리는 v2 로 되돌린다.
-
-        '아직 안 됨'은 30분만 믿는다. 정밀 목소리(PVC)는 v4 학습이 나중에 끝날 수 있다.
-        """
+        """이 목소리에 쓸 모델. v4 를 쓰라고 했어도 준비 안 된 목소리는 v2 로 되돌린다."""
         if not _is_v4(self.model_id):
             return self.model_id
-        checked = ElevenLabsTTSProvider._v4_checked_at.get(voice_id, 0.0)
-        if self._v4_ok.get(voice_id) is False and time.monotonic() - checked > _NOT_READY_TTL:
-            # 여러 요청이 동시에 지울 수 있어 없는 열쇠도 괜찮게(pop)
-            self._v4_ok.pop(voice_id, None)
         if voice_id not in self._v4_ok:
-            ElevenLabsTTSProvider._v4_checked_at[voice_id] = time.monotonic()
             try:
                 response = httpx.get(
                     f"{ELEVENLABS_BASE}/v1/voices/{voice_id}",
@@ -110,7 +94,7 @@ class ElevenLabsTTSProvider:
                 voice = response.json() if response.status_code == 200 else {}
             except httpx.HTTPError:
                 voice = {}
-            ready = v4_ready(voice, self.model_id)
+            ready = v4_ready(voice)
             self._v4_ok[voice_id] = ready
             if not ready:
                 logger.warning(
@@ -160,24 +144,22 @@ class ElevenLabsTTSProvider:
             model=model_id,
         )
 
-    def clone_voice(self, name: str, audio_path: Path) -> str:
-        """음성 샘플로 클론 음성을 등록하고 voice_id를 돌려준다(ElevenLabs add-voice)."""
+    def delete_voice(self, voice_id: str) -> None:
+        """목소리를 ElevenLabs 에서 지운다(대화 상대를 지울 때·목소리를 다시 만든 뒤).
+
+        처음 만든 목소리(IVC)·예전 똑 닮은 목소리(PVC) 모두 같은 API 다(PVC 면 슬롯을 돌려받는다).
+        """
         try:
-            with audio_path.open("rb") as audio_file:
-                response = httpx.post(
-                    f"{ELEVENLABS_BASE}/v1/voices/add",
-                    headers={"xi-api-key": self.api_key},
-                    data={"name": name},
-                    files={"files": (audio_path.name, audio_file)},
-                    timeout=self.timeout_seconds,
-                )
-        except httpx.HTTPError as error:
-            raise TTSProviderError(f"음성 클론 요청 실패: {error}") from error
-        if response.status_code != 200:
-            raise TTSProviderError(
-                f"ElevenLabs 클론 오류 {response.status_code}: {response.text[:200]}"
+            response = httpx.delete(
+                f"{ELEVENLABS_BASE}/v1/voices/{voice_id}",
+                headers={"xi-api-key": self.api_key},
+                timeout=self.timeout_seconds,
             )
-        voice_id = response.json().get("voice_id")
-        if not voice_id:
-            raise TTSProviderError("클론 응답에 voice_id가 없다.")
-        return str(voice_id)
+        except httpx.HTTPError as error:
+            raise TTSProviderError(f"목소리 지우기 요청 실패: {error}") from error
+        if response.status_code >= 400:
+            raise TTSProviderError(
+                f"ElevenLabs 목소리 지우기 오류 {response.status_code}: {response.text[:200]}"
+            )
+        self._v4_ok.pop(voice_id, None)
+        logger.info("elevenlabs voice deleted voice_id=%s", voice_id)

@@ -1,4 +1,4 @@
-"""채팅 음성 입출력 — 음성 메시지 STT(OpenAI) + 페르소나 답변 TTS(ElevenLabs·MiniMax).
+"""채팅 음성 입출력 — 음성 메시지 STT(OpenAI) + 페르소나 답변 TTS(Fish Audio, 예전 목소리는 ElevenLabs·MiniMax).
 
 녹음 분석용 전사(/analysis)와 별개: 여기는 가족이 페르소나에게 말한 짧은 음성 메시지를
 받아쓰고(STT), 페르소나 답변을 고인 목소리로 합성(TTS)한다.
@@ -20,7 +20,7 @@ from infra.error import (
 )
 from infra.external_api.audio import download_audio
 from infra.external_api.openai_client import create_openai_client
-from infra.external_api.tts import TTSResult, create_tts_provider
+from infra.external_api.tts import TTSResult, create_clone_provider, create_tts_provider
 from pipeline.s4_voice import c_sample_quality as quality
 from pipeline.s4_voice.b_emotion import strip_emotion_tags
 from infra.schema.memory import PersistedTranscriptSegment
@@ -34,8 +34,10 @@ from infra.schema.voice import (
 )
 
 # 다구간 클론 샘플 튜닝값
-_CLONE_SAMPLE_MAX_SECONDS = 180.0  # 이어붙인 샘플 총 길이 상한
-_CLONE_CANDIDATE_SECONDS = 600.0  # 품질을 재 볼 후보 총 길이(여기서 깨끗한 180초를 고른다)
+# 이어붙인 샘플 총 길이 상한. Fish 즉시 복제는 깨끗한 1분 안팎이면 충분했다(대표님 청취 비교에 쓴 길이).
+_CLONE_SAMPLE_MAX_SECONDS = 60.0
+_CLONE_CANDIDATE_SECONDS = 600.0  # 품질을 재 볼 후보 총 길이(여기서 깨끗한 60초를 고른다)
+_CLONE_SAMPLE_RATE = 44100  # 올리는 wav: 44.1kHz mono 16비트(넓은 대역 녹음의 높은 소리도 남긴다)
 _CLONE_MIN_SAMPLE_SECONDS = 10.0  # 기준을 넘는 구간이 이보다 적으면 기준을 낮춰서라도 채운다
 _CLONE_MIN_SEGMENT_MS = 800  # 이보다 짧은 구간은 버림(잡음·토막 방지)
 _CLONE_EDGE_TRIM_MS = 80  # 구간 앞뒤를 조금 깎는다. 화자 경계에 남의 숨·말끝이 붙어 있곤 하다
@@ -84,8 +86,10 @@ def synthesize_speech(
         return fallback if asked is None else asked
 
     # 감정 표시가 글에 남아 있으면 소리로 읽힌다. 저장된 대답에도 남아 있을 수 있어 여기서 한 번 더 지운다.
+    # Fish 는 여기에 더해 [ ]·< > 지시 표시도 지운다(fish_plain_text).
     text = strip_emotion_tags(request.text) or request.text
     provider = create_tts_provider(settings, voice_id=voice_id)
+    # 아래 속도·결 값은 예전 ElevenLabs·MiniMax 목소리용이다. Fish 는 받기만 하고 쓰지 않는다.
     return provider.synthesize(
         text,
         voice_id=voice_id,
@@ -100,14 +104,15 @@ def synthesize_speech(
 def _ffmpeg_normalize(
     src: Path, dst: Path, start_ms: int, end_ms: int, *, loudnorm: bool = False
 ) -> None:
-    """구간만 잘라 mono 22050 pcm_s16le wav로 정규화(concat -c copy용 통일 파라미터).
+    """구간만 잘라 mono 44100 pcm_s16le wav로 정규화(concat -c copy용 통일 파라미터).
 
     loudnorm 이면 구간마다 소리 크기를 맞춘다(통화마다 크기가 달라 학습이 흔들리지 않게).
     """
     filters = ["-af", "loudnorm=I=-20:TP=-2:LRA=11"] if loudnorm else []
     subprocess.run(
         ["ffmpeg", "-nostdin", "-y", "-ss", str(start_ms / 1000), "-to", str(end_ms / 1000),
-         "-i", str(src), *filters, "-ac", "1", "-ar", "22050", "-c:a", "pcm_s16le", str(dst)],
+         "-i", str(src), *filters, "-ac", "1", "-ar", str(_CLONE_SAMPLE_RATE), "-c:a", "pcm_s16le",
+         str(dst)],
         check=True, capture_output=True,
     )
 
@@ -178,7 +183,8 @@ def _build_multi_sample(segments: list[VoiceSampleSegment], *, settings: Setting
 
         gap = workdir / "gap.wav"
         subprocess.run(
-            ["ffmpeg", "-nostdin", "-y", "-f", "lavfi", "-i", "anullsrc=r=22050:cl=mono",
+            ["ffmpeg", "-nostdin", "-y", "-f", "lavfi",
+             "-i", f"anullsrc=r={_CLONE_SAMPLE_RATE}:cl=mono",
              "-t", str(_CLONE_GAP_SECONDS), "-c:a", "pcm_s16le", str(gap)],
             check=True, capture_output=True,
         )
@@ -297,10 +303,11 @@ def clone_voice_from_sample(
 
     두 방식: (1) sampleAudioUrl 단일 클립, (2) samples 다구간 — 화자 식별로 전 통화에서
     모은 대상자 구간들을 잘라 이어붙여 한 목소리로 학습(샘플 길이·다양성 확보).
+    늘 Fish Audio 에서 만든다. request.provider 는 받기만 하고 보지 않는다.
     """
-    provider = create_tts_provider(settings, provider=request.provider)
+    provider = create_clone_provider(settings)
     if request.samples:
-        # 품질을 재 볼 후보를 통화마다 고르게 추린다. 실제로 담을 180초는 품질을 재서 고른다.
+        # 품질을 재 볼 후보를 통화마다 고르게 추린다. 실제로 담을 60초는 품질을 재서 고른다.
         selected = select_clone_samples(
             request.samples, max_seconds=_CLONE_CANDIDATE_SECONDS
         )

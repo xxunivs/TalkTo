@@ -50,7 +50,7 @@ class ElevenLabsScribeProvider:
         self,
         *,
         api_key: str,
-        model_id: str = "scribe_v1",
+        model_id: str = "scribe_v2",
         timeout_seconds: float = 1800.0,
     ) -> None:
         self._api_key = api_key

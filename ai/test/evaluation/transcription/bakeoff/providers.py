@@ -92,7 +92,7 @@ def transcribe_scribe(
     audio_path: Path,
     *,
     api_key: str,
-    model_id: str = "scribe_v1",
+    model_id: str = "scribe_v2",
     language_code: str | None = "ko",
     num_speakers: int | None = None,
     timeout_seconds: float = 1800.0,

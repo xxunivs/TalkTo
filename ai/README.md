@@ -5,7 +5,7 @@ TalkTo 페르소나 제작과 대화를 위한 AI 서버. 녹음 분석, 페르�
 **4층 페르소나 프롬프트 생성기**와 **중간계층(orchestrator)** 도 이 레포에 있다. 새 기능은 전부 환경 변수로 켜며, 기본값에서는 기존 동작과 같다.
 
 ```text
-프론트 → BE(talkto_api_server) → 이 서버(/v1/...) → OpenAI · ElevenLabs
+프론트 → BE(talkto_api_server) → 이 서버(/v1/...) → OpenAI · Fish Audio · ElevenLabs
 ```
 
 BE 가 사용자 인증·동의·운영 DB 저장과 기억 검색을 맡고, 이 서버는 BE 가 보낸 프롬프트·기억·voice ID 로 답을 만든다.
@@ -146,13 +146,27 @@ python -m pipeline.s5_chat.a_chat --subject <대상자> --tts
 |---|---|
 | 페르소나 응답·녹음 분석·기억 추출·전사 교정 | `gpt-6-luna` |
 | 품질 평가 채점 | `gpt-5.5` |
-| 녹음 전사와 화자 분리 | ElevenLabs Scribe |
+| 녹음 전사와 화자 분리 | ElevenLabs Scribe `scribe_v2` |
 | 대화 음성 전사 | OpenAI `whisper-1` |
 | 목소리 기반 화자 식별 | SpeechBrain ECAPA-TDNN |
 | 기억과 질문 임베딩 | `text-embedding-3-small`, 1536차원 |
-| 음성 합성 | ElevenLabs `eleven_v4_turbo` |
+| 목소리 만들기·음성 합성 | Fish Audio `drama-3` (예전 목소리: ElevenLabs `eleven_v4_turbo`·MiniMax) |
 
-모델은 환경 변수로 바꾼다(기본값: `infra/setting.py`). 페르소나는 파인튜닝 대신 프롬프트와 검색한 기억으로 제어한다.
+모델은 환경 변수로 바꾼다(기본값: `infra/setting.py`). 페르소나는 파인튜닝 대신 프롬프트와 검색한 기억으로 제어한다. Fish 합성 모델(`drama-3`)만은 코드에 고정한다(아래 '목소리').
+
+## 목소리
+
+새 목소리는 모두 Fish Audio 즉시 복제로 만들고 `drama-3` 로 합성한다. ElevenLabs·MiniMax 는 예전에 만든 목소리를 다시 만들기 전까지 합성하고, 다시 만든 뒤 지우는 데만 쓴다.
+
+| 일 | 경로 | 하는 일 |
+|---|---|---|
+| 만들기 | `POST /v1/voice/clone` | BE 가 보낸 `provider` 와 무관하게 늘 Fish(`POST /model`, `train_mode=fast`, `visibility=private`). 그분 구간 600초 후보에서 깨끗한 60초를 골라 44.1kHz mono 16비트 wav 하나로 올린다. 제목에 짧은 꼬리를 붙여 다시 만들 때 겹치지 않게 한다. 응답 `state` 가 `trained` 가 아니면 30초쯤 다시 묻고, 그래도 아니면 지우고 실패로 답한다. 다시 보내지 않는다(목소리가 둘 생긴다) |
+| 합성 | `POST /v1/voice/speech` | `voiceId` 앞글자로 회사를 고른다: `fish_…` → Fish, `TalkTo…` → MiniMax, 그 밖 → ElevenLabs(예전 IVC·PVC). Fish 에는 앞글자를 떼고 보낸다. 헤더 `model: drama-3`(빠지거나 틀리면 Fish 가 말없이 `s2.1-pro` 로 합성한다), mp3 44.1kHz 128kbps. 감정 표시와 `[ ]`·`< >`·`<\|…\|>` 지시 표시를 지우고, ElevenLabs 속도·결 값은 보내지 않는다. 40초 안에 끝내고(BE 는 45초), 429·503 이면 한 번만 다시 한다 |
+| 지우기 | `POST /v1/voice/delete` | 앞글자가 먼저고, 앞글자로 모르면 `provider`, 그것도 없으면 ElevenLabs. Fish 는 `DELETE /model/{id}`(이미 없으면 넘어간다) |
+
+Fish 가 막히면 503 과 코드로 답한다. 키 `VOICE_PROVIDER_KEY`(401·403), 잔액 `VOICE_PROVIDER_CREDITS`(402), 동시 요청 한도 `VOICE_PROVIDER_RATE_LIMIT`(429), 장애·시간 초과 `VOICE_PROVIDER_UNAVAILABLE`. OpenAI 의 `AI_PROVIDER_*` 와 따로 두어 BE 가 목소리용 관리자 알림을 띄운다. 회사 원문은 로그에만 남긴다.
+
+환경 변수: `FISH_AUDIO_API_KEY`(필수), `ELEVENLABS_API_KEY`(녹음 전사와 예전 목소리), `MINIMAX_API_KEY`(예전 목소리). BE 의 `deploy.py` 는 `infra/setting.py` 에 `os.getenv` 로 글자 그대로 적힌 이름만 운영 비밀값으로 옮기므로, 키 이름을 변수로 만들지 않는다. `TTS_PROVIDER` 는 `fish` 가 기본이고 새 목소리 만들기에는 쓰이지 않는다.
 
 ## 테스트
 

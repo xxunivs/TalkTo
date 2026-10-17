@@ -88,12 +88,16 @@ class BuildMultiSampleTest(unittest.TestCase):
         ]
         settings = mock.Mock(audio_download_timeout_seconds=10, max_audio_bytes=10**9)
         with mock.patch.object(a_voice, "download_audio", fake_download), \
-                mock.patch.object(a_voice, "_CLONE_MIN_SAMPLE_SECONDS", 2.0):
+                mock.patch.object(a_voice, "_CLONE_MIN_SAMPLE_SECONDS", 2.0), \
+                mock.patch.object(a_voice.quality, "pick", wraps=quality.pick) as pick:
             out = a_voice._build_multi_sample(segments, settings=settings)
         self.addCleanup(shutil.rmtree, out.parent, True)
         self.assertEqual(len(downloads), 1)  # 같은 녹음은 한 번만 내려받는다
+        self.assertEqual(pick.call_args.kwargs["budget_seconds"], 60.0)  # Fish 에 올리는 길이 상한
         with wave.open(str(out), "rb") as w:
             seconds = w.getnframes() / w.getframerate()
+            # Fish 에 올리는 wav: 44.1kHz mono 16비트
+            self.assertEqual((w.getframerate(), w.getnchannels(), w.getsampwidth()), (44100, 1, 2))
         # 깨끗한 앞 구간(앞뒤 0.08초씩 깎음)만 들어간다
         self.assertAlmostEqual(seconds, 3.84, delta=0.1)
 

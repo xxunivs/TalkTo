@@ -11,17 +11,9 @@ from pipeline.s4_voice.a_voice import (
     synthesize_speech,
     transcribe_voice_message,
 )
-from infra.external_api.tts import create_tts_provider
-from pipeline.s4_voice import d_pvc
+from infra.external_api.tts import create_tts_provider, provider_for_voice
 from infra.schema.voice import (
     OkResponse,
-    PvcCreateRequest,
-    PvcCreateResponse,
-    PvcSamplesRequest,
-    PvcSamplesResponse,
-    PvcStatusResponse,
-    PvcVerificationRequest,
-    PvcVoiceRequest,
     SpeechSynthesisRequest,
     SubjectSampleCollectionRequest,
     SubjectSampleCollectionResponse,
@@ -76,7 +68,10 @@ def create_voice_clone(
     _authorized: InternalRequest,
     settings: SettingsDependency,
 ) -> VoiceCloneResponse:
-    """고인 목소리 샘플 클립 → 클론 음성 등록 → voiceId(대상자별 TTS 음성)."""
+    """고인 목소리 샘플 클립 → 클론 음성 등록 → voiceId(대상자별 TTS 음성).
+
+    늘 Fish Audio 에서 만든다(요청의 provider 와 무관). 답은 {voiceId: "fish_…", provider: "fish"}.
+    """
     return clone_voice_from_sample(request, settings=settings)
 
 
@@ -116,59 +111,17 @@ def collect_voice_samples(
     return SubjectSampleCollectionResponse(samples=samples)
 
 
-# ── Premium 정밀 목소리(ElevenLabs PVC) ──
-
-
-@router.post("/pvc/create", response_model=PvcCreateResponse)
-def create_pvc(
-    request: PvcCreateRequest, _authorized: InternalRequest, settings: SettingsDependency
-) -> PvcCreateResponse:
-    """빈 PVC 를 만든다(ElevenLabs PVC 슬롯을 하나 쓴다)."""
-    return PvcCreateResponse(voice_id=d_pvc.create(request, settings=settings))
-
-
-@router.post("/pvc/samples", response_model=PvcSamplesResponse)
-def add_pvc_samples(
-    request: PvcSamplesRequest, _authorized: InternalRequest, settings: SettingsDependency
-) -> PvcSamplesResponse:
-    """그분 구간을 잘라 깨끗한 것만 30분 이하 mp3 로 이어 올린다."""
-    return d_pvc.add_samples(request, settings=settings)
-
-
-@router.post("/pvc/verification", response_model=OkResponse)
-def request_pvc_verification(
-    request: PvcVerificationRequest, _authorized: InternalRequest, settings: SettingsDependency
-) -> OkResponse:
-    """목소리 주인 확인(수동)을 신청한다. 고인은 사망진단서·가족 동의서."""
-    d_pvc.request_verification(request, settings=settings)
-    return OkResponse()
-
-
-@router.post("/pvc/status", response_model=PvcStatusResponse)
-def pvc_status(
-    request: PvcVoiceRequest, _authorized: InternalRequest, settings: SettingsDependency
-) -> PvcStatusResponse:
-    return d_pvc.status(request.voice_id, settings=settings)
-
-
-@router.post("/pvc/train", response_model=OkResponse)
-def train_pvc(
-    request: PvcVoiceRequest, _authorized: InternalRequest, settings: SettingsDependency
-) -> OkResponse:
-    return OkResponse(model_id=d_pvc.train(request.voice_id, settings=settings))
-
-
 @router.post("/delete", response_model=OkResponse)
 def delete_voice(
     request: VoiceDeleteRequest, _authorized: InternalRequest, settings: SettingsDependency
 ) -> OkResponse:
     """목소리를 만든 회사에서 지운다(대화 상대를 지울 때·목소리를 다시 만들 때).
 
-    ElevenLabs 는 처음 만든 목소리(IVC)·똑 닮은 목소리(PVC) 모두 같은 API 로 지운다(PVC 면 슬롯을
-    돌려받는다). MiniMax 는 복제 목소리 지우기 API 를 쓴다.
+    voice_id 앞글자로 고른다: fish_… → Fish, TalkTo… → MiniMax. 앞글자로 모르면 provider 를 보고,
+    그것도 없으면 ElevenLabs(예전 IVC·PVC 모두 같은 API, PVC 면 슬롯을 돌려받는다).
     """
-    if request.provider == "minimax":
-        create_tts_provider(settings, provider="minimax").delete_voice(request.voice_id)
-    else:
-        d_pvc.delete(request.voice_id, settings=settings)
+    name = provider_for_voice(request.voice_id)
+    if name == "elevenlabs" and request.provider is not None:
+        name = request.provider
+    create_tts_provider(settings, provider=name).delete_voice(request.voice_id)
     return OkResponse()

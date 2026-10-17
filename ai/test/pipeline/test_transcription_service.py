@@ -25,7 +25,7 @@ class FakeProvider:
         self._segments = segments
 
     def transcribe(self, audio_path, *, language, speaker_diarization, num_speakers=None):
-        return STTResult(provider="elevenlabs", model="scribe_v1", segments=self._segments)
+        return STTResult(provider="elevenlabs", model="scribe_v2", segments=self._segments)
 
 
 def request(**overrides) -> TranscriptionRequest:
@@ -73,7 +73,7 @@ class TranscribeRecordingTest(unittest.TestCase):
 
         self.assertEqual(len(response.segments), 2)
         self.assertEqual(response.provider, "elevenlabs")
-        self.assertEqual(response.model, "scribe_v1")
+        self.assertEqual(response.model, "scribe_v2")
 
     def test_empty_transcript_raises(self, _download) -> None:
         with self.assertRaises(EmptyTranscriptError):
