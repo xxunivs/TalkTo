@@ -27,6 +27,47 @@ _QUESTION_END = re.compile(r"(니|냐|나요|까|까요|죠|지요|어요|아요
 _VOCATIVE = re.compile(r"^\s*(할머니|할머이|할매|할아버지|엄마|어머니|어머님|아빠|아버지|아버님|여보|당신)\s*[,.!~]*\s*")
 _SELF_INTRO = re.compile(r"^\s*나\s*[,]?\s*[가-힣]{1,4}?(이야|야|이에요|예요|에요|이)\s*[.!,~]+\s*")
 _PROFILE_HEAD = re.compile(r"^#+[^\n]*기본\s*정보[^\n]*\n(.*?)(?=^#|\Z)", re.M | re.S)
+# 기억을 묻는 말이 아닌 관계 말: 그분 안부("편안하게 잘 계시죠", "거기는 어때"), 인사, 마음("보고 싶어요"),
+# 자기 근황("저 잘 지내요"). is_relational() 이 '이 말만 있는 질문'을 가려 사전 판정·가드 R1a·R1t 를 건너뛴다.
+# 화제가 남는 질문("잘 계시죠? 근데 제주도 갔던 거 기억나?")은 떼기 전 원래 화제어로 전과 똑같이 판정한다.
+# (2026-10-17 실사용: 고인 안부에 "글쎄, 그건 기억이 잘 안 나네"가 나가던 문제)
+# 반복은 {0,6}·{1,3} 으로 묶는다 — 무제한 \S*·+ 를 겹치면 "잘잘잘…?" 같은 입력에서 지수 시간이 걸린다.
+_RELATIONAL = re.compile(
+    r"(?:(?:편안|편히|평안|건강|무탈|잘|괜찮)\S{0,6}?\s*){1,3}"
+    r"(?:계시|계세|계셔|계십|지내|지냈|있|사시|사세|사셔|하시|하세|하셔)\S{0,6}(?:\s+(?:있|계시|계세|계셔)\S{0,6})?"
+    r"|어떻게\s*(?:지내|계시|계세|계셔|사시|사세)\S{0,6}"
+    r"|(?:거기|그곳|그쪽|하늘나라|하늘|저세상|저승)\S{0,3}\s*(?:생활\S{0,3}\s*)?"
+    r"(?:어때|어떠세|어떠니|어떻니|괜찮아|괜찮으|괜찮니|괜찮지|편안해|편안하|편해|좋아|좋으|좋니|좋지|좋냐)\S{0,4}"
+    r"|어디\s*(?:아프|아픈|아프신)\S{0,6}(?:\s*(?:데|곳)\S{0,3}\s*(?:없|는|은)\S{0,4})?"
+    r"|아프(?:신)?\s*(?:데|곳)\S{0,3}\s*(?:없|는|은)\S{0,4}|안\s*아프\S{0,6}|아프지\s*않\S{0,6}"
+    r"|보고\s*싶\S{0,6}|그리워(?:요|라|서|하지|하지마)?|그립(?:다|네|구나|지|고)\S{0,3}"
+    r"|사랑(?:해|합|한다|하고)\S{0,4}|고마워\S{0,3}|고맙(?:다|습|네|구나|고)\S{0,4}"
+    r"|감사(?:합|해|하|드)\S{0,6}|미안(?:해|하|합)\S{0,6}|죄송(?:해|하|합)\S{0,6}"
+    r"|안녕(?:하|히)\S{0,6}|안녕(?=$|[\s.,!?~…])|여보세요\S{0,3}|오랜만\S{0,6}|반가워\S{0,3}|반갑\S{0,6}"
+    r"|별일\s*없\S{0,6}|밥\s*(?:은|잘|좀)?\s*(?:먹었|드셨|먹)\S{0,6}|식사\s*(?:하셨|했|하)\S{0,6}")
+
+
+def _keep_if_adnominal(m: re.Match) -> str:
+    """'잘 사시던 데', '잘하시던 거'처럼 '-던' 관형형은 화제를 꾸미는 말이라 떼지 않는다."""
+    return m.group(0) if "던" in m.group(0) else " "
+
+
+def strip_relational(text: str) -> str:
+    """관계 말(안부·인사·마음·자기 근황)을 지운 나머지. 화제어 판단에만 쓴다(LLM 에 가는 원문은 그대로)."""
+    return re.sub(r"\s+", " ", _RELATIONAL.sub(_keep_if_adnominal, text)).strip()
+
+
+def is_relational(text: str, topic_terms) -> bool:
+    """안부·인사·마음 말'만' 있는 질문인가. topic_terms(text) -> list 는 호출 쪽 판정의 화제어 함수.
+    - 뗄 관계 말이 하나도 없던 질문("누구였어?")은 해당 없음(전과 같은 경로로 간다).
+    - 떼고 남은 말에 의문사(뭐·어디·누구·언제·몇·기억나…)가 있으면 기억을 묻는 질문으로 본다
+      ('데·거·분' 같은 의존명사는 화제어로 안 잡혀서 "고마운 분 누구였어?"가 비어 보이는 것을 막는다)."""
+    rest = strip_relational(text)
+    if rest == re.sub(r"\s+", " ", text).strip():
+        return False
+    if _QUESTION_WORDS.search(rest):
+        return False
+    return not topic_terms(rest)
 
 
 class NoopPrecheck:
@@ -112,7 +153,7 @@ class CoveragePrecheck:
             return PrecheckResult()
         names = {n for n in (subject_name_from(turn.persona_instructions), state.speaker, turn.speaker_hint) if n}
         terms = self.topic_terms(body, names)
-        if not terms:
+        if not terms or is_relational(body, lambda t: self.topic_terms(t, names)):  # 화제어 없음·안부뿐 → 판정 안 함
             return PrecheckResult(topic_terms=[])
         best, best_id = 0.0, None
         for doc_id, doc in self._docs(turn, selection):
@@ -207,7 +248,7 @@ class CoveragePrecheckV11(CoveragePrecheck):
             return PrecheckResult()
         names = {n for n in (subject_name_from(turn.persona_instructions), state.speaker, turn.speaker_hint) if n}
         terms = self.topic_terms(body, names | addr)
-        if not terms:
+        if not terms or is_relational(body, lambda t: self.topic_terms(t, names | addr)):  # 화제어 없음·안부뿐 → 판정 안 함
             return PrecheckResult(topic_terms=[])
         raws = [_doc_text(m) for m in list(selection.memories) + list(selection.delta)]
         instructions = turn.persona_instructions

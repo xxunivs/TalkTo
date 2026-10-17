@@ -9,6 +9,8 @@ GuardV1(ORCHESTRATOR_GUARD=v1) — 규칙은 서로 독립인 순수 함수, 아
             R1a 헤더가 [근거: 없음] / 없는 id → 되묻기
             R1t 인용 기억(+프로필)이 질문 화제어를 못 덮음(커버율 < 임계) → 되묻기   ← 엉뚱한 id 를 인용하며 지어내는 경우
             R1b 답의 숫자·고유명사가 근거(인용 기억, 헤더 없으면 넣은 기억 전부)+질문+페르소나 지시문에 없음 → 되묻기
+            안부·인사·마음만 있는 질문(precheck.strip_relational 뒤 화제어 없음)은 R1a·R1t 를 건너뛰고 R1b 만 본다
+            (근거 = 넣은 기억 전부 + 말하는 사람 이름).
   3. 애정   '사랑' 문장은 가족이 먼저 사랑을 말했거나(되받기) 마무리 인사일 때만, 세션당 1번(실제 통화도 마무리에 한 번 정도).
             그 밖엔 문장 삭제.
   4. 챙김   밥·건강 챙김 문장은 세션당 care_limit 번까지(모델은 절반 넘는 턴에 넣는다). 넘으면 그 문장 삭제(다른 문장이 남을 때만).
@@ -129,6 +131,13 @@ class GuardV1:
     def extra_ground(self, turn: TurnInput) -> str:
         return ""
 
+    def has_topic(self, turn: TurnInput, state: SessionState) -> bool:
+        """안부·인사·마음 말'만' 있는 질문이 아닌가. 원래 화제어가 없던 질문도 True(전처럼 R1a 를 본다)."""
+        from orchestrator.precheck import is_relational
+        names = {n for n in (subject_name_from(turn.persona_instructions), state.speaker, turn.speaker_hint) if n}
+        return not is_relational(self.question_text(turn),
+                                 lambda x: [t for t in self.cov.topic_terms(x, names) if t not in TOPIC_LIGHT])
+
     def topic_covered(self, turn: TurnInput, state: SessionState, cited: list[MemoryItem], profile: str) -> bool | None:
         body = self.question_text(turn)
         names = {n for n in (subject_name_from(turn.persona_instructions), state.speaker, turn.speaker_hint) if n}
@@ -183,17 +192,27 @@ class GuardV1:
         if msg and is_question(msg) and not DONT_KNOW.search(body):
             instructions, _ = redact_instructions(turn.persona_instructions, restricted)
             profile = profile_section(instructions)
-            if cited is not None and (bad_id or not cited):
+            # 안부·인사·마음만 있는 질문("편안하게 잘 계시죠?")은 기억을 묻는 게 아니라 근거 기억이 없는 게 정상이다.
+            # 근거 없음(R1a)·화제 확인(R1t)으로 답을 갈아 끼우지 않고, 숫자·고유명사를 지어냈는지(R1b)만 본다.
+            relational = not self.has_topic(turn, state)
+            if relational:
+                reasons.append("relational_skip_r1a_r1t")
+            if not relational and cited is not None and (bad_id or not cited):
                 reasons.append("R1a_bad_id" if bad_id else "R1a_no_ground")
                 return done(ask_back, "ask_back")
-            if cited:
+            if not relational and cited:
                 covered = self.topic_covered(turn, state, cited, profile)
                 if covered is False:
                     reasons.append("R1t_topic_not_in_cited")
                     return done(ask_back, "ask_back")
-            ground = cited if cited is not None else labeled(selection)
+            if relational:  # 인용이 없어도 넣은 기억 전부 + 말하는 사람 이름을 근거로 본다
+                ground = labeled(selection)
+                speakers = " ".join(n for n in (state.speaker, turn.speaker_hint) if n)
+            else:
+                ground = cited if cited is not None else labeled(selection)
+                speakers = ""
             base = (" ".join(f"{m.title} {m.text}" for m in ground) + " " + turn.message + " " + instructions
-                    + " " + self.extra_ground(turn))
+                    + " " + self.extra_ground(turn) + " " + speakers)
             bad = unsupported_tokens(body, base)
             if bad:
                 reasons.append("R1b_unsupported:" + ",".join(bad))
