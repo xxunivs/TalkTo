@@ -22,10 +22,9 @@ from infra.schema.persona import (
     PersonaResponseResult,
 )
 from infra.schema.transcript import TranscriptSegment
-from infra.external_api.tts import wants_emotion_hint
 from orchestrator.text import listener_speech_level
 from pipeline.s3_synthesis.common_rules import family_guide, render_common_rules
-from pipeline.s4_voice.b_emotion import EMOTION_INSTRUCTION, split_emotion
+from pipeline.s4_voice.b_emotion import split_voice, voice_instruction, voice_mode
 
 logger = logging.getLogger(__name__)
 
@@ -159,11 +158,12 @@ def generate_persona_response(
     client = create_openai_client(settings, "persona response")
 
     messages = [{"role": "system", "content": request.persona.instructions}]
-    inline_emotion = settings.voice_emotion == "inline" and wants_emotion_hint(
-        request.persona.voice_id
-    )
-    if inline_emotion:
-        messages.append({"role": "system", "content": EMOTION_INSTRUCTION})
+    # 음성 감정 지침(MiniMax VOICE_EMOTION · Fish FISH_EMOTION). 같은 호출에 system 하나만 더한다(LLM 을 더 부르지 않는다).
+    # 정적인 글이라 지시문 바로 뒤에 둔다(프롬프트 캐시). 가져온 지침(fixedPrompt)도 같다.
+    mode = voice_mode(settings, request.persona.voice_id)
+    instruction = voice_instruction(mode)
+    if instruction:
+        messages.append({"role": "system", "content": instruction})
     memory_block = build_memory_block(request.memories)
     if memory_block:
         messages.append({"role": "system", "content": memory_block})
@@ -182,15 +182,15 @@ def generate_persona_response(
         **chat_reasoning(settings),
     )
     content = (response.choices[0].message.content or "").strip()
-    emotion = None
-    if inline_emotion:
-        emotion, content = split_emotion(content, deceased=request.persona.deceased)
+    # 감정·연기 표시를 떼어 낸다. content 는 표시 없는 글(화면·대화 기록·기억), speech_text 는 목소리용(inline)
+    voice = split_voice(content, mode, deceased=request.persona.deceased)
 
     # 주입한 기억 전부를 '사용됨'으로 반환한다. 실제로 인용됐는지는 가리지 않는다.
     return PersonaResponseResult(
-        content=content,
+        content=voice.text,
         retrieved_memory_ids=[memory.id for memory in request.memories],
-        emotion=emotion,
+        emotion=voice.emotion,
+        speech_text=voice.speech_text(),
         provider=PROVIDER,
         model=settings.openai_chat_model,
     )

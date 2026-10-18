@@ -19,10 +19,10 @@ __all__ = [
 
 
 def wants_emotion_hint(voice_id: str | None) -> bool:
-    """이 목소리가 대답마다 감정 이름을 받아 쓰는가.
+    """이 목소리가 VOICE_EMOTION=inline 일 때 대답마다 감정 이름을 받아 쓰는가.
 
-    MiniMax(예전 목소리)만 감정 이름을 받는다. Fish drama-3 와 ElevenLabs v4 는 글을 보고 스스로
-    감정을 싣기 때문에 감정을 고르라는 지침을 넣지 않는다(괜히 넣으면 표시가 글에 섞여 나올 위험만 생긴다).
+    MiniMax(예전 목소리)만 이 지침을 받는다. ElevenLabs v4 는 글을 보고 스스로 감정을 싣기 때문에 넣지 않는다.
+    Fish drama-3 는 따로 FISH_EMOTION 이 정한다(pipeline/s4_voice/b_emotion.voice_mode).
     """
     return bool(voice_id) and is_minimax_voice(voice_id)
 
@@ -81,4 +81,7 @@ def _fish(settings: Settings) -> FishAudioTTSProvider:
         raise ProviderNotConfiguredError(
             "FISH_AUDIO_API_KEY is required for the fish TTS provider."
         )
-    return FishAudioTTSProvider(api_key=settings.fish_audio_api_key.get_secret_value())
+    return FishAudioTTSProvider(
+        api_key=settings.fish_audio_api_key.get_secret_value(),
+        emotion_mode=getattr(settings, "fish_emotion", "off"),
+    )

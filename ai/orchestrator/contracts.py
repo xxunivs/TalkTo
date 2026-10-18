@@ -57,6 +57,8 @@ class TurnInput(Contract):
     session_id: str | None = None
     speaker_hint: str | None = None
     voice_id: str | None = None
+    # 고인 페르소나인가(BE persona.deceased). 음성 감정 안전선에만 쓴다. 모르면(None) 고인으로 본다.
+    deceased: bool | None = None
 
 
 class Replacement(Contract):
@@ -180,6 +182,9 @@ class TurnResult(Contract):
     retrieved_memory_ids: list[str]
     provider: str
     model: str
+    # 대답 음성 표시(FISH_EMOTION, orchestrator/voice.py). off 면 둘 다 None.
+    emotion: str | None = None
+    speech_text: str | None = None
     trace: list[StageTrace] = Field(default_factory=list)
 
 

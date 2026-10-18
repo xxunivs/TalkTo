@@ -12,6 +12,7 @@ from orchestrator.contracts import (
     PostTurn, Precheck, PrecheckResult, PromptBundle, SessionState, SessionStore, StageTrace,
     TurnInput, TurnResult,
 )
+from orchestrator.voice import VoiceMarks, VoiceRun
 
 STAGES = ("session", "select", "precheck", "assemble", "generate", "guard", "post_turn")
 
@@ -24,7 +25,10 @@ class TurnRun:
     selection: MemorySelection | None = None
     precheck: PrecheckResult | None = None
     bundle: PromptBundle | None = None
+    # 모델이 낸 글 그대로(음성 표시 포함). 가드에는 voice.guard_text 가 간다.
     generation: Generation | None = None
+    # 음성 표시를 떼어 낸 결과(FISH_EMOTION 이 켜진 Fish 목소리일 때만)
+    voice: VoiceRun | None = None
     guard: GuardResult | None = None
     next_state: SessionState | None = None
     result: TurnResult | None = None
@@ -41,12 +45,14 @@ class PersonaOrchestrator:
     llm: LLM
     guard: Guard
     post_turn: PostTurn
+    # 생성 뒤·가드 앞 음성 표시 떼기(FISH_EMOTION). 기본 off 면 아무것도 하지 않는다.
+    voice: VoiceMarks = field(default_factory=VoiceMarks)
 
     def describe(self) -> dict[str, str]:
         return {
             "session": self.sessions.impl, "memory_store": self.memories.impl, "select": self.selector.impl,
             "precheck": self.precheck.impl, "assemble": self.assembler.impl, "generate": self.llm.impl,
-            "guard": self.guard.impl, "post_turn": self.post_turn.impl,
+            "voice": self.voice.impl, "guard": self.guard.impl, "post_turn": self.post_turn.impl,
         }
 
     def _timed(self, run: TurnRun, stage: str, impl: str, fn, summarize):
@@ -89,8 +95,14 @@ class PersonaOrchestrator:
             lambda g: {"model": g.model, "chars": len(g.text), **g.usage})
         if until == "generate":
             return r
+        # 감정 이름·연기 표시는 가드 앞에서 뗀다. 가드·언어 가드·턴 뒤 처리는 표시 없는 글만 본다.
+        clean = r.generation
+        if self.voice.mode(turn) != "off":
+            r.voice = self._timed(r, "voice", self.voice.impl, lambda: self.voice.split(r.generation.text, turn),
+                                  lambda v: v.summary())
+            clean = r.generation.model_copy(update={"text": r.voice.guard_text})
         r.guard = self._timed(
-            r, "guard", self.guard.impl, lambda: self.guard.apply(r.generation, turn, r.state, r.selection),
+            r, "guard", self.guard.impl, lambda: self.guard.apply(clean, turn, r.state, r.selection),
             lambda g: {"action": g.action, "reasons": g.reasons, "cited": g.cited_memory_ids})
         if until == "guard":
             return r
@@ -103,6 +115,8 @@ class PersonaOrchestrator:
         cited = r.guard.cited_memory_ids
         # 헤더가 없으면(인용 정보 모름) 기존처럼 넣은 기억 전부를 '사용됨'으로 돌려준다.
         ids = cited if cited is not None else [m.id for m in r.selection.memories]
+        emotion, speech_text = self.voice.finish(r.voice, r.guard)
         r.result = TurnResult(content=r.guard.text, retrieved_memory_ids=ids,
-                              provider=r.generation.provider, model=r.generation.model, trace=r.trace)
+                              provider=r.generation.provider, model=r.generation.model,
+                              emotion=emotion, speech_text=speech_text, trace=r.trace)
         return r

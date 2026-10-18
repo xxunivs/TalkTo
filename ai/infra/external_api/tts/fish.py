@@ -61,10 +61,37 @@ _CODES = {
 _MODEL_ID = re.compile(r"[A-Za-z0-9_-]{1,128}")
 
 # drama-3 는 [ ] 안 글을 연기 지시·효과음으로, <whisper> 같은 꺾쇠 표시를 말투 지시로, <|speaker:0|> 를
-# 화자 바꿈으로 읽는다. 대답에는 이런 표시를 쓰지 않는다(감정 표시 없이도 감정이 실렸다 — 대표님 청취).
+# 화자 바꿈으로 읽는다. 대답에 섞여 나온 표시는 지운다. 남기는 것은 아래 두 목록의 한국어 연기 표시뿐이다
+# (FISH_EMOTION=cue·inline 일 때. off 면 지금처럼 다 지운다).
 _SPEAKER_TAG = re.compile(r"<\|[^|<>\n]*\|>")
 _ANGLE_TAG = re.compile(r"<[^<>\n]{0,40}>")
 _SQUARE = re.compile(r"\[[^\[\]\n]*\]")
+
+# FISH_EMOTION=cue: 대답 LLM 이 고른 감정 이름 → 대답 맨 앞에 붙이는 연기 표시. 표시는 대본 언어(한국어)로 쓴다.
+# 고치기 쉽게 여기 한 곳에만 둔다. neutral 은 붙이지 않는다(글을 보고 drama-3 가 정한다).
+# 고인 페르소나는 sad 가 calm 으로 바뀌어 온다(pipeline/s4_voice/b_emotion.py). 우는 소리 표시는 두지 않는다.
+FISH_CUES: dict[str, str | None] = {
+    "neutral": None,
+    "calm": "[차분하게]",
+    "warm": "[다정하게]",
+    "happy": "[반갑게 웃으며]",
+    "sad": "[조용히 서운하게]",
+    "surprised": "[깜짝 놀라며]",
+    "worried": "[걱정스럽게]",
+}
+# FISH_EMOTION=inline: 대답 LLM 이 대답 안에 쓸 수 있는 연기 표시. 여기 없는 표시는 떼어 버린다.
+# 울음·흐느낌 표시는 일부러 두지 않는다(고인 페르소나 안전선).
+FISH_INLINE_CUES: tuple[str, ...] = (
+    "[웃으며]", "[작게 웃으며]", "[한숨 쉬며]", "[다정하게]", "[반갑게]",
+    "[놀라며]", "[걱정스럽게]", "[차분하게]", "[작게]", "[잠깐 멈췄다가]",
+)
+# fish_plain_text 가 남기는 표시(두 방식의 표시 전부)
+_KEPT_CUES = frozenset(FISH_INLINE_CUES) | {cue for cue in FISH_CUES.values() if cue}
+
+
+def cue_key(raw: str) -> str:
+    """"[ 작게  웃으며 ]" → "[작게 웃으며]". 대괄호 안 띄어쓰기만 고른다."""
+    return "[" + " ".join(raw[1:-1].split()) + "]"
 
 
 def is_fish_voice(voice_id: str) -> bool:
@@ -76,16 +103,41 @@ def fish_model_id(voice_id: str) -> str:
     return voice_id.removeprefix(VOICE_ID_PREFIX)
 
 
-def fish_plain_text(text: str) -> str:
+def strip_fish_cues(text: str) -> str:
+    """Fish 연기 표시만 지운다. Fish 가 아닌 목소리(MiniMax·ElevenLabs)는 이 표시를 소리 내어 읽을 수 있다."""
+    found = False
+
+    def square(m: re.Match) -> str:
+        nonlocal found
+        if cue_key(m.group(0)) in _KEPT_CUES:
+            found = True
+            return " "
+        return m.group(0)
+
+    clean = _SQUARE.sub(square, text)
+    return _tidy(clean) if found else text  # 표시가 없으면 글을 건드리지 않는다
+
+
+def fish_plain_text(text: str, *, keep_cues: bool = True) -> str:
     """drama-3 에 보낼 글: 지시로 읽히는 [ ]·< >·<| |> 표시를 지운다. 다 지워지면 원래 글을 보낸다.
 
+    keep_cues 면 정해 둔 한국어 연기 표시(FISH_INLINE_CUES·FISH_CUES)는 남긴다(FISH_EMOTION=cue·inline).
     감정 표시([감정:sad], (감정: 슬픔) 등)는 부르는 쪽(synthesize_speech)이 strip_emotion_tags 로 먼저 지운다.
     """
-    clean = _SQUARE.sub(" ", _ANGLE_TAG.sub(" ", _SPEAKER_TAG.sub(" ", text)))
+
+    def square(m: re.Match) -> str:
+        key = cue_key(m.group(0))
+        return key if keep_cues and key in _KEPT_CUES else " "
+
+    clean = _SQUARE.sub(square, _ANGLE_TAG.sub(" ", _SPEAKER_TAG.sub(" ", text)))
+    return _tidy(clean) or text
+
+
+def _tidy(clean: str) -> str:
+    """표시를 지운 자리의 띄어쓰기를 고른다."""
     clean = re.sub(r"[ \t]+([.,!?…])", r"\1", clean)
     clean = re.sub(r"[ \t]{2,}", " ", clean)
-    clean = "\n".join(line.strip() for line in clean.splitlines()).strip()
-    return clean or text
+    return "\n".join(line.strip() for line in clean.splitlines()).strip()
 
 
 def _fail(response: httpx.Response, what: str) -> AppError:
@@ -121,10 +173,13 @@ class FishAudioTTSProvider:
         self,
         api_key: str,
         *,
+        emotion_mode: str = "off",
         timeout_seconds: float = _TIMEOUT_SECONDS,
         clone_timeout_seconds: float = _CLONE_TIMEOUT_SECONDS,
     ) -> None:
         self.api_key = api_key
+        # FISH_EMOTION. off 면 지금처럼 표시를 다 지우고 감정을 쓰지 않는다(켰다 끄면 저장된 표시도 바로 안 읽는다).
+        self.emotion_mode = emotion_mode
         self.timeout_seconds = timeout_seconds
         self.clone_timeout_seconds = clone_timeout_seconds
 
@@ -179,10 +234,15 @@ class FishAudioTTSProvider:
         stability: float = 0.3, similarity_boost: float = 0.75, style: float = 0.0,
         emotion: str | None = None,
     ) -> TTSResult:
-        # speed·stability·similarity_boost·style 은 ElevenLabs 값, emotion 은 MiniMax 용이라 쓰지 않는다.
-        # drama-3 는 속도·감정을 따로 주지 않은 채로 청취 비교를 통과했다.
+        # speed·stability·similarity_boost·style 은 ElevenLabs 값이라 쓰지 않는다.
+        # drama-3 에는 감정 값을 따로 보내지 않는다. FISH_EMOTION=cue 면 감정 이름을 한국어 연기 표시로 바꿔
+        # 글 맨 앞에 붙이고(FISH_CUES), cue·inline 이면 글 안의 정해진 연기 표시를 남긴다.
+        spoken = fish_plain_text(text, keep_cues=self.emotion_mode != "off")
+        cue = FISH_CUES.get(emotion or "") if self.emotion_mode == "cue" else None
+        if cue:
+            spoken = f"{cue} {spoken}"
         body = {
-            "text": fish_plain_text(text),
+            "text": spoken,
             "reference_id": _path_id(voice_id),
             "format": "mp3",
             "sample_rate": 44100,

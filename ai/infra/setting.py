@@ -63,9 +63,13 @@ class Settings(BaseModel):
     minimax_emotion: str | None = None
     # 목소리 결: +면 부드럽게, -면 힘 있게(-100~100). 0 이면 보내지 않는다.
     minimax_intensity: int = Field(default=0, ge=-100, le=100)
-    # 대답 음성 감정: off = 목소리 회사가 글을 보고 정함, inline = 대답 LLM 이
+    # 대답 음성 감정(MiniMax 예전 목소리만): off = 목소리 회사가 글을 보고 정함, inline = 대답 LLM 이
     # 같은 호출에서 감정을 하나 골라 붙인다(pipeline/s4_voice/b_emotion.py).
     voice_emotion: Literal["off", "inline"] = "off"
+    # Fish(drama-3) 목소리 대답의 감정. 대답 LLM 이 같은 호출에서 함께 정한다(LLM 을 더 부르지 않는다).
+    # off = 지금처럼(표시 없이 글만), cue = 감정 이름 하나 → Fish 가 맨 앞에 한국어 연기 표시(FISH_CUES)를 붙인다,
+    # inline = 대답 안 정해진 연기 표시 최대 2개(speechText). 대표님 청취 판정 전에는 운영에서 켜지 않는다.
+    fish_emotion: Literal["off", "cue", "inline"] = "off"
 
     # 화자 식별(ECAPA) 유사도 임계값 — 실통화 13건으로 맞춘 값(대상자 0.605~0.948
     # vs 타화자 0.258~0.417, 중간점 0.511)
@@ -198,6 +202,7 @@ def load_settings(env_file: str | Path | None = ".env") -> Settings:
         minimax_api_key=os.getenv("MINIMAX_API_KEY") or None,
         minimax_model=os.getenv("MINIMAX_MODEL") or "speech-2.8-turbo",
         voice_emotion=os.getenv("VOICE_EMOTION") or "off",
+        fish_emotion=os.getenv("FISH_EMOTION", "off").strip().lower() or "off",
         minimax_emotion=os.getenv("MINIMAX_EMOTION") or None,
         minimax_intensity=os.getenv("MINIMAX_INTENSITY") or "0",
         speaker_id_threshold=os.getenv("SPEAKER_ID_THRESHOLD", "0.5"),

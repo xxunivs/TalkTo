@@ -83,7 +83,29 @@ class ConfigTest(unittest.TestCase):
         names = set(re.findall(r'os\.(?:getenv|environ\.get)\(\s*"([A-Z0-9_]+)"', text))
         self.assertTrue({"FISH_AUDIO_API_KEY", "ELEVENLABS_API_KEY", "MINIMAX_API_KEY"} <= names)
         # 새 기능 플래그도 같은 방식으로 운영에 올라가야 .env 로 켜고 끌 수 있다
-        self.assertTrue({"MEMORY_FULL_MAX", "QUERY_REWRITE", "STYLE_CARD_MIN_UTTS", "STYLE_LATE_NOTE"} <= names)
+        self.assertTrue({"MEMORY_FULL_MAX", "QUERY_REWRITE", "STYLE_CARD_MIN_UTTS", "STYLE_LATE_NOTE",
+                         "FISH_EMOTION"} <= names)
+
+    def test_fish_emotion_setting(self) -> None:
+        # 기본은 off(대표님 청취 판정 전에는 운영에서 켜지 않는다). 대소문자·빈칸은 너그럽게, 모르는 값은 막는다
+        from pydantic import ValidationError
+
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertEqual(load_settings(env_file=None).fish_emotion, "off")
+        for raw, want in (("cue", "cue"), (" Inline ", "inline"), ("", "off"), ("off", "off")):
+            with patch.dict(os.environ, {"FISH_EMOTION": raw}, clear=True):
+                self.assertEqual(load_settings(env_file=None).fish_emotion, want, raw)
+        with patch.dict(os.environ, {"FISH_EMOTION": "loud"}, clear=True), self.assertRaises(ValidationError):
+            load_settings(env_file=None)
+        # 설정값만이 아니라 실제로 조립되는 중간계층도 같은 값을 쓴다
+        from pydantic import SecretStr
+
+        from infra.setting import Settings
+        from orchestrator.service import build_default
+
+        self.assertEqual(build_default(Settings(openai_api_key=SecretStr("k"))).describe()["voice"], "voice_fish_off")
+        self.assertEqual(build_default(Settings(openai_api_key=SecretStr("k"), fish_emotion="cue")).voice.fish_emotion,
+                         "cue")
 
     def test_environment_overrides_are_validated(self) -> None:
         with patch.dict(

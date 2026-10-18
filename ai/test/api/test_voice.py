@@ -269,7 +269,8 @@ class MiniMaxEmotionTest(unittest.TestCase):
         mock_post.return_value = MagicMock(
             status_code=200, json=lambda: {"base_resp": {"status_code": 0}, "data": {"audio": "00"}})
         provider = MiniMaxTTSProvider(api_key="k")
-        for ours, sent in (("happy", "happy"), ("calm", "calm"), ("neutral", None), (None, None)):
+        for ours, sent in (("happy", "happy"), ("calm", "calm"), ("neutral", None), (None, None),
+                           ("warm", None), ("worried", None)):  # Fish 용 새 이름은 MiniMax 에 없다
             provider.synthesize("응", voice_id="TalkTo1", emotion=ours)
             body = mock_post.call_args.kwargs["json"]
             self.assertEqual(body["voice_setting"].get("emotion"), sent, ours)
@@ -513,6 +514,87 @@ class FishTextTest(unittest.TestCase):
         from infra.external_api.tts.fish import fish_plain_text
 
         self.assertEqual(fish_plain_text("[웃음]"), "[웃음]")
+
+    def test_keeps_whitelisted_cues_and_strips_the_rest(self) -> None:
+        # FISH_EMOTION=cue·inline: 정해 둔 한국어 연기 표시만 남기고 나머지는 지금처럼 지운다
+        from infra.external_api.tts.fish import FISH_CUES, FISH_INLINE_CUES, fish_plain_text
+
+        cases = {  # 글: (남길 때, off 일 때)
+            "[웃으며] 그래, [미소] <whisper>잘</whisper> 왔다 [잠깐 멈췄다가] 응.":
+                ("[웃으며] 그래, 잘 왔다 [잠깐 멈췄다가] 응.", "그래, 잘 왔다 응."),
+            "[근거: m3] [ 작게  웃으며 ] 밥은 먹었냐": ("[작게 웃으며] 밥은 먹었냐", "밥은 먹었냐"),
+            # cue 방식 표시(FISH_CUES)도 남긴다
+            "[반갑게 웃으며] 왔구나.": ("[반갑게 웃으며] 왔구나.", "왔구나."),
+            "[울며] 보고 싶다.": ("보고 싶다.", "보고 싶다."),
+        }
+        for raw, (kept, off) in cases.items():
+            self.assertEqual(fish_plain_text(raw), kept, raw)
+            self.assertEqual(fish_plain_text(raw, keep_cues=False), off, raw)  # off: 지금처럼 다 지운다
+        for cue in (*FISH_INLINE_CUES, *(c for c in FISH_CUES.values() if c)):
+            self.assertEqual(fish_plain_text(f"{cue} 응."), f"{cue} 응.", cue)
+
+    def test_cue_table(self) -> None:
+        from infra.external_api.tts.fish import FISH_CUES, FISH_INLINE_CUES
+
+        self.assertEqual(FISH_CUES, {
+            "neutral": None, "calm": "[차분하게]", "warm": "[다정하게]", "happy": "[반갑게 웃으며]",
+            "sad": "[조용히 서운하게]", "surprised": "[깜짝 놀라며]", "worried": "[걱정스럽게]"})
+        self.assertEqual(FISH_INLINE_CUES, (
+            "[웃으며]", "[작게 웃으며]", "[한숨 쉬며]", "[다정하게]", "[반갑게]", "[놀라며]", "[걱정스럽게]",
+            "[차분하게]", "[작게]", "[잠깐 멈췄다가]"))
+
+
+class FishEmotionSpeechTest(unittest.TestCase):
+    """FISH_EMOTION: cue 면 감정 이름 → 맨 앞 연기 표시, cue·inline 이면 글 안 연기 표시를 남긴다. off 는 지금 그대로."""
+
+    def _speak(self, text: str, emotion: str | None = None, voice: str = "fish_0123abcd", **extra) -> str:
+        _use_settings(self, **extra)
+        fake = FakeFish(_audio())
+        body = {"text": text, "voiceId": voice, **({"emotion": emotion} if emotion else {})}
+        with fake.patch():
+            response = TestClient(app).post("/v1/voice/speech", json=body)
+        self.assertEqual(response.status_code, 200, response.text)
+        sent = json.loads(fake.sent[0].content)
+        self.assertNotIn("emotion", sent)  # drama-3 에는 감정 값을 따로 보내지 않는다
+        return sent["text"]
+
+    def test_cue_mode_prefixes_the_mapped_cue(self) -> None:
+        self.assertEqual(self._speak("밥은 먹었니?", "warm", fish_emotion="cue"), "[다정하게] 밥은 먹었니?")
+        self.assertEqual(self._speak("그래…", "calm", fish_emotion="cue"), "[차분하게] 그래…")
+        self.assertEqual(self._speak("조심해라.", "worried", fish_emotion="cue"), "[걱정스럽게] 조심해라.")
+        self.assertEqual(self._speak("응.", "neutral", fish_emotion="cue"), "응.")  # neutral 은 붙이지 않는다
+        self.assertEqual(self._speak("응.", None, fish_emotion="cue"), "응.")
+
+    def test_inline_mode_keeps_cues_and_ignores_emotion(self) -> None:
+        self.assertEqual(self._speak("[웃으며] 왔구나. [미소] 밥은?", "happy", fish_emotion="inline"),
+                         "[웃으며] 왔구나. 밥은?")
+
+    def test_off_is_unchanged(self) -> None:
+        self.assertEqual(self._speak("[웃으며] 왔구나.", "warm"), "왔구나.")
+
+    def test_other_providers_never_read_fish_cues(self) -> None:
+        # MiniMax 는 warm 을 모른다(None → 서버 기본값). 연기 표시는 소리 내어 읽지 않게 지운다
+        _use_settings(self, fish_emotion="inline")
+        with patch("infra.external_api.tts.minimax.httpx.post") as mock_post:
+            mock_post.return_value = MagicMock(
+                status_code=200, json=lambda: {"base_resp": {"status_code": 0}, "data": {"audio": "00"}})
+            response = TestClient(app).post(
+                "/v1/voice/speech", json={"text": "[웃으며] 왔구나.", "voiceId": "TalkTo1", "emotion": "warm"})
+        self.assertEqual(response.status_code, 200, response.text)
+        body = mock_post.call_args.kwargs["json"]
+        self.assertEqual(body["text"], "왔구나.")
+        self.assertNotIn("emotion", body["voice_setting"])
+
+    def test_off_leaves_other_providers_byte_identical(self) -> None:
+        # FISH_EMOTION=off 면 예전 목소리(MiniMax)에 가는 글은 예전과 글자까지 같다
+        _use_settings(self)
+        with patch("infra.external_api.tts.minimax.httpx.post") as mock_post:
+            mock_post.return_value = MagicMock(
+                status_code=200, json=lambda: {"base_resp": {"status_code": 0}, "data": {"audio": "00"}})
+            response = TestClient(app).post(
+                "/v1/voice/speech", json={"text": "[웃으며] 왔구나.", "voiceId": "TalkTo1"})
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(mock_post.call_args.kwargs["json"]["text"], "[웃으며] 왔구나.")
 
 
 class FishCloneTest(unittest.TestCase):

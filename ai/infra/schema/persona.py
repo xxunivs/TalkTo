@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, model_serializer
 
 from infra.schema.field_rule import ApiModel
 from infra.schema.subject import IntakeContext, SubjectContext
@@ -46,10 +46,24 @@ class PersonaResponseRequest(ApiModel):
 class PersonaResponseResult(ApiModel):
     content: str
     retrieved_memory_ids: list[str] = Field(default_factory=list)
-    # 대답 음성에 실을 감정(VOICE_EMOTION=inline 일 때만). None 이면 목소리 회사가 정한다.
+    # 대답 음성에 실을 감정(MiniMax VOICE_EMOTION=inline, Fish FISH_EMOTION=cue 일 때만). None 이면 목소리 회사가 정한다.
     emotion: str | None = None
+    # 목소리로 읽을 글(Fish FISH_EMOTION=inline 이고 연기 표시가 남았을 때만). content 와 글자는 같고
+    # 정해진 연기 표시([웃으며] 등)만 들어 있다. BE 는 이것을 저장했다가 읽기에 쓰고, 없으면 content 를 읽는다.
+    # 화면·대화 기록·기억 추출에는 content(표시 없음)만 쓴다.
+    speech_text: str | None = None
     provider: str
     model: str
+
+    @model_serializer(mode="wrap")
+    def _omit_empty_speech_text(self, handler):
+        # speechText 가 없으면 칸을 아예 빼서 FISH_EMOTION=off 응답이 예전과 글자까지 같게 둔다
+        data = handler(self)
+        if isinstance(data, dict):
+            for key in ("speechText", "speech_text"):
+                if key in data and data[key] is None:
+                    del data[key]
+        return data
 
 
 class MemoryCandidateRequest(ApiModel):

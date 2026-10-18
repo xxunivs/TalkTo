@@ -21,6 +21,7 @@ from infra.error import (
 from infra.external_api.audio import download_audio
 from infra.external_api.openai_client import create_openai_client
 from infra.external_api.tts import TTSResult, create_clone_provider, create_tts_provider
+from infra.external_api.tts.fish import strip_fish_cues
 from pipeline.s4_voice import c_sample_quality as quality
 from pipeline.s4_voice.b_emotion import strip_emotion_tags
 from infra.schema.memory import PersistedTranscriptSegment
@@ -86,9 +87,13 @@ def synthesize_speech(
         return fallback if asked is None else asked
 
     # 감정 표시가 글에 남아 있으면 소리로 읽힌다. 저장된 대답에도 남아 있을 수 있어 여기서 한 번 더 지운다.
-    # Fish 는 여기에 더해 [ ]·< > 지시 표시도 지운다(fish_plain_text).
+    # Fish 는 여기에 더해 정해진 연기 표시 말고는 [ ]·< > 지시 표시도 지운다(fish_plain_text).
     text = strip_emotion_tags(request.text) or request.text
     provider = create_tts_provider(settings, voice_id=voice_id)
+    if provider.name != "fish" and getattr(settings, "fish_emotion", "off") != "off":
+        # Fish 연기 표시([웃으며] 등, BE 가 speechText 로 보낸 글)는 다른 회사가 소리 내어 읽을 수 있다.
+        # FISH_EMOTION=off 면 표시가 생기지 않으니 예전 목소리 글은 예전과 글자까지 같게 둔다
+        text = strip_fish_cues(text) or text
     # 아래 속도·결 값은 예전 ElevenLabs·MiniMax 목소리용이다. Fish 는 받기만 하고 쓰지 않는다.
     return provider.synthesize(
         text,

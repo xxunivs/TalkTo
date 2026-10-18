@@ -20,6 +20,7 @@ _DEFAULT_MODEL = "speech-2.8-turbo"
 VOICE_ID_PREFIX = "TalkTo"
 # 우리 감정 이름 → MiniMax 감정. neutral 은 보내지 않는다(MiniMax 가 글을 보고 정한다).
 # MiniMax 에는 angry·fearful·disgusted 도 있지만 우리 쪽에서 고를 수 없다.
+# Fish 용 이름 warm·worried 는 MiniMax 에 맞는 감정이 없어 None(없음)으로 본다 → 서버 기본값 또는 MiniMax 가 정한다.
 _EMOTIONS = {"calm": "calm", "happy": "happy", "sad": "sad", "surprised": "surprised"}
 
 

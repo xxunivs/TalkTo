@@ -11,8 +11,10 @@ PersonaResponseRequest ─turn_from_request→ TurnInput
   ③ Precheck.check           → PrecheckResult
   ④ Assembler.assemble       → PromptBundle(sections)
   ⑤ LLM.generate             → Generation
+     VoiceMarks.split        → VoiceRun   (FISH_EMOTION 이 켜진 Fish 목소리일 때만, 가드 앞에서 음성 표시 떼기)
   ⑥ Guard.apply              → GuardResult
   ⑦ PostTurn.after           → SessionState(다음) → SessionStore.save
+     VoiceMarks.finish       → (emotion, speech_text)
 → TurnResult → PersonaResponseResult
 ```
 
@@ -28,6 +30,7 @@ PersonaResponseRequest ─turn_from_request→ TurnInput
 | ③ 사전 판정 | → PrecheckResult(known, coverage, topic_terms, directive) | `NoopPrecheck`(기본) / `CoveragePrecheck`(`coverage`) / `CoveragePrecheckV11`(`coverage_v11`) |
 | ④ 조립 | → PromptBundle(sections: name·role·content) | `LegacyAssembler`(기본) / `StructuredAssembler`(`ORCHESTRATOR_ASSEMBLER=structured`) |
 | ⑤ 생성 | messages → Generation(text, model, usage) | `OpenAIChatLLM`(비스트리밍) / `FakeLLM`(테스트) |
+| 음성 표시 | Generation.text → VoiceRun(guard_text, 감정·연기 표시) | `VoiceMarks`(`FISH_EMOTION` = off · cue · inline, 기본 off 면 아무것도 안 함). 아래 "음성 감정" |
 | ⑥ 가드 | → GuardResult(text, action, reasons, cited_memory_ids, counter_delta) | `PassGuard`(기본) / `GuardV1`(`v1`) / `GuardV11`(`v11`), 그 뒤에 `LanguageGuard`(`ORCHESTRATOR_LANG_GUARD=flag|fix`) |
 | ⑦ 턴 뒤 | → SessionState | `RecordTurn`(최근 8턴, 카운터 반영) |
 
@@ -51,6 +54,7 @@ PersonaResponseRequest ─turn_from_request→ TurnInput
 
 ```
 [system] 공통 규칙 + 페르소나 지시문(공통 규칙과 같은 줄·빈 제목 제거) + 말투 카드 + 실제 주고받기(system 모드, 지시문에 이미 있으면 생략)
+[system] 음성 지침(FISH_EMOTION=cue·inline 이고 Fish 목소리일 때만)
 [system] 참고 기억 → [system] 이번 통화에서 새로 들은 것(델타)
 [user/assistant …] 실제 주고받기(ORCHESTRATOR_SHOTS=messages)
 [system] 사전 판정 지시 → [system] 지금 상황(런타임 절)
@@ -100,9 +104,22 @@ structured 경로에서만 적용한다.
 
 언어 누출 가드(`ORCHESTRATOR_LANG_GUARD`)는 그 뒤에 붙는다. 한글이 아닌 글자를 일괄로 막지 않고, 이번 턴 맥락(가족 말·지시문·넣은 기억·앞 대화)에 없던 문자 체계, 맥락에 없던 영어 낱말, "Wait"·"The user" 같은 추론 문장만 본다. 가족이 영어로 말하는 중이면 영어 답은 통과한다. `flag` 는 이유만 기록, `fix` 는 걸린 문장을 지우고 다 지워지면 되묻는다.
 
+## 음성 감정 (FISH_EMOTION, `orchestrator/voice.py`)
+
+Fish 목소리 대답에만 쓴다. 대답 LLM 이 같은 호출에서 정한다(LLM 을 더 부르지 않는다). 기본 off 면 메시지·응답이 예전과 같다.
+
+- `cue`: 대답 맨 앞 `[감정:이름]` 하나(neutral, calm, warm, happy, sad, surprised, worried) → `emotion`. 고인(모르면 고인)은 sad → calm. BE 가 읽기 요청에 감정을 실으면 Fish 가 한국어 연기 표시(`fish.FISH_CUES`)를 맨 앞에 붙인다. 글에 섞여 나온 다른 `[ ]` 표시(`[울면서]` 등)는 inline 과 같이 지운다.
+- `inline`: 대답 안 정해진 연기 표시(`fish.FISH_INLINE_CUES`)를 많아야 2개, 꾸미는 말 바로 앞에. `content` 는 표시 없는 글, `speechText` 는 같은 글에 표시만 남긴 것(목록 밖 표시·맨 끝 표시는 버린다).
+- 조립: 두 조립기 모두 첫 system 바로 뒤에 음성 지침 system 하나(지시문 글은 그대로라 말투 덧붙임·존댓말 판정이 바뀌지 않는다). legacy 조립은 기존 경로와 같은 자리다.
+- 떼기: 생성 바로 뒤, 가드 앞. 가드·언어 가드·턴 뒤 처리(세션 최근 턴)는 표시 없는 글만 본다. 근거 헤더(`[근거: …]`)는 표시가 앞에 와도 맨 앞에 두어 가드가 읽는다. `TurnRun.generation` 에는 모델 글이 그대로 남고, 추적에는 `voice` 단계(방식·감정·표시 이름)가 붙는다.
+- 가드 뒤: 연기 표시는 가드가 남긴 글의 같은 자리에 다시 꽂는다(지운 문장의 표시는 빠진다). 가드가 답을 갈아 끼웠으면(`ask_back`·`redact`) 감정·표시를 버린다.
+- MiniMax 감정(`VOICE_EMOTION`)은 기존 경로에만 있다. 중간계층에서는 지금처럼 없다.
+
 ## BE 요청에서 받을 수 있는 필드(선택)
 
-`sessionId`, `speakerHint` — 없으면 None. BE 가 보내기 시작하면 세션 상태가 이어진다. `memories[].memoryType` — 없으면 장기로 본다.
+`sessionId`, `speakerHint` — 없으면 None. BE 가 보내기 시작하면 세션 상태가 이어진다. `memories[].memoryType` — 없으면 장기로 본다. `persona.deceased` — `TurnInput.deceased` 로 옮겨 음성 감정 안전선에만 쓴다.
+
+응답의 `emotion`·`speechText` 는 기존 경로와 같은 뜻이다. `speechText` 는 있을 때만 칸이 생긴다.
 
 ## 모듈 하나만 돌려 보기
 

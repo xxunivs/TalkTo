@@ -106,8 +106,10 @@ class SpeechSynthesisRequest(ApiModel):
     stability: float | None = Field(default=None, ge=0.0, le=1.0)
     similarity_boost: float | None = Field(default=None, ge=0.0, le=1.0)
     style: float | None = Field(default=None, ge=0.0, le=1.0)
-    # 대답 감정(우리 이름: neutral, calm, happy, sad, surprised). MiniMax 만 쓴다. None 이면 회사가 글을 보고 정한다.
-    emotion: Literal["neutral", "calm", "happy", "sad", "surprised"] | None = None
+    # 대답 감정(우리 이름: neutral, calm, warm, happy, sad, surprised, worried). None 이면 회사가 글을 보고 정한다.
+    # MiniMax 는 자기 감정으로 바꿔 쓰고(warm·worried 는 없음), Fish 는 FISH_EMOTION=cue 일 때 연기 표시로 바꿔
+    # 글 맨 앞에 붙인다(fish.FISH_CUES). ElevenLabs 는 쓰지 않는다.
+    emotion: Literal["neutral", "calm", "warm", "happy", "sad", "surprised", "worried"] | None = None
 
 
 class VoiceDeleteRequest(ApiModel):

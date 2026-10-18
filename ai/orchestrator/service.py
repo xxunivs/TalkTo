@@ -28,6 +28,7 @@ from orchestrator.pipeline import PersonaOrchestrator, TurnRun
 from orchestrator.post_turn import RecordTurn
 from orchestrator.precheck import CoveragePrecheck, CoveragePrecheckV11, NoopPrecheck
 from orchestrator.session import InMemorySessionStore
+from orchestrator.voice import VoiceMarks
 from pipeline.s3_synthesis.c_build_system_prompt import warn_if_over_full_max
 
 log = logging.getLogger(__name__)
@@ -50,6 +51,7 @@ def turn_from_request(request: PersonaResponseRequest) -> TurnInput:
         session_id=request.session_id,
         speaker_hint=request.speaker_hint,
         voice_id=request.persona.voice_id,
+        deceased=request.persona.deceased,
     )
 
 
@@ -57,13 +59,20 @@ def build_registry(settings: Settings) -> PersonaRegistry:
     return PersonaRegistry(settings.orchestrator_persona_dir)
 
 
+def build_voice(settings: Settings) -> VoiceMarks:
+    """FISH_EMOTION: off(기본) | cue | inline. Fish 목소리 대답에만 쓴다."""
+    return VoiceMarks(getattr(settings, "fish_emotion", "off"))
+
+
 def build_assembler(settings: Settings, kind: str | None = None, registry: PersonaRegistry | None = None):
     kind = kind or settings.orchestrator_assembler
     late = settings.style_late_note == "on"
+    voice = build_voice(settings)
     if kind == "structured":
         return StructuredAssembler(registry or build_registry(settings), header=settings.orchestrator_guard in ("v1", "v11"),
-                                   rules=settings.orchestrator_rules, shots_mode=settings.orchestrator_shots, late_note=late)
-    return LegacyAssembler(late_note=late)
+                                   rules=settings.orchestrator_rules, shots_mode=settings.orchestrator_shots, late_note=late,
+                                   voice=voice)
+    return LegacyAssembler(late_note=late, voice=voice)
 
 
 def build_guard(settings: Settings, kind: str | None = None, registry: PersonaRegistry | None = None):
@@ -122,6 +131,7 @@ def build_default(settings: Settings) -> PersonaOrchestrator:
         llm=OpenAIChatLLM(settings),
         guard=build_guard(settings, registry=registry),
         post_turn=RecordTurn(),
+        voice=build_voice(settings),
     )
 
 
@@ -170,4 +180,5 @@ def orchestrate_persona_response(request: PersonaResponseRequest, *, settings: S
             log.exception("orchestrator trace write failed")
     res = run.result
     return PersonaResponseResult(content=res.content, retrieved_memory_ids=res.retrieved_memory_ids,
+                                 emotion=res.emotion, speech_text=res.speech_text,
                                  provider=res.provider, model=res.model)

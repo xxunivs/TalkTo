@@ -1,9 +1,9 @@
 """④ 프롬프트 조립.
 
 LegacyAssembler: 기존 generate_persona_response 와 같은 메시지를 만든다(동일성 테스트로 고정).
-  [system 페르소나 지시문] [system 참고 기억 블록(있으면)] [history…] [user 발화]
+  [system 페르소나 지시문] [system 음성 지침(FISH_EMOTION, 있으면)] [system 참고 기억 블록(있으면)] [history…] [user 발화]
 사전 판정 directive·델타 기억이 있으면 별도 system 절로 붙인다(둘 다 없으면 기존과 같다).
-StructuredAssembler: 공통 규칙 → 페르소나 → 말투 → 기억 → 델타 → 세션 상태 순으로 조립한다.
+StructuredAssembler: 공통 규칙 → 페르소나 → 말투 → 음성 지침 → 기억 → 델타 → 세션 상태 순으로 조립한다.
 """
 from __future__ import annotations
 
@@ -19,6 +19,7 @@ from pipeline.s3_synthesis.c_build_system_prompt import build_memory_block, late
 from orchestrator.guard import HEADER_RULE, header_block
 from orchestrator.persona import has_layered_rules
 from orchestrator.restricted import brief_rule, redact_instructions
+from orchestrator.voice import VoiceMarks
 from pipeline.persona_prompt.layers import SHOTS_MODES, RuntimeContext, runtime_section
 from pipeline.s3_synthesis.common_rules import (
     DEATH_POLICIES, RULES_DIR, render_block_file, render_common_rules, render_rules,
@@ -39,15 +40,23 @@ def delta_block(delta: list[MemoryItem]) -> str:
     return "이번 통화에서 새로 들은 것:\n" + "\n".join(lines)
 
 
+def voice_section(voice: VoiceMarks | None, turn: TurnInput) -> list[PromptSection]:
+    """음성 지침(FISH_EMOTION=cue·inline 이고 Fish 목소리일 때만) system 한 개. 정적인 글이라 지시문 바로 뒤에 둔다."""
+    instruction = voice.instruction(turn) if voice is not None else None
+    return [PromptSection(name="voice", role="system", content=instruction)] if instruction else []
+
+
 class LegacyAssembler:
     impl = "legacy_v0"
 
-    def __init__(self, *, late_note: bool = False) -> None:
+    def __init__(self, *, late_note: bool = False, voice: VoiceMarks | None = None) -> None:
         self.late_note = late_note  # STYLE_LATE_NOTE=on: 기존 경로와 같게 마지막 말 앞에 말투 덧붙임
+        self.voice = voice  # FISH_EMOTION: 기존 경로와 같은 자리(지시문 바로 뒤)에 음성 지침
 
     def assemble(self, turn: TurnInput, state: SessionState, selection: MemorySelection,
                  precheck: PrecheckResult) -> PromptBundle:
         sections = [PromptSection(name="persona", role="system", content=turn.persona_instructions)]
+        sections += voice_section(self.voice, turn)
         block = legacy_memory_block(selection.memories)
         if block:
             sections.append(PromptSection(name="memories", role="system", content=block))
@@ -135,9 +144,10 @@ class StructuredAssembler:
     impl = "structured_v1"
 
     def __init__(self, profiles, *, max_recent_turns: int = 6, header: bool = False, rules: str = "legacy",
-                 shots_mode: str = "system", late_note: bool = False) -> None:
+                 shots_mode: str = "system", late_note: bool = False, voice: VoiceMarks | None = None) -> None:
         self.profiles = profiles
         self.late_note = late_note  # STYLE_LATE_NOTE=on: 마지막 말 앞에 말투 덧붙임(카드가 등록부에서 와도 head 로 가린다)
+        self.voice = voice  # FISH_EMOTION: 첫 system(규칙+페르소나) 바로 뒤에 음성 지침
         # shots_mode="messages": 실제 주고받기를 지시문 글 대신 기억 뒤 user/assistant 메시지로 넣는다
         if shots_mode not in SHOTS_MODES:
             raise ValueError(f"shots_mode must be one of {SHOTS_MODES}")
@@ -204,6 +214,8 @@ class StructuredAssembler:
             dblock = delta_block(selection.delta)
             if dblock:
                 sections.append(PromptSection(name="delta", role="system", content=dblock))
+        # 음성 지침은 첫 system 과 따로 둔다(지시문 글을 바꾸지 않아 말투 덧붙임·존댓말 판정이 그대로다)
+        sections[1:1] = voice_section(self.voice, turn)
         if prof.shots and self.shots_mode == "messages" and not shots_in_text:
             for i, sh in enumerate(prof.shots):
                 sections += [PromptSection(name=f"shot{i}u", role="user", content=sh.user),

@@ -214,20 +214,24 @@ def answer(
     result = generate_persona_response(request, settings=settings)
     return {
         "text": result.content,
+        # 음성 감정(FISH_EMOTION): 운영 BE 처럼 읽을 때만 쓴다(--tts). 꺼져 있으면 None
+        "speech_text": result.speech_text,
+        "emotion": result.emotion,
         "safety": "allowed",
         "used_memory_ids": result.retrieved_memory_ids,
         "retrieved": [{"id": m["id"], "text": m["text"]} for m in retrieved],
     }
 
 
-def _maybe_synthesize(text: str, voice_id: str | None, chat_dir: Path, turn: int, settings: Settings) -> str | None:
+def _maybe_synthesize(text: str, voice_id: str | None, chat_dir: Path, turn: int, settings: Settings,
+                      emotion: str | None = None) -> str | None:
     """--tts: 응답을 대상자 목소리로 합성해 mp3 저장. 실패해도 대화는 계속."""
     from infra.schema.voice import SpeechSynthesisRequest
     from pipeline.s4_voice.a_voice import synthesize_speech
 
     try:
         tts = synthesize_speech(
-            SpeechSynthesisRequest(text=text, voice_id=voice_id), settings=settings
+            SpeechSynthesisRequest(text=text, voice_id=voice_id, emotion=emotion), settings=settings
         )
     except Exception as error:  # 음성 합성 실패가 대화를 깨지 않게
         logger.warning("음성 합성 실패: %s", error)
@@ -343,7 +347,9 @@ def run_repl(args: argparse.Namespace) -> int:
 
             audio_path = None
             if args.tts and reply["safety"] == "allowed":
-                audio_path = _maybe_synthesize(reply["text"], voice_id, chat_dir, turn, settings)
+                # 목소리용 글(연기 표시 포함)이 있으면 그것을 읽는다(운영 BE 와 같다)
+                audio_path = _maybe_synthesize(reply.get("speech_text") or reply["text"], voice_id, chat_dir,
+                                               turn, settings, emotion=reply.get("emotion"))
 
             turns.append(
                 {
