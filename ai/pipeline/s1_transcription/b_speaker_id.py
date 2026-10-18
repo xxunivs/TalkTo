@@ -68,9 +68,13 @@ class SpeakerEmbedder:
     def embed_clip(
         self, audio_path: Path, *, start_ms: int | None = None, end_ms: int | None = None
     ) -> list[float]:
+        # 지문은 앞 60초면 충분하다. 길게 넣으면 메모리가 길이만큼 는다(embed_speakers 와 같은 한도)
+        start = start_ms or 0
+        limit = start + int(MAX_SPEECH_SECONDS * 1000)
+        end = limit if end_ms is None else min(end_ms, limit)
         raw = decode_to_raw(audio_path)
         try:
-            return self.embed_waveform(read_clip(raw, start_ms or 0, end_ms))
+            return self.embed_waveform(read_clip(raw, start, end))
         finally:
             raw.unlink(missing_ok=True)
 
@@ -81,7 +85,8 @@ class SpeakerEmbedder:
 
         녹음 전체를 메모리에 펼치지 않는다. 한 시간 녹음이면 펼치기만 230MB, 펼치는 동안은 두 배가
         든다. 2시간 통화면 그것만으로 AI 컨테이너(2.5GB)가 강제 종료됐다(2026-10-18). 그래서 PCM 을
-        파일로 풀고 화자마다 쓸 구간(최대 60초)만 읽는다. 지문 값은 예전과 같다.
+        파일로 풀고 화자마다 쓸 구간(최대 60초)만 읽는다. 구간 하나가 60초보다 길어도 남은 몫까지만
+        읽는다(지문에 들어가는 소리가 화자당 60초를 넘지 않는다).
         """
         import torch
 
@@ -95,7 +100,11 @@ class SpeakerEmbedder:
                 used = budgets.get(segment.speaker_label, 0.0)
                 if used >= MAX_SPEECH_SECONDS:
                     continue
-                clip = read_clip(raw, segment.start_ms, segment.end_ms)
+                # 한 구간이 길어도(혼자 몇 분씩 이어 말한 경우) 남은 몫까지만 읽는다. 예전에는 구간
+                # 하나를 통째로 넣어, 3분짜리 하나에 3.7GB 를 써서 컨테이너가 죽었다(2026-10-18)
+                left_ms = int((MAX_SPEECH_SECONDS - used) * 1000)
+                end_ms = min(segment.end_ms, segment.start_ms + left_ms)
+                clip = read_clip(raw, segment.start_ms, end_ms)
                 clips.setdefault(segment.speaker_label, []).append(clip)
                 budgets[segment.speaker_label] = used + clip.shape[1] / SAMPLE_RATE
 

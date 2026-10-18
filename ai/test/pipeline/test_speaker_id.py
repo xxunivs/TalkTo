@@ -103,3 +103,28 @@ class ClipReadingTest(unittest.TestCase):
         self.assertEqual(sorted(out), ["SPK_0", "SPK_1"])
         self.assertEqual(seen, [32000, 40000])
         self.assertEqual(list(self.audio.parent.glob("*.f32")), [])
+
+    def test_long_turns_are_cut_to_the_speaker_budget(self) -> None:
+        """혼자 몇 분씩 이어 말한 구간도 화자당 한도(운영 60초)까지만 넣는다(메모리가 길이만큼 는다)."""
+        from unittest.mock import patch
+
+        from infra.schema.transcript import TranscriptSegment
+        from pipeline.s1_transcription import b_speaker_id
+        from pipeline.s1_transcription.b_speaker_id import SpeakerEmbedder
+
+        embedder = SpeakerEmbedder()
+        seen = []
+        embedder.embed_waveform = lambda waveform: seen.append(waveform.shape[1]) or [1.0]
+        segments = [
+            TranscriptSegment(segment_index=0, start_ms=0, end_ms=1500, speaker_label="SPK_0",
+                              transcript_text="x"),
+            TranscriptSegment(segment_index=1, start_ms=1500, end_ms=4800, speaker_label="SPK_0",
+                              transcript_text="x"),
+            TranscriptSegment(segment_index=2, start_ms=0, end_ms=4800, speaker_label="SPK_1",
+                              transcript_text="x"),
+        ]
+        with patch.object(b_speaker_id, "MAX_SPEECH_SECONDS", 2.0):
+            embedder.embed_speakers(self.audio, segments)
+            embedder.embed_clip(self.audio)
+        # SPK_0: 1.5초 + 남은 0.5초, SPK_1: 4.8초 구간에서 2초만, 기준 클립도 2초만
+        self.assertEqual(seen, [32000, 32000, 32000])
