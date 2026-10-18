@@ -65,6 +65,31 @@ class PickTest(unittest.TestCase):
         self.assertEqual(quality.pick(cands, budget_seconds=12, min_seconds=10), [0, 1])
 
 
+class PickSecondsTest(unittest.TestCase):
+    """긴 구간 하나가 통째로 들어가 Fish 올리기 한도(약 6분)를 넘던 일(2026-10-18 413)을 막는다."""
+
+    def _q(self, seconds: float, snr: float = 30) -> quality.SegmentQuality:
+        return quality.SegmentQuality(seconds=seconds, snr_db=snr, clip_ratio=0.0, level_db=-20)
+
+    def test_long_turn_is_cut_to_the_budget(self) -> None:
+        cands = [("a", self._q(300)), ("b", self._q(5, 28))]
+        self.assertEqual(
+            quality.pick_seconds(cands, budget_seconds=60, min_seconds=10, min_part_seconds=0.8),
+            {0: 60},
+        )
+
+    def test_tiny_leftover_is_dropped(self) -> None:
+        cands = [("a", self._q(59.5)), ("b", self._q(5, 28))]
+        use = quality.pick_seconds(cands, budget_seconds=60, min_seconds=10, min_part_seconds=0.8)
+        self.assertEqual(use, {0: 59.5})
+
+    def test_never_more_than_the_budget(self) -> None:
+        cands = [(str(i % 3), self._q(s)) for i, s in enumerate([40, 70, 12, 9, 200, 3, 33])]
+        use = quality.pick_seconds(cands, budget_seconds=60, min_seconds=10, min_part_seconds=0.8)
+        self.assertLessEqual(sum(use.values()), 60)
+        self.assertAlmostEqual(sum(use.values()), 60)
+
+
 @unittest.skipIf(shutil.which("ffmpeg") is None, "ffmpeg 필요")
 class BuildMultiSampleTest(unittest.TestCase):
     def test_keeps_clean_segments_and_downloads_each_recording_once(self) -> None:
@@ -100,6 +125,31 @@ class BuildMultiSampleTest(unittest.TestCase):
             self.assertEqual((w.getframerate(), w.getnchannels(), w.getsampwidth()), (44100, 1, 2))
         # 깨끗한 앞 구간(앞뒤 0.08초씩 깎음)만 들어간다
         self.assertAlmostEqual(seconds, 3.84, delta=0.1)
+
+    def test_one_long_turn_is_cut_to_the_budget(self) -> None:
+        """혼자 길게 이어 말한 구간 하나도 상한까지만 잘라 올린다(통째로 넣으면 Fish 413)."""
+        tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, tmp, True)
+        recording = tmp / "long.wav"
+        _write(recording, _speech_like(20))
+
+        def fake_download(url, *, timeout_seconds, max_bytes, temp_dir):
+            dst = Path(temp_dir) / "src.wav"
+            shutil.copy(recording, dst)
+            return dst
+
+        segments = [VoiceSampleSegment(audio_url="https://s/long.wav", start_ms=0, end_ms=20000)]
+        settings = mock.Mock(audio_download_timeout_seconds=10, max_audio_bytes=10**9)
+        with (
+            mock.patch.object(a_voice, "download_audio", fake_download),
+            mock.patch.object(a_voice, "_CLONE_MIN_SAMPLE_SECONDS", 2.0),
+            mock.patch.object(a_voice, "_CLONE_SAMPLE_MAX_SECONDS", 5.0),
+        ):
+            out = a_voice._build_multi_sample(segments, settings=settings)
+        self.addCleanup(shutil.rmtree, out.parent, True)
+        with wave.open(str(out), "rb") as w:
+            seconds = w.getnframes() / w.getframerate()
+        self.assertAlmostEqual(seconds, 5.0, delta=0.1)
 
 
 if __name__ == "__main__":

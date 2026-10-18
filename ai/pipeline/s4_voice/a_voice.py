@@ -175,10 +175,12 @@ def _build_multi_sample(segments: list[VoiceSampleSegment], *, settings: Setting
                 f"유효한 대상자 구간이 없습니다(자른 뒤 길이가 모두 {_CLONE_MIN_SEGMENT_MS}ms 미만). "
                 "startMs/endMs가 해당 오디오 범위 안인지 확인하세요."
             )
-        chosen = quality.pick(
+        # 후보마다 쓸 초까지 정한다. 긴 구간 하나가 통째로 들어가 Fish 올리기 한도를 넘지 않게
+        use = quality.pick_seconds(
             [(str(seg.audio_url), q) for seg, _, _, q in measured],
             budget_seconds=_CLONE_SAMPLE_MAX_SECONDS,
             min_seconds=_CLONE_MIN_SAMPLE_SECONDS,
+            min_part_seconds=_CLONE_MIN_SEGMENT_MS / 1000,
         )
 
         gap = workdir / "gap.wav"
@@ -189,8 +191,9 @@ def _build_multi_sample(segments: list[VoiceSampleSegment], *, settings: Setting
             check=True, capture_output=True,
         )
         parts: list[Path] = []
-        for n, i in enumerate(chosen):
+        for n, i in enumerate(sorted(use)):
             seg, start_ms, end_ms, _ = measured[i]
+            end_ms = min(end_ms, start_ms + int(use[i] * 1000))
             part = workdir / f"part_{n}.wav"
             _ffmpeg_normalize(sources[str(seg.audio_url)], part, start_ms, end_ms, loudnorm=True)
             parts += [part, gap]

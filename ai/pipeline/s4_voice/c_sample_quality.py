@@ -76,8 +76,11 @@ def pick(
     *,
     budget_seconds: float,
     min_seconds: float,
+    keep_order: bool = False,
 ) -> list[int]:
-    """(녹음 주소, 품질) 목록에서 담을 후보의 번호를 고른다(원래 순서대로 돌려준다).
+    """(녹음 주소, 품질) 목록에서 담을 후보의 번호를 고른다.
+
+    원래 순서대로 돌려준다(keep_order 면 고른 순서대로).
 
     기준을 넘는 구간만 쓰되, 그것만으로 min_seconds 가 안 되면 기준을 낮춰 점수 높은 것부터 쓴다
     (통화 녹음처럼 전부 잡음이 있는 경우에도 복제는 되게). 녹음마다 번갈아 담아 한 통화가
@@ -97,4 +100,31 @@ def pick(
                 i = queue.pop(0)
                 chosen.append(i)
                 total += candidates[i][1].seconds
-    return sorted(chosen)
+    return chosen if keep_order else sorted(chosen)
+
+
+def pick_seconds(
+    candidates: list[tuple[str, SegmentQuality]],
+    *,
+    budget_seconds: float,
+    min_seconds: float,
+    min_part_seconds: float,
+) -> dict[int, float]:
+    """pick 과 같이 고르되, 후보마다 몇 초를 쓸지까지 정한다(번호 → 초).
+
+    pick 은 담은 길이가 예산에 닿을 때까지 후보를 '통째로' 담아, 마지막 하나가 길면(혼자 몇 분씩
+    이어 말한 구간) 예산을 훌쩍 넘었다. 그 wav 가 Fish Audio 의 올리기 한도(30~40MB, 이 형식으로
+    약 6분)를 넘어 413 으로 목소리를 못 만들었다(2026-10-18). 넘치는 후보는 남은 예산만큼만 쓰고,
+    그 남은 몫이 min_part_seconds 보다 짧으면 뺀다. 그래서 쓰는 말소리는 늘 budget_seconds 이하다.
+    """
+    out: dict[int, float] = {}
+    left = budget_seconds
+    for i in pick(
+        candidates, budget_seconds=budget_seconds, min_seconds=min_seconds, keep_order=True
+    ):
+        seconds = min(candidates[i][1].seconds, left)
+        if seconds < min(min_part_seconds, candidates[i][1].seconds):
+            continue
+        out[i] = seconds
+        left -= seconds
+    return out
