@@ -210,8 +210,9 @@ class ListenerFamilyTableTest(unittest.TestCase):
         req = PersonaAssemblyRequest(subject_context=SubjectContext(**LISTENER_SUBJECT),
                                      intake_context=IntakeContext(familyMap=LISTENER_ROWS))
         s = Settings(openai_api_key=SecretStr("sk-test"))
-        legacy = assemble_persona_instructions(req, s).instructions
-        layered = assemble_persona_instructions(req, s.model_copy(update={"persona_prompt_builder": "layered"}))
+        self.assertEqual(s.persona_prompt_builder, "layered")  # 기본은 4층(세션 14)
+        legacy = assemble_persona_instructions(req, s.model_copy(update={"persona_prompt_builder": "legacy"})).instructions
+        layered = assemble_persona_instructions(req, s)
         self.assertIn('· 사용자는 "아빠"라고 부름', legacy)
         self.assertIn('/ 사용자는 "아빠"라고 부름', layered.instructions)
 
@@ -328,12 +329,26 @@ class FlagTest(unittest.TestCase):
         req = PersonaAssemblyRequest(subject_context=SubjectContext(**SUBJECT), intake_context=IntakeContext(**INTAKE),
                                      persona_insights=["주사 후 주의사항을 지킨다"])
         s = Settings(openai_api_key=SecretStr("sk-test"))
-        legacy = assemble_persona_instructions(req, s).instructions
-        layered = assemble_persona_instructions(req, s.model_copy(update={"persona_prompt_builder": "layered"}))
+        self.assertEqual(s.persona_prompt_builder, "layered")  # 기본은 4층
+        legacy = assemble_persona_instructions(req, s.model_copy(update={"persona_prompt_builder": "legacy"})).instructions
+        layered = assemble_persona_instructions(req, s)
         self.assertNotIn("# 기억을 쓰는 법", legacy)
         self.assertIn("# 기억을 쓰는 법", layered.instructions)
         self.assertNotIn("주사 후 주의사항", layered.instructions)  # 기억 통찰은 넣지 않는다
         self.assertEqual(layered.subject_name, "김할매")
+
+    def test_style_card_threshold(self) -> None:
+        """말투 카드는 speechExamples 가 문턱(STYLE_CARD_MIN_UTTS, 기본 30) 이상일 때만 붙는다."""
+        utts = ["어, 그래. 밥은 먹었어?", "그러니까 조금만 넣어.", "어, 알았다."]
+        req = lambda n: PersonaAssemblyRequest(subject_context=SubjectContext(**SUBJECT),  # noqa: E731
+                                              speech_examples=(utts * 20)[:n])
+        s = Settings(openai_api_key=SecretStr("sk-test"))
+        self.assertEqual(s.style_card_min_utts, 30)
+        self.assertNotIn("# 말투 카드", assemble_persona_instructions(req(29), s).instructions)
+        self.assertIn("# 말투 카드", assemble_persona_instructions(req(30), s).instructions)
+        low = s.model_copy(update={"style_card_min_utts": 8})
+        self.assertNotIn("# 말투 카드", assemble_persona_instructions(req(7), low).instructions)
+        self.assertIn("# 말투 카드", assemble_persona_instructions(req(8), low).instructions)
 
     def test_orchestrator_layered_rules(self) -> None:
         from orchestrator.assembler import StructuredAssembler

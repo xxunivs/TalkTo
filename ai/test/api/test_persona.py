@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
 
-from infra.setting import Settings
+from infra.setting import Settings, get_settings
 from main import app
 from pipeline.s3_synthesis.c_build_system_prompt import extract_memory_candidates
 from infra.schema.persona import MemoryCandidateRequest
@@ -21,11 +21,19 @@ def _mock_openai_returning(content: str) -> MagicMock:
 
 
 class PersonaAssemblyTest(unittest.TestCase):
-    """POST /v1/persona/assembly — LLM 미사용(순수 조립)이라 실호출 없이 검증 가능."""
+    """POST /v1/persona/assembly — LLM 미사용(순수 조립)이라 실호출 없이 검증 가능.
+
+    아래 두 테스트는 예전 조립기(PERSONA_PROMPT_BUILDER=legacy)의 출력 문구를 본다. 기본(4층)은 DefaultAssemblyTest.
+    """
 
     @classmethod
     def setUpClass(cls) -> None:
         cls.client = TestClient(app)
+
+    def setUp(self) -> None:
+        app.dependency_overrides[get_settings] = lambda: Settings(
+            openai_api_key=SecretStr("test-key"), persona_prompt_builder="legacy")
+        self.addCleanup(app.dependency_overrides.pop, get_settings, None)
 
     def test_assembly_builds_prompt_from_context(self) -> None:
         response = self.client.post(
@@ -63,6 +71,26 @@ class PersonaAssemblyTest(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         instructions = response.json()["instructions"]
         self.assertIn("사후 페르소나", instructions)
+        self.assertNotIn("폐렴", instructions)
+
+
+class DefaultAssemblyTest(unittest.TestCase):
+    """설정을 따로 주지 않으면 /v1/persona/assembly 는 4층 프롬프트를 돌려준다."""
+
+    def test_default_builder_is_layered_and_hides_death_context(self) -> None:
+        app.dependency_overrides[get_settings] = lambda: Settings(openai_api_key=SecretStr("test-key"))
+        self.addCleanup(app.dependency_overrides.pop, get_settings, None)
+        response = TestClient(app).post(
+            "/v1/persona/assembly",
+            json={
+                "subjectContext": {"subject": {"name": "최순례", "addressTerm": "할머니"}},
+                "intakeContext": {"basicProfile": {"status": "사망", "deathContext": "2024년 폐렴으로 별세"}},
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        instructions = response.json()["instructions"]
+        self.assertIn("# 기억을 쓰는 법", instructions)  # 4층 L1
+        self.assertIn("최순례", instructions)
         self.assertNotIn("폐렴", instructions)
 
 

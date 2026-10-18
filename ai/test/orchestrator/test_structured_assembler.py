@@ -103,7 +103,22 @@ class StructuredAssemblerTest(unittest.TestCase):
                                       MemorySelection(memories=[], strategy="t"), PrecheckResult()).sections[0].content
                     death = [ln for ln in head.splitlines() if ln.strip().startswith(death_rule_lead())]
                     self.assertEqual(death, [own_line])
-                    self.assertLess(head.index(own_line), head.index("# 페르소나\n"))
+                    if rules == "layered":
+                        # 등록부 없이 L1 을 품은 지시문은 공통 규칙을 다시 붙이지 않는다(세션 17, test_layered_death_policy)
+                        self.assertEqual(head, instructions)
+                    else:
+                        self.assertLess(head.index(own_line), head.index("# 페르소나\n"))
+            with self.subTest(policy=policy, rules="layered", registry="no restricted policy"):
+                # 등록부는 있는데 사망 정책(restricted·intake·spec)이 없으면 layered 도 공통 규칙을 붙이고,
+                # 그 사망 줄은 지시문이 고른 줄로 바뀐다(adopt_death_rule)
+                a = StructuredAssembler(PersonaRegistry(PERSONAS), rules="layered")
+                turn = TurnInput(subject_id="subj-demo", message="안녕", persona_instructions=instructions)
+                head = a.assemble(turn, SessionState(session_id=None, subject_id="subj-demo"),
+                                  MemorySelection(memories=[], strategy="t"), PrecheckResult()).sections[0].content
+                self.assertTrue(head.startswith("# 공통 규칙 (모든 페르소나 공통, prompts/rules)\n"))
+                death = [ln for ln in head.splitlines() if ln.strip().startswith(death_rule_lead())]
+                self.assertEqual(death, [own_line])
+                self.assertLess(head.index(own_line), head.index("# 페르소나\n"))
 
     def test_death_rule_lead_and_noop_cases(self) -> None:
         lead = death_rule_lead()
@@ -118,6 +133,25 @@ class StructuredAssemblerTest(unittest.TestCase):
         self.assertEqual(adopt_death_rule(dead, PRIVATE), dead)  # 지시문에 사망 줄이 없으면 그대로
 
     def test_setting_selects_assembler(self) -> None:
-        s = Settings(openai_api_key=SecretStr("k"), orchestrator_assembler="structured")
+        s = Settings(openai_api_key=SecretStr("k"), orchestrator_assembler="structured",
+                     orchestrator_rules="legacy", orchestrator_shots="system")
         self.assertEqual(build_default(s).assembler.impl, "structured_v1")
+        # 기본 규칙·주고받기 위치는 layered·messages
+        s_default = Settings(openai_api_key=SecretStr("k"), orchestrator_assembler="structured")
+        self.assertEqual(build_default(s_default).assembler.impl, "structured_v1+layered+shotmsgs")
         self.assertEqual(build_default(Settings(openai_api_key=SecretStr("k"))).assembler.impl, "legacy_v0")
+
+    def test_production_flags_layered_instructions_used_as_is(self) -> None:
+        # 운영 플래그(structured·guard v11·rules layered, 등록부 없음)로 4층 지시문을 받으면 첫 system 은
+        # 지시문 그대로 + 근거 헤더 규칙이다(공통 규칙을 다시 붙이지 않는다)
+        from orchestrator.guard import HEADER_RULE
+        s = Settings(openai_api_key=SecretStr("k"), orchestrator_assembler="structured", orchestrator_guard="v11",
+                     orchestrator_rules="layered")
+        a = build_default(s).assembler
+        own = render_rules("layered", public=False, deceased=True, has_family=True, death_policy="ask_only",
+                           vars={"family_list": "아래 가족 목록", "death_answer": "그렇게 됐지"})
+        instructions = own + "\n\n" + PRIVATE
+        head = a.assemble(TurnInput(subject_id="s", message="안녕", persona_instructions=instructions),
+                          SessionState(session_id=None, subject_id="s"),
+                          MemorySelection(memories=[], strategy="t"), PrecheckResult()).sections[0].content
+        self.assertEqual(head, instructions + "\n\n" + HEADER_RULE)

@@ -23,6 +23,7 @@ from infra.schema.persona import (
 )
 from infra.schema.transcript import TranscriptSegment
 from infra.external_api.tts import wants_emotion_hint
+from orchestrator.text import listener_speech_level
 from pipeline.s3_synthesis.common_rules import family_guide, render_common_rules
 from pipeline.s4_voice.b_emotion import EMOTION_INSTRUCTION, split_emotion
 
@@ -68,7 +69,7 @@ def assemble_persona_instructions(
     """
     if settings is not None and settings.persona_prompt_builder == "layered":
         from pipeline.persona_prompt import build
-        spec = build.for_assembly(request, settings.persona_death_talk)
+        spec = build.for_assembly(request, settings.persona_death_talk, settings.style_card_min_utts)
         return PersonaAssemblyResponse(instructions=build.prompt(spec), subject_name=spec.name)
     segments = _speech_segments(request.speech_examples)
     instructions = assemble_persona_prompt(
@@ -92,9 +93,16 @@ def chat_reasoning(settings) -> dict:
 
 
 def build_memory_block(memories) -> str:
-    """검색된 기억 후보를 프롬프트에 주입할 텍스트 블록으로. 없으면 빈 문자열."""
+    """검색된 기억 후보를 프롬프트에 주입할 텍스트 블록으로. 없으면 빈 문자열.
+
+    순서는 기억 id 순으로 고정한다. BE 가 매 턴 다른 순서로 보내도 같은 기억이면 같은 글자가 되어
+    프롬프트 캐시가 유지된다. id 는 무작위 UUID 라 종류·시간과 상관없는 고정 순서가 되는데, 세션 14 E1
+    "기억 전부" c 조건(고정 무작위 순서)과 같은 성질이다(종류·시간순 d 조건은 성적이 낮았다).
+    """
     if not memories:
         return ""
+    # ponytail: 새 기억이 들어오면 그 자리부터 뒤는 캐시가 깨진다. 기록 시각을 BE 가 보내면 "옛것 먼저"로 바꿀 수 있다.
+    memories = sorted(memories, key=lambda m: getattr(m, "id", "") or "")
     lines = []
     for memory in memories:
         title = (memory.title or "").strip()
@@ -108,9 +116,46 @@ def build_memory_block(memories) -> str:
     )
 
 
+# 세션 18 실험(D1·E1) 문구에서 대상자 한 사람의 숫자("714마디", "열에 넷" 등)만 빼서 모든 페르소나에 맞게 했다.
+STYLE_LATE_NOTE = """# 말투 덧붙임 (실제 통화 말버릇. 위 말투 규칙과 부딪히면 이것을 따른다)
+- 실제로는 문장 끝을 다 맺지 않는 말이 많다. "어.", "응."으로 받거나 "…하고.", "…해서.", "그거."처럼 흐려도 된다.
+- 한두 마디로 끝내도 된다. "어, 그래." "응."만 하고 말아도 된다. 매번 내용을 채워 답하지 않는다.
+- 잘 못 알아들었거나 놀라면 "어?", "뭐?" 하고 한마디로 되묻는다.
+- 가끔은 묻는 말도 한다. 위의 "매 턴 되묻지 않는다"는 매번 묻지 말라는 뜻이지 묻지 말라는 뜻이 아니다."""
+_CARD_HEAD = "# 말투 카드"  # pipeline/persona_prompt/from_transcript.py 가 붙이는 제목
+_SHORT_RULE = "- 기본은 1~2문장으로 짧게."  # pipeline/persona_prompt/render.py style() 의 짧은 말투 규칙
+_VISITORS_HEAD = "# 방문자"  # 공개 본인 페르소나(render.visitors): 처음 보는 방문자에게 존댓말
+
+
+def late_style_note(instructions: str) -> str:
+    """마지막 가족 말 바로 앞에 넣을 말투 덧붙임. 실험한 범위(4층 + 말투 카드 + 짧은 말투)일 때만, 아니면 빈 문자열.
+
+    덧붙임의 예시("어.", "응.", "뭐?")는 반말이고 "부딪히면 이것을 따른다"고 하므로, 지금 상대에게 존댓말을
+    쓰는 지시문에는 넣지 않는다: 가족 표의 '지금 대화하는 사람' 줄이 존댓말(가족 공유의 사위·며느리 등)이거나
+    공개 본인 페르소나(방문자에게 존댓말). 실험은 반말로 말하는 가족 페르소나에서 했다.
+    """
+    # ponytail: 지시문 글자로 범위를 가린다. 말이 긴 페르소나·카드 없는 페르소나는 재 보고 넓힌다.
+    if _CARD_HEAD not in instructions or _SHORT_RULE not in instructions:
+        return ""
+    if listener_speech_level(instructions) == "존댓말" or _VISITORS_HEAD in instructions:
+        return ""
+    return STYLE_LATE_NOTE
+
+
+def warn_if_over_full_max(n_memories: int, settings: Settings) -> bool:
+    """기억이 MEMORY_FULL_MAX 를 넘었나. 넘어도 자르지 않는다(AI 서버엔 벡터가 없어 스스로 고를 수 없다).
+    넘으면 검색으로 바꾸는 것은 BE 가 한다. 여기서는 경고만 남긴다."""
+    if n_memories <= settings.memory_full_max:
+        return False
+    logger.warning("memories %d > MEMORY_FULL_MAX %d: BE should send search results instead of all memories",
+                   n_memories, settings.memory_full_max)
+    return True
+
+
 def generate_persona_response(
     request: PersonaResponseRequest, *, settings: Settings
 ) -> PersonaResponseResult:
+    warn_if_over_full_max(len(request.memories), settings)
     client = create_openai_client(settings, "persona response")
 
     messages = [{"role": "system", "content": request.persona.instructions}]
@@ -124,6 +169,11 @@ def generate_persona_response(
         messages.append({"role": "system", "content": memory_block})
     for turn in request.history:
         messages.append({"role": turn.role, "content": turn.content})
+    # 가져온 지침(fixedPrompt)은 MVP 때와 같은 메시지(지침 + 기억 + 대화)만 보낸다 — 덧붙임은 4층 지시문용
+    late = settings.style_late_note == "on" and not request.persona.fixed_prompt
+    note = late_style_note(request.persona.instructions) if late else ""
+    if note:
+        messages.append({"role": "system", "content": note})
     messages.append({"role": "user", "content": request.message})
 
     response = client.chat.completions.create(

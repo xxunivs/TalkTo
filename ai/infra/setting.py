@@ -24,8 +24,8 @@ class Settings(BaseModel):
     # 1턴이 3초가 넘는다. none 이면 1.5초 안팎(low 도 가끔 100토큰 넘게 생각한다, 2026-10-13 측정).
     openai_chat_reasoning_effort: Literal["none", "low", "medium", "high"] | None = "none"
     openai_analysis_model: str = "gpt-6-luna"
-    # 평가 채점(LLM judge)용 상위 모델 — 채점 대상 모델보다 강한 모델 사용 원칙
-    openai_judge_model: str = "gpt-5.5"
+    # 평가 채점(LLM judge) 모델 — 비용 때문에 생성과 같은 gpt-6-luna 를 쓴다
+    openai_judge_model: str = "gpt-6-luna"
     openai_stt_model: str = "whisper-1"
     openai_correction_model: str = "gpt-6-luna"
     # 교정 발음 유사도 게이트(자모 편집거리 비율 상한). 실통화 13건으로 맞춘 초기값
@@ -91,11 +91,16 @@ class Settings(BaseModel):
     # 조립기: legacy(기존과 동일) | structured(공통 규칙 md + 페르소나 + 말투 재료)
     orchestrator_assembler: Literal["legacy", "structured"] = "legacy"
     # structured 조립의 공통 규칙: legacy = 예전 규칙(+사인 정책 절) / layered = 4층 L1 모듈(사인 정책은 모듈 변형으로)
-    orchestrator_rules: Literal["legacy", "layered"] = "legacy"
+    # 기본 layered: 지시문이 4층이면 같은 줄을 지워 규칙이 두 벌 겹치지 않는다. structured 조립일 때만 쓰인다.
+    orchestrator_rules: Literal["legacy", "layered"] = "layered"
     # structured 조립에서 실제 주고받기를 넣는 곳: system(지시문 안 글) / messages(기억 뒤 대화 메시지)
-    orchestrator_shots: Literal["system", "messages"] = "system"
+    # 기본 messages: 실험에서 정답률 58%→68%. 등록부에 주고받기가 있을 때만 효과가 있다.
+    orchestrator_shots: Literal["system", "messages"] = "messages"
     # 페르소나 지시문 조립(/v1/persona/assembly, 로컬 s3_c): legacy = assemble_persona_prompt / layered = 4층(pipeline/persona_prompt)
-    persona_prompt_builder: Literal["legacy", "layered"] = "legacy"
+    # 기본 layered: 실험에서 지어내기 33%→24%. 예전 조립은 PERSONA_PROMPT_BUILDER=legacy 로 되돌린다.
+    persona_prompt_builder: Literal["legacy", "layered"] = "layered"
+    # 4층 조립에서 말투 카드를 붙이는 speechExamples 최소 개수. 낮추는 값은 세션 17 오프라인 비교 뒤 재헌이 정한다.
+    style_card_min_utts: int = Field(default=30, ge=1, le=50)
     # 사인·임종 질문 기본 설정(요청에 deathTalk 가 없을 때): intake = 설문 그대로 / off = 끔 / on = 켬
     persona_death_talk: Literal["intake", "off", "on"] = "intake"
     # 페르소나 등록부(profile.json·말투 카드·실제 발화). None 이면 지시문에서 추정만.
@@ -111,6 +116,16 @@ class Settings(BaseModel):
     orchestrator_selector: Literal["passthrough", "tiered"] = "passthrough"
     orchestrator_selector_st_top_k: int = Field(default=5, ge=0, le=50)
     orchestrator_selector_threshold: float = Field(default=0.18, ge=-1, le=1)
+    # BE 가 기억을 전부 보낼 때의 상한. 넘으면 경고 로그(+중간계층 trace)만 남기고 자르지 않는다.
+    # 넘으면 검색으로 바꾸는 것은 BE 몫. 400 은 제안값(실험 페르소나 기억 309개 ≈ 1.9만 토큰), 최종 값은 재헌 결정.
+    memory_full_max: int = Field(default=400, gt=0)
+    # 기억 검색 질문 다시 쓰기(/v1/embeddings/query 에 history 가 올 때만). on 이면 질문 하나당 LLM 1회가 검색 앞에 붙는다.
+    query_rewrite: Literal["off", "on"] = "off"
+    # 말투 덧붙임: 지시문에 말투 카드와 "짧게" 말투 규칙이 있으면 마지막 가족 말 바로 앞에 system 한 줄 묶음을 넣는다.
+    # 기본 on: 세션 18 실험(덧말 막는 줄과 함께, E1)에서 어미 거리 −0.08, 사실 정답 56.5%→71.7%.
+    # 가져온 지침(persona.fixedPrompt)에는 넣지 않는다(4층 생성기 글이 아니라 실험 범위 밖). 덧붙임 예시가 반말이라
+    # 존댓말로 대하는 상대(가족 표 듣는 사람 줄이 존댓말)·공개 본인 페르소나에도 넣지 않는다(late_style_note).
+    style_late_note: Literal["off", "on"] = "on"
 
     @field_validator(
         "ai_server_token",
@@ -158,7 +173,7 @@ def load_settings(env_file: str | Path | None = ".env") -> Settings:
         openai_chat_model=os.getenv("OPENAI_CHAT_MODEL", "gpt-6-luna"),
         openai_chat_reasoning_effort=os.getenv("OPENAI_CHAT_REASONING_EFFORT", "none").strip() or None,
         openai_analysis_model=os.getenv("OPENAI_ANALYSIS_MODEL", "gpt-6-luna"),
-        openai_judge_model=os.getenv("OPENAI_JUDGE_MODEL", "gpt-5.5"),
+        openai_judge_model=os.getenv("OPENAI_JUDGE_MODEL", "gpt-6-luna"),
         openai_stt_model=os.getenv("OPENAI_STT_MODEL", "whisper-1"),
         openai_correction_model=os.getenv("OPENAI_CORRECTION_MODEL", "gpt-6-luna"),
         correction_max_jamo_ratio=os.getenv("CORRECTION_MAX_JAMO_RATIO", "0.45"),
@@ -200,10 +215,11 @@ def load_settings(env_file: str | Path | None = ".env") -> Settings:
         persona_orchestrator=os.getenv("PERSONA_ORCHESTRATOR", "false").strip() or "false",
         orchestrator_trace_dir=os.getenv("ORCHESTRATOR_TRACE_DIR"),
         orchestrator_assembler=os.getenv("ORCHESTRATOR_ASSEMBLER", "legacy").strip() or "legacy",
-        orchestrator_rules=os.getenv("ORCHESTRATOR_RULES", "legacy").strip() or "legacy",
-        orchestrator_shots=os.getenv("ORCHESTRATOR_SHOTS", "system").strip() or "system",
-        persona_prompt_builder=os.getenv("PERSONA_PROMPT_BUILDER", "legacy").strip() or "legacy",
+        orchestrator_rules=os.getenv("ORCHESTRATOR_RULES", "layered").strip() or "layered",
+        orchestrator_shots=os.getenv("ORCHESTRATOR_SHOTS", "messages").strip() or "messages",
+        persona_prompt_builder=os.getenv("PERSONA_PROMPT_BUILDER", "layered").strip() or "layered",
         persona_death_talk=os.getenv("PERSONA_DEATH_TALK", "intake").strip() or "intake",
+        style_card_min_utts=os.getenv("STYLE_CARD_MIN_UTTS", "30"),
         orchestrator_persona_dir=os.getenv("ORCHESTRATOR_PERSONA_DIR"),
         orchestrator_precheck=os.getenv("ORCHESTRATOR_PRECHECK", "noop").strip() or "noop",
         orchestrator_precheck_threshold=os.getenv("ORCHESTRATOR_PRECHECK_THRESHOLD", "0.6"),
@@ -212,6 +228,9 @@ def load_settings(env_file: str | Path | None = ".env") -> Settings:
         orchestrator_selector=os.getenv("ORCHESTRATOR_SELECTOR", "passthrough").strip() or "passthrough",
         orchestrator_selector_st_top_k=os.getenv("ORCHESTRATOR_SELECTOR_ST_TOPK", "5"),
         orchestrator_selector_threshold=os.getenv("ORCHESTRATOR_SELECTOR_THRESHOLD", "0.18"),
+        memory_full_max=os.getenv("MEMORY_FULL_MAX", "400"),
+        query_rewrite=os.getenv("QUERY_REWRITE", "off").strip() or "off",
+        style_late_note=os.getenv("STYLE_LATE_NOTE", "on").strip() or "on",
     )
 
 

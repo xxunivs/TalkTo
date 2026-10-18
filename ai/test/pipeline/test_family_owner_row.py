@@ -227,9 +227,9 @@ class AssemblyFlagTest(unittest.TestCase):
             {"subjectContext": SUBJECT,
              "intakeContext": {"basicProfile": {"status": "사망"}, "audience": "나와 내가 초대한 사람만",
                                "familyMap": POLITE_ROWS}})
-        s = Settings(openai_api_key=SecretStr("sk-test"))
-        legacy = assemble_persona_instructions(req, s).instructions
-        layered = assemble_persona_instructions(req, s.model_copy(update={"persona_prompt_builder": "layered"}))
+        s = Settings(openai_api_key=SecretStr("sk-test"))  # 기본 조립기는 layered(세션 14)
+        legacy = assemble_persona_instructions(req, s.model_copy(update={"persona_prompt_builder": "legacy"})).instructions
+        layered = assemble_persona_instructions(req, s)
         self.assertIn(LEGACY_OWNER_LINE, legacy)
         self.assertIn(LAYERED_OWNER_LINE, layered.instructions)
         for text in (legacy, layered.instructions):

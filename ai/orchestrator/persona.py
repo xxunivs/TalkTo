@@ -39,9 +39,14 @@ def subject_name_from(instructions: str) -> str | None:
     return m.group(1) if m else None
 
 
+def has_layered_rules(instructions: str) -> bool:
+    """4층 생성기가 L1(공통 규칙)까지 넣어 만든 지시문인가. 두 제목은 L1 에만 있다."""
+    return any(k in instructions for k in _LAYERED_MARKS)
+
+
 def infer_profile(instructions: str) -> PersonaProfile:
     public = any(k in instructions for k in _PUBLIC_MARKS)
-    if any(k in instructions for k in _LAYERED_MARKS):  # 4층 지시문: 공통 규칙의 사망 문구로 오판하지 않게
+    if has_layered_rules(instructions):  # 4층 지시문: 공통 규칙의 사망 문구로 오판하지 않게
         deceased = _LAYERED_AFTERLIFE in instructions
     elif public:
         deceased = "사후 페르소나" in instructions

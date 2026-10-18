@@ -6,7 +6,7 @@
     .venv\\Scripts\\python.exe experiments\\prompt_compare\\batch.py summarize --batch <id>
     --tiers 1,2,3  --reps-scale 1.0  --mock
 
-모델: 생성·인터뷰 추출 = .env OPENAI_CHAT_MODEL(gpt-6-luna). 판정 = .env OPENAI_JUDGE_MODEL(팀 설정 gpt-5.5, 채점 대상보다 강한 모델)
+모델: 생성·인터뷰 추출 = .env OPENAI_CHAT_MODEL(gpt-6-luna). 판정 = .env OPENAI_JUDGE_MODEL(gpt-6-luna, 비용 때문에 생성과 같은 모델)
       → *.judged55.jsonl. 같은 답을 luna 로도 판정해(*.judged.jsonl) 두 판정기의 일치도를 같이 본다(싸다).
       이미 생성된 답은 다시 만들지 않고, 빠진 판정만 채운다 → 같은 묶음 이름으로 다시 실행하면 이어진다.
 
@@ -203,7 +203,7 @@ def agreement(batch: str, suffix: str) -> list[str]:
 
 def summarize(batch: str, mock: bool = False, prices: dict | None = None, judged: str | None = None) -> Path:
     suffix = "_MOCK" if mock else ""
-    if judged is None:  # 주 판정기(gpt-5.5) 결과가 있으면 그걸로
+    if judged is None:  # 주 판정기(.env OPENAI_JUDGE_MODEL) 결과가 있으면 그걸로
         judged = "judged55" if any(RES.glob(f"answers_*_r*_{batch}{suffix}.judged55.jsonl")) else "judged"
     sets = {r["iid"]: r for r in C.rj(DATA / "sets.jsonl")}
     per: dict[str, list[dict]] = {}
@@ -306,13 +306,13 @@ def main() -> None:
     ap.add_argument("--reps-scale", type=float, default=1.0)
     ap.add_argument("--workers", type=int, default=20, help="동시 호출 수")
     ap.add_argument("--judge55", choices=["none", "r1", "all"], default="none",
-                    help="gpt-5.5 주 판정: none / r1(반복 1회차만) / all")
+                    help="주 판정(.env OPENAI_JUDGE_MODEL): none / r1(반복 1회차만) / all")
     ap.add_argument("--mock", action="store_true")
     ap.add_argument("--only", help="이 조건만(쉼표로), 예: layered")
-    ap.add_argument("--judged", choices=["judged", "judged55"], help="요약에 쓸 판정(기본: gpt-5.5 판정이 있으면 그것)")
+    ap.add_argument("--judged", choices=["judged", "judged55"], help="요약에 쓸 판정(기본: 주 판정 결과가 있으면 그것)")
     a = ap.parse_args()
-    # 판정 가격은 주 판정기 gpt-5.5 기준(입력 $5 — 제3자 정리, 출력 $30 은 추정). luna 판정은 그보다 훨씬 싸서 합계에 안 넣음
-    prices = {"in": 0.10, "cached": 0.01, "out": 0.50, "j_in": 5.0, "j_out": 30.0}
+    # 판정 가격은 주 판정기 기준. 지금은 gpt-6-luna(가정값 입력 $0.10·출력 $0.50 /1M, 확인 전)
+    prices = {"in": 0.10, "cached": 0.01, "out": 0.50, "j_in": 0.10, "j_out": 0.50}
     tiers = {int(t) for t in a.tiers.split(",") if t.strip()}
     if a.only:
         ONLY.update(x.strip() for x in a.only.split(",") if x.strip())

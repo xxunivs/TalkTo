@@ -23,13 +23,14 @@ from pipeline.persona_prompt.spec import PersonaSpec
 TOGGLE = {"intake": None, "off": False, "on": True}
 
 
-def for_assembly(request: PersonaAssemblyRequest, default_death_talk: str = "intake") -> PersonaSpec:
+def for_assembly(request: PersonaAssemblyRequest, default_death_talk: str = "intake",
+                 style_card_min_utts: int = 30) -> PersonaSpec:
     spec = spec_from_intake(request.subject_context, request.intake_context)
     if request.death_talk is not None:
         apply_death_toggle(spec, request.death_talk, "request")
     else:
         apply_death_toggle(spec, TOGGLE[default_death_talk], "setting")
-    spec.style.card = card_from_utterances(request.speech_examples)
+    spec.style.card = card_from_utterances(request.speech_examples, min_utts=style_card_min_utts)
     if spec.style.card:
         spec.add_material("transcript")
     return spec

@@ -2,7 +2,7 @@
 
 TalkTo 페르소나 제작과 대화를 위한 AI 서버. 녹음 분석, 페르소나 프롬프트 생성, 기억 임베딩, 음성 합성, 그리고 대화 한 턴을 처리하는 중간계층을 담는다.
 
-**4층 페르소나 프롬프트 생성기**와 **중간계층(orchestrator)** 도 이 레포에 있다. 새 기능은 전부 환경 변수로 켜며, 기본값에서는 기존 동작과 같다.
+**4층 페르소나 프롬프트 생성기**와 **중간계층(orchestrator)** 도 이 레포에 있다. 페르소나를 만들 때는 기본으로 4층 생성기를 쓰고, 중간계층은 환경 변수로 켠다(코드 기본은 꺼짐 → 대화 한 턴은 기존 경로와 같다).
 
 ```text
 프론트 → BE(talkto_api_server) → 이 서버(/v1/...) → OpenAI · Fish Audio · ElevenLabs
@@ -11,6 +11,26 @@ TalkTo 페르소나 제작과 대화를 위한 AI 서버. 녹음 분석, 페르�
 BE 가 사용자 인증·동의·운영 DB 저장과 기억 검색을 맡고, 이 서버는 BE 가 보낸 프롬프트·기억·voice ID 로 답을 만든다.
 
 텍스트 응답은 다 만든 뒤 한 번에 돌려준다(스트리밍 아님).
+
+## 켜는 법 (먼저 읽기)
+
+**지금 기본값이 4층 프롬프트다.** 따로 설정하지 않아도 새로 만드는 페르소나는 4층 프롬프트로 만들어진다. 웹 화면에는 이 설정이 없고, 서버 환경 변수로만 바꾼다.
+
+| 변수 | 기본 | 뜻 |
+|---|---|---|
+| `PERSONA_PROMPT_BUILDER` | `layered` | 페르소나를 만들 때(`/v1/persona/assembly`) 4층 프롬프트를 쓴다 |
+| `ORCHESTRATOR_RULES` | `layered` | 중간계층을 켰을 때 공통 규칙도 4층 것을 쓴다 |
+| `ORCHESTRATOR_SHOTS` | `messages` | 중간계층을 켰을 때 실제 주고받기를 대화 메시지로 넣는다 |
+| `STYLE_LATE_NOTE` | `on` | 지시문에 말투 카드와 짧은 말투 규칙이 있으면 마지막 가족 말 바로 앞에 말투 덧붙임을 넣는다(존댓말로 대하는 상대·공개 본인 페르소나 제외) |
+| `PERSONA_ORCHESTRATOR` | `false` | 중간계층은 코드 기본으로 끈다. 사전 판정·가드는 지어내기를 줄이지만 답을 놓치는 일이 크게 늘었다 |
+
+- **넣는 곳**: 로컬은 `.env`. 운영(AWS)은 BE `deploy/aws/deploy.py` 가 이 레포 `.env` 에서 `infra/setting.py` 가 읽는 이름만 골라 올린다. 값을 바꾼 뒤 다시 배포(재시작)해야 반영된다.
+- **예전으로 되돌리기**: `PERSONA_PROMPT_BUILDER=legacy` (중간계층을 켜 쓰던 경우 `ORCHESTRATOR_RULES=legacy`, `ORCHESTRATOR_SHOTS=system` 도). 말투 덧붙임은 `STYLE_LATE_NOTE=off`.
+- **이미 만든 페르소나는 바뀌지 않는다.** 페르소나 지시문은 만들 때 한 번 생성돼 BE DB 에 저장되고, 대화할 때는 저장된 글을 그대로 쓴다. 환경 변수를 바꿔도 기존 페르소나는 예전 지시문으로 대화한다. 확인하려면 배포 뒤 페르소나를 새로 만든다.
+- **중간계층 + 4층 지시문**: `ORCHESTRATOR_RULES=layered` 에서 등록부 없이 4층 지시문(L1 포함)이 오면 공통 규칙을 앞에 다시 붙이지 않는다(만들 때 정한 사망 정책이 한 벌만 남는다). 그래서 `prompts/rules` 를 고쳐도 이미 만든 4층 페르소나에는 닿지 않는다.
+- **가져온 지침**(BE '페르소나 가져오기', `persona.fixedPrompt`)은 늘 기존 경로이고 말투 덧붙임도 넣지 않는다(MVP 때와 같은 메시지).
+- **기존 페르소나를 4층으로 다시 만들기**: 아직 깔끔한 방법이 없다. 이 서버의 `/v1/persona/assembly` 를 처음과 같은 재료(subjectContext·intakeContext·speechExamples)로 다시 불러 받은 `instructions` 로 BE DB 의 지시문을 바꿔야 하는데, 이 레포에는 그걸 해 주는 기능이 없다(BE 쪽 재생성 기능이나 DB 수동 갱신이 필요). 로컬에 파이프라인 산출물이 있으면 `python -m pipeline.persona_prompt build --subject <대상자>` 로 지시문 글은 만들 수 있지만, DB 에 넣는 건 역시 손으로 해야 한다.
+- **한계**: `/v1/persona/assembly` 요청에는 통화 주고받기가 없어서 웹으로 만든 페르소나에는 실제 주고받기가 들어가지 않는다(`ORCHESTRATOR_SHOTS` 는 중간계층 + 페르소나 등록부가 있을 때만 효과가 있다. 운영은 등록부를 쓰지 않는다). `speechExamples` 가 `STYLE_CARD_MIN_UTTS`(30)개 미만이면 말투 카드도, 말투 덧붙임도 빠진다.
 
 ## 폴더
 
@@ -83,16 +103,16 @@ python -m pipeline.persona_prompt extract-interview --subject <대상자>   # LL
 
 ## 환경 변수(기능 플래그)
 
-기본값은 모두 기존 동작이다.
+4층 프롬프트 관련 변수(`PERSONA_PROMPT_BUILDER`·`ORCHESTRATOR_RULES`·`ORCHESTRATOR_SHOTS`·`STYLE_LATE_NOTE`)만 기본이 새 동작이고, 나머지는 기존 동작이다.
 
 | 변수 | 기본 | 뜻 |
 |---|---|---|
-| `PERSONA_PROMPT_BUILDER` | `legacy` | `/v1/persona/assembly`·로컬 s3_c 조립기. `layered` 면 4층 생성기 |
+| `PERSONA_PROMPT_BUILDER` | `layered` | `/v1/persona/assembly`·로컬 s3_c 조립기. `legacy` 면 예전 조립기 |
 | `PERSONA_DEATH_TALK` | `intake` | 사인·임종 질문: 설문 그대로 / `off` 말하지 않음 / `on` 물으면 짧게. 요청의 `deathTalk` 가 우선 |
 | `PERSONA_ORCHESTRATOR` | `false` | `/v1/persona/responses` 를 중간계층으로 처리 |
 | `ORCHESTRATOR_ASSEMBLER` | `legacy` | `structured` 면 공통 규칙 + 페르소나 + 말투 재료 + 기억 순으로 조립 |
-| `ORCHESTRATOR_RULES` | `legacy` | `layered` 면 L1 모듈 사용. 등록부에 spec.json 이 있으면 런타임 절(지금 상대·이미 한 말)도 붙인다 |
-| `ORCHESTRATOR_SHOTS` | `system` | 실제 주고받기를 지시문 안 글로 / `messages` 면 기억 뒤 대화 메시지로 |
+| `ORCHESTRATOR_RULES` | `layered` | structured 조립의 공통 규칙. `layered` 면 L1 모듈이고(등록부 없이 4층 지시문이 오면 다시 붙이지 않는다), 등록부에 spec.json 이 있으면 런타임 절(지금 상대·이미 한 말)도 붙인다. `legacy` 면 예전 규칙 + 사인 정책 절 |
+| `ORCHESTRATOR_SHOTS` | `messages` | 실제 주고받기를 기억 뒤 대화 메시지로 / `system` 이면 지시문 안 글로 |
 | `ORCHESTRATOR_PERSONA_DIR` | 없음 | 페르소나 등록부(profile.json, spec.json, style_card.md, shots.jsonl, restricted.json, intake.json) |
 | `ORCHESTRATOR_SELECTOR` | `passthrough` | `tiered` 면 장기 기억 전부 + 단기 기억은 발화 분해 단서로 검색 |
 | `ORCHESTRATOR_PRECHECK` | `noop` | `coverage`/`coverage_v11` 이면 기억이 질문 화제를 못 덮을 때 "모른다·되묻기" 지시 |
@@ -101,6 +121,10 @@ python -m pipeline.persona_prompt extract-interview --subject <대상자>   # LL
 | `ORCHESTRATOR_TRACE_DIR` | 없음 | 턴마다 추적 로그(jsonl, 대화 원문 포함 — git 밖 경로에) |
 | `ORCHESTRATOR_PRECHECK_THRESHOLD` | `0.6` | 사전 판정 커버율 임계 |
 | `ORCHESTRATOR_SELECTOR_ST_TOPK` / `_THRESHOLD` | `5` / `0.18` | tiered 선택의 단기 기억 개수·코사인 임계 |
+| `MEMORY_FULL_MAX` | `400` | `/responses` 에 기억이 이보다 많이 오면 경고 로그(+중간계층 trace). 자르지 않는다. 넘으면 검색으로 바꾸는 것은 BE |
+| `QUERY_REWRITE` | `off` | `on` 이면 `/v1/embeddings/query` 에 `history` 가 올 때 최근 메시지 4개로 질문을 다시 써서 임베딩(LLM 1회), 응답에 `rewrittenQuery`. BE 는 대화 때 최근 메시지 4개를 늘 보낸다(꺼져 있으면 쓰지 않는다) |
+| `STYLE_CARD_MIN_UTTS` | `30` | 4층 조립에서 말투 카드를 붙이는 `speechExamples` 최소 개수 |
+| `STYLE_LATE_NOTE` | `on` | 지시문에 말투 카드와 짧은 말투 규칙이 있으면 `/responses` 의 마지막 가족 말 바로 앞에 말투 덧붙임 system 메시지를 넣는다(중간계층 포함). 가져온 지침, 듣는 사람 줄이 존댓말인 지시문(가족 공유의 사위·며느리 등), 공개 본인 페르소나(`# 방문자`)에는 넣지 않는다(덧붙임 예시가 반말). `off` 로 끔 |
 
 자세한 계약과 단계별 구현은 [orchestrator/CONTRACT.md](orchestrator/CONTRACT.md).
 
@@ -157,7 +181,7 @@ python tools/export_manual_persona.py --src output/<대상자>_manual --voice-id
 | 기능 | 기본 모델 |
 |---|---|
 | 페르소나 응답·녹음 분석·기억 추출·전사 교정 | `gpt-6-luna` |
-| 품질 평가 채점 | `gpt-5.5` |
+| 품질 평가 채점 | `gpt-6-luna` |
 | 녹음 전사와 화자 분리 | ElevenLabs Scribe `scribe_v2` |
 | 대화 음성 전사 | OpenAI `whisper-1` |
 | 목소리 기반 화자 식별 | SpeechBrain ECAPA-TDNN |

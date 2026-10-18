@@ -15,8 +15,9 @@ from types import SimpleNamespace
 from orchestrator.contracts import (
     MemoryItem, MemorySelection, PrecheckResult, PromptBundle, PromptSection, SessionState, TurnInput,
 )
-from pipeline.s3_synthesis.c_build_system_prompt import build_memory_block
+from pipeline.s3_synthesis.c_build_system_prompt import build_memory_block, late_style_note
 from orchestrator.guard import HEADER_RULE, header_block
+from orchestrator.persona import has_layered_rules
 from orchestrator.restricted import brief_rule, redact_instructions
 from pipeline.persona_prompt.layers import SHOTS_MODES, RuntimeContext, runtime_section
 from pipeline.s3_synthesis.common_rules import (
@@ -25,7 +26,7 @@ from pipeline.s3_synthesis.common_rules import (
 
 
 def legacy_memory_block(memories: list[MemoryItem]) -> str:
-    return build_memory_block([SimpleNamespace(title=m.title, content=m.text) for m in memories])
+    return build_memory_block([SimpleNamespace(id=m.id, title=m.title, content=m.text) for m in memories])
 
 
 def delta_block(delta: list[MemoryItem]) -> str:
@@ -41,6 +42,9 @@ def delta_block(delta: list[MemoryItem]) -> str:
 class LegacyAssembler:
     impl = "legacy_v0"
 
+    def __init__(self, *, late_note: bool = False) -> None:
+        self.late_note = late_note  # STYLE_LATE_NOTE=on: 기존 경로와 같게 마지막 말 앞에 말투 덧붙임
+
     def assemble(self, turn: TurnInput, state: SessionState, selection: MemorySelection,
                  precheck: PrecheckResult) -> PromptBundle:
         sections = [PromptSection(name="persona", role="system", content=turn.persona_instructions)]
@@ -54,6 +58,9 @@ class LegacyAssembler:
             sections.append(PromptSection(name="directive", role="system", content=precheck.directive))
         for i, t in enumerate(turn.history):
             sections.append(PromptSection(name=f"history{i}", role=t.role, content=t.content))
+        note = late_style_note(turn.persona_instructions) if self.late_note else ""
+        if note:
+            sections.append(PromptSection(name="late_style", role="system", content=note))
         sections.append(PromptSection(name="message", role="user", content=turn.message))
         return PromptBundle(sections=sections)
 
@@ -122,13 +129,15 @@ class StructuredAssembler:
     """공통 규칙 md → 페르소나(중복 제거) → 말투 카드·실제 발화 → 기억 → 델타 → 지시 → 세션 → 최근 턴 → 발화.
 
     첫 system 메시지는 "# 공통 규칙 …" + "# 페르소나" + 지시문이고, 말투 카드·실제 발화도 같은 메시지 뒤에 붙인다.
+    rules="layered" 인데 등록부 없이 4층 지시문(L1 포함)이 오면 공통 규칙을 다시 붙이지 않고 지시문만 쓴다.
     정적인 것을 앞에 둬 프롬프트 캐시를 살린다.
     """
     impl = "structured_v1"
 
     def __init__(self, profiles, *, max_recent_turns: int = 6, header: bool = False, rules: str = "legacy",
-                 shots_mode: str = "system") -> None:
+                 shots_mode: str = "system", late_note: bool = False) -> None:
         self.profiles = profiles
+        self.late_note = late_note  # STYLE_LATE_NOTE=on: 마지막 말 앞에 말투 덧붙임(카드가 등록부에서 와도 head 로 가린다)
         # shots_mode="messages": 실제 주고받기를 지시문 글 대신 기억 뒤 user/assistant 메시지로 넣는다
         if shots_mode not in SHOTS_MODES:
             raise ValueError(f"shots_mode must be one of {SHOTS_MODES}")
@@ -150,7 +159,11 @@ class StructuredAssembler:
         prof = self.profiles.profile_for(turn)
         flags = dict(public=prof.public, deceased=prof.deceased, has_family=prof.has_family)
         instructions, _ = redact_instructions(turn.persona_instructions, prof.restricted)
-        if self.rules == "layered":
+        if self.rules == "layered" and prof.source == "inferred" and has_layered_rules(instructions):
+            # 등록부 없이 4층 지시문을 받았다: L1(만들 때 정한 사망 정책 포함)이 이미 들어 있다. 앞에 다시 붙이면
+            # 사망 정책이 두 벌(앞 deny + 저장 ask_only 등)이 되고, 추정한 가족 유무로 다른 줄도 어긋난다.
+            rules, extra = None, None
+        elif self.rules == "layered":
             r = prof.restricted
             rules = render_rules("layered", **flags,
                                  death_policy=(r.policy if r is not None and prof.deceased else "deny"),
@@ -160,14 +173,14 @@ class StructuredAssembler:
         else:
             rules = render_common_rules(**flags)
             extra = brief_rule(prof.restricted)
-        if prof.restricted is None:
+        if rules is not None and prof.restricted is None:
             # 등록부가 사망 정책을 주지 않았으면 지시문이 이미 고른 사망 규칙을 쓴다(위 deny 는 기본값일 뿐)
             rules = adopt_death_rule(rules, instructions)
-        rule_lines = {ln.strip() for ln in rules.splitlines() if ln.strip().startswith("- ")}
+        rule_lines = {ln.strip() for ln in (rules or "").splitlines() if ln.strip().startswith("- ")}
         persona = dedupe_rules(instructions, rule_lines)
         # legacy 머리말은 측정한 프롬프트와 글자까지 같게 둔다
         label = "prompts/rules" if self.rules == "layered" else "shared_rules.md"
-        head = f"# 공통 규칙 (모든 페르소나 공통, {label})\n" + rules + "\n\n# 페르소나\n" + persona
+        head = persona if rules is None else f"# 공통 규칙 (모든 페르소나 공통, {label})\n" + rules + "\n\n# 페르소나\n" + persona
         if extra:
             head += "\n\n" + extra
         # 지시문(4층 생성기 결과 등)에 이미 들어 있으면 다시 붙이지 않는다
@@ -203,6 +216,9 @@ class StructuredAssembler:
             sections.append(PromptSection(name="session", role="system", content=session))
         for i, t in enumerate(history):
             sections.append(PromptSection(name=f"history{i}", role=t.role, content=t.content))
+        note = late_style_note(head) if self.late_note else ""
+        if note:
+            sections.append(PromptSection(name="late_style", role="system", content=note))
         sections.append(PromptSection(name="message", role="user", content=turn.message))
         return PromptBundle(sections=sections)
 

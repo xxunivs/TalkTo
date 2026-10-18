@@ -28,7 +28,8 @@ def create_embeddings(
     return generate_embeddings(request, settings=settings)
 
 
-@router.post("/embeddings/query", response_model=QueryEmbeddingResponse)
+# exclude_none: 질문을 다시 쓰지 않았으면 rewrittenQuery 칸 자체를 빼서 지금 응답과 같은 모양을 지킨다
+@router.post("/embeddings/query", response_model=QueryEmbeddingResponse, response_model_exclude_none=True)
 def create_query_embedding(
     request: QueryEmbeddingRequest,
     _authorized: InternalRequest,

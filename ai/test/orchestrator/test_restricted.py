@@ -20,8 +20,10 @@ MEMS = [MemoryItem(id="m1", text="된장찌개를 잘 끓였다."),
         MemoryItem(id="m3", text="가족이 가상병 얘기를 했다.")]
 
 
-def _orch(assembler="structured", persona_dir=PDIR):
-    s = Settings(openai_api_key=SecretStr("k"), orchestrator_assembler=assembler, orchestrator_persona_dir=persona_dir)
+def _orch(assembler="structured", persona_dir=PDIR, rules="legacy"):
+    # 사인 정책 별도 절(brief_rule)은 legacy 규칙 경로의 동작이라 rules 를 legacy 로 고정한다(layered 는 test_persona_prompt)
+    s = Settings(openai_api_key=SecretStr("k"), orchestrator_assembler=assembler, orchestrator_persona_dir=persona_dir,
+                 orchestrator_rules=rules)
     o = build_default(s)
     o.llm = FakeLLM()
     return o

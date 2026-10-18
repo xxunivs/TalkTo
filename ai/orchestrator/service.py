@@ -28,6 +28,7 @@ from orchestrator.pipeline import PersonaOrchestrator, TurnRun
 from orchestrator.post_turn import RecordTurn
 from orchestrator.precheck import CoveragePrecheck, CoveragePrecheckV11, NoopPrecheck
 from orchestrator.session import InMemorySessionStore
+from pipeline.s3_synthesis.c_build_system_prompt import warn_if_over_full_max
 
 log = logging.getLogger(__name__)
 _lock = threading.Lock()
@@ -58,10 +59,11 @@ def build_registry(settings: Settings) -> PersonaRegistry:
 
 def build_assembler(settings: Settings, kind: str | None = None, registry: PersonaRegistry | None = None):
     kind = kind or settings.orchestrator_assembler
+    late = settings.style_late_note == "on"
     if kind == "structured":
         return StructuredAssembler(registry or build_registry(settings), header=settings.orchestrator_guard in ("v1", "v11"),
-                                   rules=settings.orchestrator_rules, shots_mode=settings.orchestrator_shots)
-    return LegacyAssembler()
+                                   rules=settings.orchestrator_rules, shots_mode=settings.orchestrator_shots, late_note=late)
+    return LegacyAssembler(late_note=late)
 
 
 def build_guard(settings: Settings, kind: str | None = None, registry: PersonaRegistry | None = None):
@@ -139,12 +141,13 @@ def reset_orchestrator() -> None:
         _instance = None
 
 
-def write_trace(trace_dir: Path, run: TurnRun, components: dict[str, str]) -> None:
+def write_trace(trace_dir: Path, run: TurnRun, components: dict[str, str], flags: dict | None = None) -> None:
     trace_dir.mkdir(parents=True, exist_ok=True)
     day = datetime.now(timezone.utc).strftime("%Y%m%d")
     row = {
         "at": datetime.now(timezone.utc).isoformat(),
         "components": components,
+        **({"flags": flags} if flags else {}),
         "turn": run.turn.model_dump(),
         "state": run.state.model_dump() if run.state else None,
         "trace": [t.model_dump() for t in run.trace],
@@ -156,11 +159,13 @@ def write_trace(trace_dir: Path, run: TurnRun, components: dict[str, str]) -> No
 
 def orchestrate_persona_response(request: PersonaResponseRequest, *, settings: Settings,
                                  orchestrator: PersonaOrchestrator | None = None) -> PersonaResponseResult:
+    over = warn_if_over_full_max(len(request.memories), settings)
     orch = orchestrator or get_orchestrator(settings)
     run = orch.run(turn_from_request(request))
     if settings.orchestrator_trace_dir:
+        flags = {"memory_over_full_max": {"n": len(request.memories), "max": settings.memory_full_max}} if over else None
         try:
-            write_trace(settings.orchestrator_trace_dir, run, orch.describe())
+            write_trace(settings.orchestrator_trace_dir, run, orch.describe(), flags)
         except OSError:  # 추적 로그 실패가 응답을 막으면 안 된다
             log.exception("orchestrator trace write failed")
     res = run.result

@@ -54,7 +54,7 @@ PersonaResponseRequest ─turn_from_request→ TurnInput
 [system] 참고 기억 → [system] 이번 통화에서 새로 들은 것(델타)
 [user/assistant …] 실제 주고받기(ORCHESTRATOR_SHOTS=messages)
 [system] 사전 판정 지시 → [system] 지금 상황(런타임 절)
-[history …] → [user] 발화
+[history …] → [system] 말투 덧붙임(STYLE_LATE_NOTE, 범위 안일 때만) → [user] 발화
 ```
 
 정적인 것을 앞에 둬 프롬프트 캐시를 살린다.
@@ -64,6 +64,9 @@ PersonaResponseRequest ─turn_from_request→ TurnInput
   - 화자를 알면: 가족 표의 그 사람 줄(부르는 말·자기를 가리키는 말·말 높이)을 다시 짚는다. 화자 힌트가 관계말("손녀")이면 그 관계인 사람이 한 명일 때만 그 줄을 쓰고, 여럿이면 확인하라고 한다. 표에 없는 사람이면 아는 척하지 말라고 한다.
   - 화자를 모르면(비공개·가족 있음): 호칭을 단정하지 말고 확인하라고 한다.
   - 대화가 길어지면(앞 대화 6개 이상): 이미 한 챙김·'사랑해'만 짚어 반복하지 않게 한다.
+  - 등록부 없이(추정 프로필) 4층 지시문(L1 표지 `# 말하는 형식`·`# 기억을 쓰는 법`)이 오면 공통 규칙을 앞에 다시 붙이지 않고 지시문을 그대로 첫 system 으로 쓴다. 만들 때 정한 사망 정책이 한 벌만 남고, 추정한 가족 유무로 다른 줄이 어긋나지 않는다(운영: 등록부 없음).
+- 말투 덧붙임(`STYLE_LATE_NOTE=on`, 기본): 첫 system 에 `# 말투 카드` 와 짧은 말투 줄(`- 기본은 1~2문장으로 짧게.`)이 함께 있으면 마지막 발화 바로 앞에 말투 덧붙임 system 을 넣는다. legacy 조립기와 기존 경로(`generate_persona_response`)도 같은 자리에 넣고, 가져온 지침(`fixedPrompt`)에는 넣지 않는다. 덧붙임 예시가 반말이라 지금 상대에게 존댓말을 쓰는 지시문(가족 표 듣는 사람 줄이 존댓말, 공개 본인 페르소나의 `# 방문자`)에도 넣지 않는다.
+- 참고 기억 블록(`build_memory_block`: 기존 경로·legacy 조립기·header 없는 structured)은 기억 id 순으로 고정해 넣는다(BE 가 보낸 순서와 무관 — 같은 기억이면 같은 글이라 프롬프트 캐시가 유지된다). guard v1/v11 의 (m번호) 블록(`header_block`)은 번호가 `parse_header` 와 맞아야 해서 선택 순서 그대로다. 기억이 `MEMORY_FULL_MAX`(400)보다 많으면 경고 로그와 trace `flags.memory_over_full_max` 만 남기고 자르지 않는다.
 
 ## 사망·임종 정책
 

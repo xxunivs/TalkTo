@@ -2,7 +2,9 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 from fastapi.testclient import TestClient
+from pydantic import SecretStr
 
+from infra.setting import Settings, get_settings
 from main import app
 
 
@@ -56,6 +58,75 @@ class EmbeddingsTest(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["embedding"], [0.1, 0.2])
+
+
+HISTORY = [{"role": "user", "content": "할머니 된장찌개 어떻게 끓여?"},
+           {"role": "assistant", "content": "멸치 육수 내고 된장 풀면 되지."},
+           {"role": "user", "content": "두부도 넣어?"},
+           {"role": "assistant", "content": "그럼, 두부 넣지."},
+           {"role": "user", "content": "호박은?"}]
+
+
+def _client(chat_content: str | Exception = '{"ask": true, "rewritten": "된장찌개에 된장 얼마나 넣어?"}') -> MagicMock:
+    client = MagicMock()
+    emb = MagicMock()
+    emb.data = [MagicMock(embedding=[0.5, 0.6])]
+    client.embeddings.create.return_value = emb
+    if isinstance(chat_content, Exception):
+        client.chat.completions.create.side_effect = chat_content
+    else:
+        chat = MagicMock()
+        chat.choices = [MagicMock(message=MagicMock(content=chat_content))]
+        client.chat.completions.create.return_value = chat
+    return client
+
+
+class QueryRewriteTest(unittest.TestCase):
+    """/v1/embeddings/query 의 질문 다시 쓰기(QUERY_REWRITE). 답 생성(/responses)과는 상관없다."""
+
+    def _post(self, body: dict, client: MagicMock, **settings):
+        app.dependency_overrides[get_settings] = lambda: Settings(openai_api_key=SecretStr("k"), **settings)
+        self.addCleanup(app.dependency_overrides.pop, get_settings, None)
+        with patch("infra.external_api.openai_client.OpenAI", return_value=client):
+            return TestClient(app).post("/v1/embeddings/query", json=body)
+
+    def test_off_by_default_response_unchanged(self) -> None:
+        self.assertEqual(Settings().query_rewrite, "off")
+        client = _client()
+        r = self._post({"text": "얼마나 넣어?", "history": HISTORY}, client)
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(set(r.json()), {"provider", "model", "dimensions", "embedding"})  # 지금 응답과 같은 칸
+        client.chat.completions.create.assert_not_called()
+        self.assertEqual(client.embeddings.create.call_args.kwargs["input"], ["얼마나 넣어?"])
+
+    def test_on_rewrites_with_last_four_messages(self) -> None:
+        client = _client()
+        r = self._post({"text": "얼마나 넣어?", "history": HISTORY}, client, query_rewrite="on")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()["rewrittenQuery"], "된장찌개에 된장 얼마나 넣어?")
+        self.assertEqual(client.embeddings.create.call_args.kwargs["input"], ["된장찌개에 된장 얼마나 넣어?"])
+        kw = client.chat.completions.create.call_args.kwargs
+        self.assertEqual(kw["model"], "gpt-6-luna")
+        prompt = kw["messages"][0]["content"]
+        self.assertNotIn("어떻게 끓여", prompt)  # 앞 대화는 최근 메시지 4개만(세션 14 E6 와 같음)
+        self.assertIn("대상자: 멸치 육수 내고 된장 풀면 되지.\n가족: 두부도 넣어?", prompt)
+        self.assertIn("[가족의 이번 말]\n얼마나 넣어?", prompt)
+        self.assertNotIn("{", prompt.split("형식:")[0])  # 자리표시자가 남지 않음
+
+    def test_on_without_history_skips_llm(self) -> None:
+        client = _client()
+        r = self._post({"text": "고향이 어디야?"}, client, query_rewrite="on")
+        self.assertNotIn("rewrittenQuery", r.json())
+        client.chat.completions.create.assert_not_called()
+
+    def test_on_failure_falls_back_to_original(self) -> None:
+        for bad in ("다시 쓸 수 없음", '{"ask": true, "rewritten": ""}', RuntimeError("rate limit")):
+            client = _client(bad)
+            with self.assertLogs("pipeline.s3_synthesis.d_build_memory_embedding", "WARNING"):
+                r = self._post({"text": "얼마나 넣어?", "history": HISTORY}, client, query_rewrite="on")
+            self.assertEqual(r.status_code, 200)
+            self.assertNotIn("rewrittenQuery", r.json())
+            self.assertEqual(client.embeddings.create.call_args.kwargs["input"], ["얼마나 넣어?"])
 
 
 if __name__ == "__main__":
