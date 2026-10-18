@@ -68,34 +68,43 @@ class SpeakerEmbedder:
     def embed_clip(
         self, audio_path: Path, *, start_ms: int | None = None, end_ms: int | None = None
     ) -> list[float]:
-        waveform = load_mono_16k(audio_path)
-        if start_ms is not None or end_ms is not None:
-            waveform = slice_ms(waveform, start_ms or 0, end_ms)
-        return self.embed_waveform(waveform)
+        raw = decode_to_raw(audio_path)
+        try:
+            return self.embed_waveform(read_clip(raw, start_ms or 0, end_ms))
+        finally:
+            raw.unlink(missing_ok=True)
 
     def embed_speakers(
         self, audio_path: Path, segments: list[TranscriptSegment]
     ) -> dict[str, list[float]]:
-        """녹음 하나에서 화자 라벨별 임베딩 생성."""
+        """녹음 하나에서 화자 라벨별 임베딩 생성.
+
+        녹음 전체를 메모리에 펼치지 않는다. 한 시간 녹음이면 펼치기만 230MB, 펼치는 동안은 두 배가
+        든다. 2시간 통화면 그것만으로 AI 컨테이너(2.5GB)가 강제 종료됐다(2026-10-18). 그래서 PCM 을
+        파일로 풀고 화자마다 쓸 구간(최대 60초)만 읽는다. 지문 값은 예전과 같다.
+        """
         import torch
 
-        waveform = load_mono_16k(audio_path)
-        clips: dict[str, list] = {}
-        budgets: dict[str, float] = {}
-        for segment in segments:
-            if segment.end_ms - segment.start_ms < MIN_SEGMENT_MS:
-                continue
-            used = budgets.get(segment.speaker_label, 0.0)
-            if used >= MAX_SPEECH_SECONDS:
-                continue
-            clip = slice_ms(waveform, segment.start_ms, segment.end_ms)
-            clips.setdefault(segment.speaker_label, []).append(clip)
-            budgets[segment.speaker_label] = used + clip.shape[1] / SAMPLE_RATE
+        raw = decode_to_raw(audio_path)
+        try:
+            clips: dict[str, list] = {}
+            budgets: dict[str, float] = {}
+            for segment in segments:
+                if segment.end_ms - segment.start_ms < MIN_SEGMENT_MS:
+                    continue
+                used = budgets.get(segment.speaker_label, 0.0)
+                if used >= MAX_SPEECH_SECONDS:
+                    continue
+                clip = read_clip(raw, segment.start_ms, segment.end_ms)
+                clips.setdefault(segment.speaker_label, []).append(clip)
+                budgets[segment.speaker_label] = used + clip.shape[1] / SAMPLE_RATE
 
-        return {
-            label: self.embed_waveform(torch.cat(parts, dim=1))
-            for label, parts in clips.items()
-        }
+            return {
+                label: self.embed_waveform(torch.cat(parts, dim=1))
+                for label, parts in clips.items()
+            }
+        finally:
+            raw.unlink(missing_ok=True)
 
 
 def identify_subject(
@@ -157,6 +166,42 @@ def slice_ms(waveform, start_ms: int, end_ms: int | None):
     start = int(start_ms * SAMPLE_RATE / 1000)
     end = int(end_ms * SAMPLE_RATE / 1000) if end_ms is not None else waveform.shape[1]
     return waveform[:, start:end]
+
+
+_BYTES_PER_SAMPLE = 4  # float32
+
+
+def decode_to_raw(audio_path: Path) -> Path:
+    """오디오 → mono 16kHz float32 PCM 파일(녹음 옆 '<이름>.f32'). 부르는 쪽이 지운다.
+
+    load_mono_16k 처럼 ffmpeg 으로 디코딩하되, 결과를 메모리가 아니라 파일로 받는다(read_clip 이
+    필요한 구간만 읽는다). 컨테이너의 임시 폴더는 디스크다(tmpfs 아님).
+    """
+    import subprocess
+
+    raw = audio_path.with_name(audio_path.name + ".f32")
+    subprocess.run(
+        ["ffmpeg", "-nostdin", "-loglevel", "error", "-y", "-i", str(audio_path),
+         "-ac", "1", "-ar", str(SAMPLE_RATE), "-f", "f32le", str(raw)],
+        check=True,
+        capture_output=True,
+    )
+    return raw
+
+
+def read_clip(raw_path: Path, start_ms: int, end_ms: int | None):
+    """decode_to_raw 파일에서 [start_ms, end_ms) 만 텐서(1, samples)로 읽는다(slice_ms 와 같은 범위)."""
+    import torch
+
+    total = raw_path.stat().st_size // _BYTES_PER_SAMPLE
+    start = min(total, int(start_ms * SAMPLE_RATE / 1000))
+    end = total if end_ms is None else min(total, int(end_ms * SAMPLE_RATE / 1000))
+    if end <= start:
+        return torch.zeros((1, 0), dtype=torch.float32)
+    with raw_path.open("rb") as handle:
+        handle.seek(start * _BYTES_PER_SAMPLE)
+        data = handle.read((end - start) * _BYTES_PER_SAMPLE)
+    return torch.frombuffer(bytearray(data), dtype=torch.float32).unsqueeze(0)
 
 
 # ===== 내용 기반 대상자 폴백 (ECAPA 성문 참조가 없을 때) =====
