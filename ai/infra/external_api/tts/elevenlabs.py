@@ -5,6 +5,7 @@ from typing import Protocol
 import httpx
 
 from infra.error import TTSProviderError
+from infra.external_api.elevenlabs_records import forget_speech
 
 
 @dataclass
@@ -137,6 +138,8 @@ class ElevenLabsTTSProvider:
             raise TTSProviderError(
                 f"ElevenLabs TTS 오류 {response.status_code}: {response.text[:200]}"
             )
+        # ElevenLabs 계정에 남는 대답 읽기 기록(대답 글·음성)을 바로 지운다
+        forget_speech(self.api_key, voice_id=voice_id, headers=response.headers)
         return TTSResult(
             audio=response.content,
             content_type="audio/mpeg",

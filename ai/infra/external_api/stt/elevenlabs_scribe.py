@@ -9,6 +9,7 @@ from typing import Protocol
 import httpx
 
 from infra.error import STTProviderError
+from infra.external_api.elevenlabs_records import forget_transcript
 from infra.schema.transcript import TranscriptSegment
 
 
@@ -88,6 +89,8 @@ class ElevenLabsScribeProvider:
                 f"Scribe error {response.status_code}: {response.text[:500]}"
             )
         body = response.json()
+        # ElevenLabs 계정에 남는 받아쓰기 기록(보낸 녹음·받아쓴 글)을 바로 지운다
+        forget_transcript(self._api_key, body)
 
         segments = group_scribe_words(body.get("words") or [])
         if not segments and (body.get("text") or "").strip():
