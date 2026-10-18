@@ -117,7 +117,7 @@ Fish 목소리 대답에만 쓴다. 대답 LLM 이 같은 호출에서 정한다
 
 ## BE 요청에서 받을 수 있는 필드(선택)
 
-`sessionId`, `speakerHint` — 없으면 None. BE 가 보내기 시작하면 세션 상태가 이어진다. `memories[].memoryType` — 없으면 장기로 본다. `persona.deceased` — `TurnInput.deceased` 로 옮겨 음성 감정 안전선에만 쓴다.
+`sessionId`, `speakerHint` — 없으면 None. BE 가 보내기 시작하면 세션 상태가 이어진다. `memories[].memoryType` — 없으면 장기로 본다. `persona.deceased` — `TurnInput.deceased` 로 옮겨 음성 감정 안전선에 쓰고, 등록부가 없을 때는 지시문 추정 대신 이 값으로 공통 규칙 변형(사후·사망 정책)을 고른다(`PersonaRegistry.profile_for`).
 
 응답의 `emotion`·`speechText` 는 기존 경로와 같은 뜻이다. `speechText` 는 있을 때만 칸이 생긴다.
 

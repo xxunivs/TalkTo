@@ -189,12 +189,17 @@ def decode_to_raw(audio_path: Path) -> Path:
     import subprocess
 
     raw = audio_path.with_name(audio_path.name + ".f32")
-    subprocess.run(
-        ["ffmpeg", "-nostdin", "-loglevel", "error", "-y", "-i", str(audio_path),
-         "-ac", "1", "-ar", str(SAMPLE_RATE), "-f", "f32le", str(raw)],
-        check=True,
-        capture_output=True,
-    )
+    try:
+        subprocess.run(
+            ["ffmpeg", "-nostdin", "-loglevel", "error", "-y", "-i", str(audio_path),
+             "-ac", "1", "-ar", str(SAMPLE_RATE), "-f", "f32le", str(raw)],
+            check=True,
+            capture_output=True,
+        )
+    except BaseException:
+        # 부르는 쪽은 raw 를 받기 전이라 지울 수 없다. 반쯤 쓴 PCM(디스크가 찬 경우 등)을 여기서 지운다
+        raw.unlink(missing_ok=True)
+        raise
     return raw
 
 

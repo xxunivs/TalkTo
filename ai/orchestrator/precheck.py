@@ -48,6 +48,19 @@ _RELATIONAL = re.compile(
     r"|별일\s*없\S{0,6}|밥\s*(?:은|잘|좀)?\s*(?:먹었|드셨|먹)\S{0,6}|식사\s*(?:하셨|했|하)\S{0,6}")
 
 
+# 위기(자해·자살 생각)와 그분의 죽음·임종을 묻는 말. 기억을 묻는 질문이 아니다.
+# '-어요'로 끝나 질문으로 잡히면 사전 판정이 "기억에 없다, 되물어라"를 넣고 가드가 위기 대답(109·119 안내 포함)을
+# "글쎄, 그건 기억이 잘 안 나네. 네가 얘기 좀 해 줄래?"로 갈아 끼웠다(고인에게 죽음 경위를 되묻는 셈).
+# 이런 말은 사전 판정·가드의 지어내기 검사(R1)를 건너뛰고 공통 규칙(위기 대응·사망 정책)을 따른다.
+SAFETY = re.compile(
+    r"죽고\s?싶|죽을\s?것\s?같|죽어\s?버리|사라지고\s?싶|없어지고\s?싶|살기\s?싫|살고\s?싶지\s?않"
+    r"|자살|자해|목숨|돌아가셨|돌아가신|임종|장례|세상을\s?떠|마지막\s?(?:순간|모습)")
+
+
+def is_safety_turn(text: str) -> bool:
+    return bool(SAFETY.search(text or ""))
+
+
 def _keep_if_adnominal(m: re.Match) -> str:
     """'잘 사시던 데', '잘하시던 거'처럼 '-던' 관형형은 화제를 꾸미는 말이라 떼지 않는다."""
     return m.group(0) if "던" in m.group(0) else " "
@@ -155,6 +168,8 @@ class CoveragePrecheck:
         return term in doc or any(s in doc for s in self.synonyms.get(term, ()))
 
     def check(self, turn: TurnInput, state: SessionState, selection: MemorySelection) -> PrecheckResult:
+        if is_safety_turn(turn.message):  # 위기·죽음 말에는 "모른다·되묻기"를 넣지 않는다
+            return PrecheckResult()
         body = strip_preamble(turn.message)
         if not body or not is_question(body):
             return PrecheckResult()
@@ -255,6 +270,8 @@ class CoveragePrecheckV11(CoveragePrecheck):
         return any(s in raw for s in self.extra.get(term, ()))
 
     def check(self, turn: TurnInput, state: SessionState, selection: MemorySelection) -> PrecheckResult:
+        if is_safety_turn(turn.message):  # 위기·죽음 말에는 "모른다·되묻기"를 넣지 않는다
+            return PrecheckResult()
         body, addr = self.question_text(turn)
         if not body or not is_question(body):
             return PrecheckResult()

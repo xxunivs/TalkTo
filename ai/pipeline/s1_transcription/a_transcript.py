@@ -10,6 +10,7 @@ from infra.schema.transcript import (
     TranscriptSegment,
 )
 from infra.external_api.audio import download_audio
+from infra.scratch import scratch_dir
 from pipeline.s1_transcription.c_correction import correct_segments
 from pipeline.s1_transcription.c_correction import build_glossary
 
@@ -44,7 +45,7 @@ def _identify_subject_speaker(
             str(request.reference_voice_sample_url),
             timeout_seconds=settings.audio_download_timeout_seconds,
             max_bytes=settings.max_audio_bytes,
-            temp_dir=settings.temp_dir,
+            temp_dir=scratch_dir(settings),
         )
     except AppError as error:  # 참조 샘플을 못 받아도 전사는 그대로 진행한다(대상자 미확정)
         logger.warning("reference voice sample download failed: %s", error.code)
@@ -78,7 +79,7 @@ def transcribe_recording(
         mime_type=request.audio_mime_type,
         timeout_seconds=settings.audio_download_timeout_seconds,
         max_bytes=settings.max_audio_bytes,
-        temp_dir=settings.temp_dir,
+        temp_dir=scratch_dir(settings),
     )
     try:
         result = provider.transcribe(

@@ -34,6 +34,14 @@ class Settings(BaseModel):
     openai_embedding_dimensions: int = Field(default=1536, gt=0)
     openai_timeout_seconds: float = Field(default=60, gt=0)
     openai_max_retries: int = Field(default=2, ge=0)
+    # 대화 대답 생성. BE 는 45초에 끊는다. 시간 한도 × (다시 하기 + 1) 이 45초보다 짧아야 BE 가 포기한 뒤에도
+    # 혼자 돌며 돈을 쓰지 않는다(기본 60초 × 3번이면 3분까지 돌았다).
+    openai_chat_timeout_seconds: float = Field(default=20, gt=0)
+    openai_chat_max_retries: int = Field(default=1, ge=0)
+    # 녹음 분석(인물·민감·기억·말투·요약)과 통찰. 긴 녹음은 답 하나에 60초가 넘게 걸려 늘 실패했다.
+    # BE 는 이 호출을 30분까지 기다린다.
+    openai_analysis_timeout_seconds: float = Field(default=300, gt=0)
+    openai_analysis_max_retries: int = Field(default=1, ge=0)
 
     # 목소리: 새 목소리는 늘 Fish Audio(drama-3)에서 만든다. 합성·지우기는 voice_id 로 만든 회사를
     # 알아본다(fish_… → Fish, TalkTo… → MiniMax, 그 밖 → ElevenLabs). 예전 회사 목소리는 다시 만들기 전까지 쓴다.
@@ -86,6 +94,7 @@ class Settings(BaseModel):
     min_speech_ms: int = Field(default=3_000, gt=0)
 
     max_audio_bytes: int | None = Field(default=None, gt=0)
+    # 임시 파일을 둘 곳. 실제로는 그 아래 talkto-ai 폴더 하나에 모은다(infra/scratch.py). None 이면 시스템 임시 폴더.
     temp_dir: Path | None = None
 
     # 중간계층(orchestrator/) — /v1/persona/responses 를 중간계층으로 처리. 꺼져 있으면 기존 경로.
@@ -189,6 +198,10 @@ def load_settings(env_file: str | Path | None = ".env") -> Settings:
         ),
         openai_timeout_seconds=os.getenv("OPENAI_TIMEOUT_SECONDS", "60"),
         openai_max_retries=os.getenv("OPENAI_MAX_RETRIES", "2"),
+        openai_chat_timeout_seconds=os.getenv("OPENAI_CHAT_TIMEOUT_SECONDS", "20"),
+        openai_chat_max_retries=os.getenv("OPENAI_CHAT_MAX_RETRIES", "1"),
+        openai_analysis_timeout_seconds=os.getenv("OPENAI_ANALYSIS_TIMEOUT_SECONDS", "300"),
+        openai_analysis_max_retries=os.getenv("OPENAI_ANALYSIS_MAX_RETRIES", "1"),
         # 배포(BE deploy.py)는 os.getenv 에 글자 그대로 적힌 이름만 운영 비밀값으로 옮긴다. 변수로 만들지 않는다.
         fish_audio_api_key=os.getenv("FISH_AUDIO_API_KEY") or None,
         tts_provider=os.getenv("TTS_PROVIDER") or "fish",

@@ -7,6 +7,7 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass, field
 
+from infra.error import EmptyReplyError
 from orchestrator.contracts import (
     LLM, Assembler, Generation, Guard, GuardResult, MemorySelection, MemorySelector, MemoryStore,
     PostTurn, Precheck, PrecheckResult, PromptBundle, SessionState, SessionStore, StageTrace,
@@ -106,6 +107,9 @@ class PersonaOrchestrator:
             lambda g: {"action": g.action, "reasons": g.reasons, "cited": g.cited_memory_ids})
         if until == "guard":
             return r
+        if not r.guard.text.strip():
+            # 빈 대답은 돌려주지 않는다(BE 가 저장하면 그 대화의 다음 턴이 모두 422 로 막혔다). 세션에도 남기지 않는다.
+            raise EmptyReplyError()
         r.next_state = self._timed(
             r, "post_turn", self.post_turn.impl, lambda: self.post_turn.after(turn, r.state, r.guard),
             lambda s: {"turn_index": s.turn_index, "counters": s.counters})

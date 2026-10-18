@@ -5,11 +5,10 @@ Generative Agents 방식: 개별 관찰(기억)을 가로질러 대상자를 설
 번호로 제시해 LLM이 번호로 인용하게 하고(긴 id 인용 오류 방지), 검증에서 실제 id로 되돌린다.
 """
 
-import json
 import logging
 
 from infra.setting import Settings
-from infra.external_api.openai_client import create_openai_client
+from infra.external_api.openai_client import analysis_client, analysis_completion, json_reply
 from infra.schema.insight import (
     Reflection,
     ReflectionRequest,
@@ -58,8 +57,10 @@ def _build_user_prompt(request: ReflectionRequest) -> str:
 def run_reflection(
     request: ReflectionRequest, *, settings: Settings
 ) -> ReflectionResponse:
-    client = create_openai_client(settings, "persona reflection")
-    response = client.chat.completions.create(
+    client = analysis_client(settings, "persona reflection")
+    response = analysis_completion(
+        client,
+        "persona reflection",
         model=settings.openai_analysis_model,
         response_format={"type": "json_object"},
         messages=[
@@ -67,7 +68,7 @@ def run_reflection(
             {"role": "user", "content": _build_user_prompt(request)},
         ],
     )
-    payload = json.loads(response.choices[0].message.content or "{}")
+    payload = json_reply(response, "persona reflection")
 
     id_by_number = {i: memory.id for i, memory in enumerate(request.memories, start=1)}
     reflections: list[Reflection] = []

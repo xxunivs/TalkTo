@@ -1,9 +1,9 @@
 from uuid import UUID
 
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from infra.schema.field_rule import ApiModel
-from infra.schema.persona import ConversationMessage
+from infra.schema.persona import ConversationMessage, drop_empty_turns
 
 
 class EmbeddingInput(ApiModel):
@@ -36,6 +36,8 @@ class QueryEmbeddingRequest(ApiModel):
     text: str = Field(min_length=1, max_length=50_000)
     # 선택: 앞 대화. QUERY_REWRITE=on 이면 최근 메시지 4개로 생략된 질문("얼마나 넣어?")을 채워 그 문장을 임베딩한다.
     history: list[ConversationMessage] = Field(default_factory=list, max_length=50)
+
+    _drop_empty_history = field_validator("history", mode="before")(drop_empty_turns)
 
 
 class QueryEmbeddingResponse(ApiModel):

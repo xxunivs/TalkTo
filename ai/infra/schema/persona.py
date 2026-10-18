@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import Field, model_serializer
+from pydantic import Field, field_validator, model_serializer
 
 from infra.schema.field_rule import ApiModel
 from infra.schema.subject import IntakeContext, SubjectContext
@@ -9,6 +9,22 @@ from infra.schema.subject import IntakeContext, SubjectContext
 class ConversationMessage(ApiModel):
     role: Literal["user", "assistant"]
     content: str = Field(min_length=1, max_length=20_000)
+
+
+def drop_empty_turns(value: object) -> object:
+    """앞 대화에서 글이 빈 줄을 뺀다(검증 전에).
+
+    예전에 빈 대답이 BE 에 저장된 대화는 그 줄이 최근 12줄 안에 남아 다음 턴이 모두 422 로 막혔다.
+    빈 줄은 대화에 아무것도 더하지 않으므로 빼고 진행한다(그런 대화가 다시 이어진다).
+    """
+    if not isinstance(value, list):
+        return value
+
+    def blank(item: object) -> bool:
+        content = item.get("content") if isinstance(item, dict) else getattr(item, "content", None)
+        return isinstance(content, str) and not content.strip()
+
+    return [item for item in value if not blank(item)]
 
 
 class MemoryContext(ApiModel):
@@ -42,6 +58,8 @@ class PersonaResponseRequest(ApiModel):
     # 앱에서 고른 가족 프로필 등 "지금 누가 말하나" 힌트
     speaker_hint: str | None = Field(default=None, max_length=200)
 
+    _drop_empty_history = field_validator("history", mode="before")(drop_empty_turns)
+
 
 class PersonaResponseResult(ApiModel):
     content: str
@@ -70,6 +88,8 @@ class MemoryCandidateRequest(ApiModel):
     user_message: str = Field(min_length=1, max_length=20_000)
     assistant_message: str = Field(min_length=1, max_length=20_000)
     history: list[ConversationMessage] = Field(default_factory=list)
+
+    _drop_empty_history = field_validator("history", mode="before")(drop_empty_turns)
 
 
 class MemoryCandidate(ApiModel):

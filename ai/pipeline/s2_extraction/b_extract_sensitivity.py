@@ -6,10 +6,9 @@
 실패하면 해당 녹음 전체를 중단한다 (부분 실패 정책).
 """
 
-import json
 import logging
 
-from infra.external_api.openai_client import create_openai_client
+from infra.external_api.openai_client import analysis_client, analysis_completion, json_reply
 
 from infra.setting import Settings
 from infra.schema.transcript import TranscriptSegment
@@ -27,12 +26,14 @@ def run_sensitivity_analysis(
     settings: Settings,
 ) -> dict:
 
-    client = create_openai_client(settings, "sensitivity analysis")
+    client = analysis_client(settings, "sensitivity analysis")
     # 부분 실패 정책: 구조 위반이면 1회 재시도, 재실패 시 예외(녹음 중단)
     last_error: SensitivityValidationError | None = None
     result = None
     for attempt in range(2):
-        response = client.chat.completions.create(
+        response = analysis_completion(
+            client,
+            "sensitivity analysis",
             model=settings.openai_analysis_model,
             response_format={"type": "json_object"},
             messages=[
@@ -40,7 +41,7 @@ def run_sensitivity_analysis(
                 {"role": "user", "content": build_sensitivity_user_prompt(segments)},
             ],
         )
-        payload = json.loads(response.choices[0].message.content or "{}")
+        payload = json_reply(response, "sensitivity analysis")
         try:
             result = validate_sensitivity_payload(payload, segments)
             break
@@ -53,7 +54,9 @@ def run_sensitivity_analysis(
     # 이중 체크: 2차 판정이 "유형 정의에 명백히 부합하지 않는" 플래그만
     # 제거한다. 애매하면 유지 — 재현율은 1차, 정밀도는 2차가 담당
     if result["sensitivityFlags"]:
-        judge_response = client.chat.completions.create(
+        judge_response = analysis_completion(
+            client,
+            "sensitivity judge",
             model=settings.openai_analysis_model,
             response_format={"type": "json_object"},
             messages=[
@@ -66,7 +69,7 @@ def run_sensitivity_analysis(
                 },
             ],
         )
-        judge_payload = json.loads(judge_response.choices[0].message.content or "{}")
+        judge_payload = json_reply(judge_response, "sensitivity judge")
         result = apply_judge_decisions(result, judge_payload)
     return result
 

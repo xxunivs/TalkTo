@@ -51,7 +51,8 @@ class MiniMaxTTSProvider:
         *,
         emotion: str | None = None,
         intensity: int = 0,
-        timeout_seconds: float = 120,
+        # BE 가 45초에 끊는다. 그보다 길게 기다리면 합성 값만 나가고 소리는 버려진다(Fish 는 40초 마감)
+        timeout_seconds: float = 35,
     ) -> None:
         self.api_key = api_key
         self.model_id = model_id or _DEFAULT_MODEL

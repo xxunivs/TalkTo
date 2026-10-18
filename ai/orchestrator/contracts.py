@@ -57,7 +57,8 @@ class TurnInput(Contract):
     session_id: str | None = None
     speaker_hint: str | None = None
     voice_id: str | None = None
-    # 고인 페르소나인가(BE persona.deceased). 음성 감정 안전선에만 쓴다. 모르면(None) 고인으로 본다.
+    # 고인 페르소나인가(BE persona.deceased). 음성 감정 안전선(모르면(None) 고인으로 본다)과, 등록부가 없을 때
+    # 공통 규칙 변형(사후·사망 정책, PersonaRegistry.profile_for: 값이 있으면 지시문 추정보다 우선)에 쓴다.
     deceased: bool | None = None
 
 

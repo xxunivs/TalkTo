@@ -94,20 +94,58 @@ class ElevenLabsScribeProvider:
 
         segments = group_scribe_words(body.get("words") or [])
         if not segments and (body.get("text") or "").strip():
+            # 시간 정보 없는 글만 온 경우. 길면 나눈다(구간 하나 20,000자 한도, transcript.py)
             segments = [
                 TranscriptSegment(
-                    segment_index=0,
+                    segment_index=i,
                     start_ms=0,
                     end_ms=0,
                     speaker_label="SPK_0",
-                    transcript_text=strip_non_speech_notes(body["text"]),
+                    transcript_text=piece,
+                )
+                for i, piece in enumerate(
+                    split_text(strip_non_speech_notes(body["text"]), MAX_SEGMENT_CHARS)
                 )
             ]
         return STTResult(provider="elevenlabs", model=self.model_id, segments=segments)
 
 
+# 한 사람이 이어 말한 구간 하나의 상한. 화자가 바뀔 때만 나누면 혼자 한 시간 가까이 말한 녹음(이야기·음성 일기)이
+# 구간 하나가 되어 20,000자 한도(transcript.py)를 넘었고, 받아쓰기 값을 낸 뒤 500 으로 실패했다(다시 해도 같음).
+# 보통 통화의 한 번 말하기(몇십 초~1분)는 나뉘지 않을 만큼 넉넉하게 둔다. 나눌 때는 낱말 경계에서, 같은 화자로.
+MAX_SEGMENT_CHARS = 5_000
+MAX_SEGMENT_MS = 300_000  # 5분
+
+
+def split_text(text: str, limit: int) -> list[str]:
+    """글을 limit 글자 이하 조각으로(띄어쓰기에서). 띄어쓰기 없이 긴 덩어리는 글자 수로 자른다."""
+    pieces: list[str] = []
+    current = ""
+    for word in text.split():
+        while len(word) > limit:
+            if current:
+                pieces.append(current)
+                current = ""
+            pieces.append(word[:limit])
+            word = word[limit:]
+        if not word:
+            continue
+        if current and len(current) + 1 + len(word) > limit:
+            pieces.append(current)
+            current = word
+        else:
+            current = f"{current} {word}" if current else word
+    if current:
+        pieces.append(current)
+    return pieces
+
+
 def group_scribe_words(words: list[dict]) -> list[TranscriptSegment]:
-    """Group Scribe word entries into one segment per speaker turn."""
+    """Group Scribe word entries into one segment per speaker turn.
+
+    A very long turn is split at a word boundary (same speaker) once it passes
+    MAX_SEGMENT_CHARS or MAX_SEGMENT_MS.
+    """
     segments: list[TranscriptSegment] = []
     current: dict | None = None
 
@@ -137,7 +175,15 @@ def group_scribe_words(words: list[dict]) -> list[TranscriptSegment]:
         label = f"SPK_{speaker.rsplit('_', 1)[-1]}"
         start_ms = int(float(word.get("start") or 0) * 1000)
         end_ms = int(float(word.get("end") or 0) * 1000)
-        if current is None or current["speakerLabel"] != label:
+        too_long = (
+            current is not None
+            and word.get("type", "word") == "word"  # 낱말 앞에서만 나눈다(띄어쓰기에서 시작하지 않게)
+            and (
+                len(current["text"]) >= MAX_SEGMENT_CHARS
+                or current["endMs"] - current["startMs"] >= MAX_SEGMENT_MS
+            )
+        )
+        if current is None or current["speakerLabel"] != label or too_long:
             flush()
             current = {
                 "speakerLabel": label,

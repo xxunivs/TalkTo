@@ -4,11 +4,10 @@
 태그: 기억 조각들의 태그를 녹음 단위로 집계 — 이미 통제 어휘라 재검증만.
 """
 
-import json
 import logging
 import re
 
-from infra.external_api.openai_client import create_openai_client
+from infra.external_api.openai_client import analysis_client, analysis_completion, json_reply
 
 from infra.setting import Settings
 from pipeline.s2_extraction.e_extract_memory import _ALLOWED_TAGS
@@ -22,8 +21,10 @@ _SENTENCE_SPLIT = re.compile(r"[.!?]+\s*")
 def summarize_recording(
     segments: list[TranscriptSegment], *, settings: Settings
 ) -> str:
-    client = create_openai_client(settings, "summary")
-    response = client.chat.completions.create(
+    client = analysis_client(settings, "summary")
+    response = analysis_completion(
+        client,
+        "summary",
         model=settings.openai_analysis_model,
         response_format={"type": "json_object"},
         messages=[
@@ -31,7 +32,7 @@ def summarize_recording(
             {"role": "user", "content": build_summary_user_prompt(segments)},
         ],
     )
-    payload = json.loads(response.choices[0].message.content or "{}")
+    payload = json_reply(response, "summary")
     return str(payload.get("summary") or "").strip()
 
 

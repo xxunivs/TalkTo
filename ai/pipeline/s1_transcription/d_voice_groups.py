@@ -17,6 +17,7 @@ from pathlib import Path
 
 from infra.external_api.audio import download_audio
 from infra.schema.transcript import TranscriptSegment
+from infra.scratch import scratch_dir
 from infra.setting import Settings
 
 logger = logging.getLogger(__name__)
@@ -122,7 +123,7 @@ def group_voices(
                 audio_url,
                 timeout_seconds=settings.audio_download_timeout_seconds,
                 max_bytes=settings.max_audio_bytes,
-                temp_dir=settings.temp_dir,
+                temp_dir=scratch_dir(settings),
             )
             with EMBED_LOCK:
                 vectors = embedder.embed_speakers(path, segments)

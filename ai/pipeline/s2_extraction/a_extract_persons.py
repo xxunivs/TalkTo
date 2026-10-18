@@ -4,10 +4,9 @@ LLM 산출은 그대로 믿지 않는다: 근거 세그먼트 실존, confidence
 구조 검증을 코드로 강제하고, 위반 항목은 버리거나 unresolved로 강등한다.
 """
 
-import json
 import logging
 
-from infra.external_api.openai_client import create_openai_client
+from infra.external_api.openai_client import analysis_client, analysis_completion, json_reply
 
 from infra.setting import Settings
 from infra.schema.subject import SubjectContext
@@ -27,8 +26,10 @@ def run_persons_analysis(
     conversation_partner_name: str | None = None,
 ) -> dict:
 
-    client = create_openai_client(settings, "persons analysis")
-    response = client.chat.completions.create(
+    client = analysis_client(settings, "persons analysis")
+    response = analysis_completion(
+        client,
+        "persons analysis",
         model=settings.openai_analysis_model,
         response_format={"type": "json_object"},
         messages=[
@@ -42,7 +43,7 @@ def run_persons_analysis(
             },
         ],
     )
-    payload = json.loads(response.choices[0].message.content or "{}")
+    payload = json_reply(response, "persons analysis")
     subject = subject_context.subject if subject_context is not None else None
     return validate_persons_payload(
         payload,

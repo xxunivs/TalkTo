@@ -146,4 +146,9 @@ class PersonaRegistry:
         name = subject_name_from(turn.persona_instructions)
         if name and name in self.by_name:
             return self.by_name[name]
-        return infer_profile(turn.persona_instructions)
+        profile = infer_profile(turn.persona_instructions)
+        if turn.deceased is not None and profile.deceased != turn.deceased:
+            # BE 가 아는 고인 여부(persona.deceased)가 지시문 글자 추정보다 정확하다. 예전 지시문은 '돌아가신
+            # 할아버지'처럼 다른 사람 이야기만 있어도 고인으로, 그런 말이 없는 고인은 생존으로 추정됐다.
+            profile = profile.model_copy(update={"deceased": turn.deceased})
+        return profile

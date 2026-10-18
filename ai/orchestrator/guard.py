@@ -5,6 +5,7 @@ GuardV1(ORCHESTRATOR_GUARD=v1) — 규칙은 서로 독립인 순수 함수, 아
   0. 헤더   첫 줄 "[근거: m3,m10]"/"[근거: 없음]" 을 떼고(TTS 로 새지 않게) 인용 기억을 찾는다.
             id 는 m{0부터 순번}, 선택된 기억 → 델타 순(header_block 참고).
   1. 누출   restricted.leak_terms 가 든 문장을 지운다. 다 지워지면 brief_answer(있으면) 또는 되묻기.
+  1-1. 안전  위기·죽음을 묻는 말(precheck.SAFETY)이거나 답에 위기 상담 번호(109·119 등)가 있으면 여기서 그대로 통과(2~4 안 함).
   2. 지어내기(질문일 때만, 답이 이미 '모른다·되묻기'면 통과)  ※ 화제 임계 0.5 는 사전 판정(0.6)과 따로 실측으로 정한 값
             R1a 헤더가 [근거: 없음] / 없는 id → 되묻기
             R1t 인용 기억(+프로필)이 질문 화제어를 못 덮음(커버율 < 임계) → 되묻기   ← 엉뚱한 id 를 인용하며 지어내는 경우
@@ -24,7 +25,7 @@ import re
 
 from orchestrator.contracts import Generation, GuardResult, MemoryItem, MemorySelection, SessionState, TurnInput
 from orchestrator.persona import subject_name_from
-from orchestrator.precheck import is_question, profile_section, strip_preamble
+from orchestrator.precheck import is_question, is_safety_turn, profile_section, strip_preamble
 from orchestrator.restricted import redact_instructions
 from orchestrator.text import listener_speech_level
 
@@ -85,6 +86,8 @@ USER_LOVE = re.compile(r"사랑|보고\s?싶")
 CLOSING = re.compile(r"(끊(어|을게|는다|자|을께)|들어가(세요|요|라|볼게)|잘\s?(자|있어|지내)|또\s?(전화|연락)|안녕히|다음에\s?(또|전화)|이만)")
 CARE = re.compile(r"(밥|끼니|챙겨\s?먹|건강\s?(잘\s?)?챙|건강이\s?제일|몸\s?(조심|건강|챙|잘\s?돌)|아프지\s?마|감기\s?조심|푹\s?쉬|잘\s?먹어|무리하지\s?마)")
 NUM = re.compile(r"\d+")
+# 위기 상담 번호(자살예방 109·옛 1393, 정신건강 위기상담 1577-0199, 응급 119)
+CRISIS_LINE = re.compile(r"(?<!\d)(?:109|119|1393|1577-0199)(?!\d)")
 SENT = re.compile(r"(?<=[.!?…~])\s+|\n+")
 ASK_BACK = {
     "family": ("글쎄, 그건 기억이 잘 안 나네. 네가 얘기 좀 해 줄래?", "그건 잘 모르겠다."),
@@ -190,6 +193,12 @@ class GuardV1:
                 if not kept:
                     return done(restricted.brief_answer or ask_back, "redact")
                 body = " ".join(kept)
+
+        # 위기(자해 생각)·그분의 죽음을 묻는 말이거나 대답에 위기 상담 번호가 있으면 지어내기·문장 삭제를 하지 않는다.
+        # 위기 대답이 "기억이 안 나네, 얘기해 줄래?"로 바뀌거나 상담 번호 문장이 지워지면 안 된다(누출 검사는 위에서 했다).
+        if is_safety_turn(turn.message) or CRISIS_LINE.search(body):
+            reasons.append("safety_skip")
+            return done(body, "trim" if "leak" in reasons else "pass")
 
         # 2. 지어내기 (질문일 때만)
         msg = self.question_text(turn)

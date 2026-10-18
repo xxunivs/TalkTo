@@ -71,7 +71,8 @@ class ElevenLabsTTSProvider:
         *,
         api_key: str,
         model_id: str | None = None,
-        timeout_seconds: float = 60.0,
+        # BE 가 45초에 끊는다. 그보다 길게 기다리면 합성 값만 나가고 소리는 버려진다(Fish 는 40초 마감)
+        timeout_seconds: float = 35.0,
     ) -> None:
         self.api_key = api_key
         self.model_id = model_id or _DEFAULT_MODEL

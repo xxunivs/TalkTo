@@ -7,6 +7,7 @@
 import json
 import logging
 
+from infra.error import AppError
 from infra.setting import Settings
 from infra.external_api.openai_client import create_openai_client
 from infra.schema.embedding import (
@@ -21,18 +22,60 @@ logger = logging.getLogger(__name__)
 
 PROVIDER = "openai"
 
+# 한 번에 보내는 양. OpenAI 는 요청 하나에 2,048개·약 30만 토큰까지 받는다. 기억이 많은 대화 상대(긴 녹음
+# 여러 개)는 한 번에 다 보내면 400 으로 거절돼, 녹음 분석까지 다 마친 뒤 마지막 단계에서 실패했다.
+# 글자 상한은 한글이 글자당 토큰을 더 쓰는 경우를 넉넉히 본 값이다.
+EMBED_BATCH_ITEMS = 256
+EMBED_BATCH_CHARS = 60_000
+# 대화 중 기억 찾기(/v1/embeddings/query). BE 는 45초에 끊는다: 질문 다시 쓰기(8초) + 임베딩(15초 × 2번) < 45초.
+QUERY_EMBED_TIMEOUT_SECONDS = 15.0
+QUERY_EMBED_MAX_RETRIES = 1
+REWRITE_TIMEOUT_SECONDS = 8.0
 
-def embed_texts(texts: list[str], *, settings: Settings) -> list[list[float]]:
+
+def _batches(texts: list[str]) -> list[list[str]]:
+    batches: list[list[str]] = []
+    current: list[str] = []
+    size = 0
+    for text in texts:
+        if current and (len(current) >= EMBED_BATCH_ITEMS or size + len(text) > EMBED_BATCH_CHARS):
+            batches.append(current)
+            current, size = [], 0
+        current.append(text)
+        size += len(text)
+    if current:
+        batches.append(current)
+    return batches
+
+
+def embed_texts(texts: list[str], *, settings: Settings, interactive: bool = False) -> list[list[float]]:
+    """글마다 벡터 하나(순서 그대로). 많으면 나눠 보낸다. interactive 면 대화 중 시간 한도를 쓴다."""
     if not texts:
         return []
 
-    client = create_openai_client(settings, "embeddings")
-    response = client.embeddings.create(
-        model=settings.openai_embedding_model,
-        input=texts,
-        dimensions=settings.openai_embedding_dimensions,
-    )
-    return [item.embedding for item in response.data]
+    if interactive:
+        client = create_openai_client(
+            settings, "query embedding",
+            timeout=QUERY_EMBED_TIMEOUT_SECONDS, max_retries=QUERY_EMBED_MAX_RETRIES,
+        )
+    else:
+        client = create_openai_client(settings, "embeddings")
+    vectors: list[list[float]] = []
+    for batch in _batches(texts):
+        response = client.embeddings.create(
+            model=settings.openai_embedding_model,
+            input=batch,
+            dimensions=settings.openai_embedding_dimensions,
+        )
+        got = [item.embedding for item in response.data]
+        if len(got) != len(batch):  # 개수가 어긋나면 벡터가 엉뚱한 기억에 붙는다
+            raise AppError(
+                code="EMBEDDING_COUNT_MISMATCH",
+                message=f"Embedding provider returned {len(got)} vectors for {len(batch)} inputs.",
+                status_code=502,
+            )
+        vectors.extend(got)
+    return vectors
 
 
 def generate_embeddings(
@@ -79,7 +122,10 @@ def rewrite_query(request: QueryEmbeddingRequest, *, settings: Settings) -> str 
                      for m in request.history[-REWRITE_HISTORY:])
     prompt = QUERY_REWRITE_PROMPT.format(history=hist, msg=request.text)
     try:
-        client = create_openai_client(settings, "query rewrite")
+        # 대화 중이라 짧게 한 번만. 못 끝내면 원문으로 찾는다(아래 except)
+        client = create_openai_client(
+            settings, "query rewrite", timeout=REWRITE_TIMEOUT_SECONDS, max_retries=0
+        )
         response = client.chat.completions.create(
             model=settings.openai_analysis_model, messages=[{"role": "user", "content": prompt}])
         text = (response.choices[0].message.content or "").strip().strip("`").removeprefix("json").strip()
@@ -101,7 +147,7 @@ def generate_query_embedding(
     rewritten = None
     if settings.query_rewrite == "on" and request.history:
         rewritten = rewrite_query(request, settings=settings)
-    vector = embed_texts([rewritten or request.text], settings=settings)[0]
+    vector = embed_texts([rewritten or request.text], settings=settings, interactive=True)[0]
     return QueryEmbeddingResponse(
         provider=PROVIDER,
         model=settings.openai_embedding_model,

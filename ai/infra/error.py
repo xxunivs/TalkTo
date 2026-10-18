@@ -1,10 +1,13 @@
 # 에러 종류별 응답 형식
 
+import logging
 from typing import Any
 
 from fastapi import Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+
+logger = logging.getLogger(__name__)
 
 
 class AppError(Exception):
@@ -132,6 +135,36 @@ class MissingVoiceError(AppError):
         )
 
 
+class EmptyReplyError(AppError):
+    """대답 글이 비었다(내용 걸러짐·빈 답). 빈 대답을 BE 가 저장하면 그 대화의 다음 턴이 모두 422 로
+    막혔다(대화 기록의 빈 줄). 502 로 답해 BE 가 이번 턴을 되돌리게 한다."""
+
+    def __init__(self) -> None:
+        super().__init__(code="EMPTY_REPLY", message="The persona reply was empty.", status_code=502)
+
+
+class AnalysisTooLongError(AppError):
+    """분석 답이 시간 안에 끝나지 않았거나 길이 한도에서 잘렸다. 같은 녹음은 다시 해도 같다(422)."""
+
+    def __init__(self, stage: str) -> None:
+        super().__init__(
+            code="ANALYSIS_TOO_LONG",
+            message=f"The {stage} step could not finish for this input (too long).",
+            status_code=422,
+        )
+
+
+class AnalysisBadOutputError(AppError):
+    """분석 답이 JSON 이 아니었다(모델이 형식을 어김). 다시 하면 나을 수 있다(502)."""
+
+    def __init__(self, stage: str) -> None:
+        super().__init__(
+            code="ANALYSIS_BAD_OUTPUT",
+            message=f"The {stage} step returned malformed output.",
+            status_code=502,
+        )
+
+
 async def app_error_handler(_request: Request, error: AppError) -> JSONResponse:
     body: dict[str, Any] = {
         "error": {
@@ -162,7 +195,10 @@ PROVIDER_BUSY = "AI_PROVIDER_BUSY"  # 잠깐 요청이 몰림(곧 풀린다)
 
 
 def provider_error_code(error: Exception) -> str:
-    """OpenAI 오류를 세 가지로 나눈다(본문의 error.code·type 을 본다)."""
+    """OpenAI 오류를 세 가지로 나눈다(본문의 error.code·type 을 본다).
+
+    시간 초과·연결 실패·OpenAI 5xx 는 본문이 없거나 위 코드가 아니어서 BUSY(곧 풀린다)가 된다.
+    """
     body = getattr(error, "body", None)
     detail = body.get("error", body) if isinstance(body, dict) else {}
     detail = detail if isinstance(detail, dict) else {}
@@ -175,10 +211,62 @@ def provider_error_code(error: Exception) -> str:
 
 
 async def provider_error_handler(_request: Request, error: Exception) -> JSONResponse:
-    """OpenAI 가 거절한 요청(429·401·403). 원문(키·결제 주소)은 돌려주지 않는다."""
+    """OpenAI 가 거절했거나 답하지 않은 요청(429·401·403·5xx·시간 초과·연결 실패).
+    원문(키·결제 주소)은 돌려주지 않는다."""
     code = provider_error_code(error)
+    logger.warning("openai unavailable: %s -> %s", type(error).__name__, code)
     return JSONResponse(
         status_code=503,
         content={"error": {"code": code, "message": "AI provider unavailable"}},
+    )
+
+
+# OpenAI 가 요청 자체를 받지 않은 경우(400). 회사가 막힌 것이 아니라 다시 보내도 같다 — BE 가 다시 하지 않게 422.
+PROVIDER_INPUT_TOO_LARGE = "AI_INPUT_TOO_LARGE"  # 글이 모델 한도(문맥·임베딩 입력)보다 길다
+PROVIDER_REJECTED = "AI_PROVIDER_REJECTED"  # 그 밖의 거절
+_TOO_LARGE_CODES = {"context_length_exceeded", "string_above_max_length", "max_tokens_exceeded"}
+_TOO_LARGE_WORDS = ("context length", "maximum", "too long", "too large", "too many", "max ")
+
+
+def bad_request_code(error: Exception) -> str:
+    body = getattr(error, "body", None)
+    detail = body.get("error", body) if isinstance(body, dict) else {}
+    detail = detail if isinstance(detail, dict) else {}
+    code = str(getattr(error, "code", "") or detail.get("code") or "")
+    message = str(detail.get("message") or getattr(error, "message", "") or "").lower()
+    if code in _TOO_LARGE_CODES or any(word in message for word in _TOO_LARGE_WORDS):
+        return PROVIDER_INPUT_TOO_LARGE
+    return PROVIDER_REJECTED
+
+
+async def provider_bad_request_handler(_request: Request, error: Exception) -> JSONResponse:
+    """OpenAI 400. 원문은 돌려주지도 남기지도 않는다(요청 글 일부가 들어 있을 수 있다)."""
+    code = bad_request_code(error)
+    logger.warning("openai rejected the request: %s -> %s", type(error).__name__, code)
+    return JSONResponse(
+        status_code=422,
+        content={"error": {"code": code, "message": "AI provider rejected the request"}},
+    )
+
+
+async def internal_validation_error_handler(request: Request, error: Exception) -> JSONResponse:
+    """요청 형식이 아니라 처리 중에 만든 값이 스키마를 어긴 경우(pydantic ValidationError).
+
+    그대로 두면 500 과 함께 traceback 이 로그에 남고, pydantic 오류 글에는 받은 값(input) 앞뒤가 들어
+    가족 대화 글이 로그로 샜다. 같은 입력이면 다시 해도 같으므로 422 + 코드로 답하고, 로그에는 오류
+    종류와 위치만 남긴다.
+    """
+    errors = error.errors() if hasattr(error, "errors") else []
+    where = [
+        {"type": item.get("type"), "loc": list(item.get("loc") or ())}
+        for item in errors[:10]
+    ]
+    logger.error(
+        "internal data failed validation on %s: %s %s",
+        request.url.path, getattr(error, "title", type(error).__name__), where,
+    )
+    return JSONResponse(
+        status_code=422,
+        content={"error": {"code": "AI_DATA_INVALID", "message": "AI server produced invalid data"}},
     )
 

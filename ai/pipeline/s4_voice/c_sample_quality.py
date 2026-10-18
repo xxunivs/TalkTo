@@ -62,11 +62,18 @@ def measure(pcm: np.ndarray, sample_rate: int) -> SegmentQuality:
     )
 
 
-def measure_wav(path: Path) -> SegmentQuality:
-    """16비트 mono wav(_ffmpeg_normalize 결과)를 읽어 잰다."""
+def measure_wav(path: Path, *, max_seconds: float | None = None) -> SegmentQuality:
+    """16비트 mono wav(_ffmpeg_normalize 결과)를 읽어 잰다.
+
+    max_seconds 를 주면 앞에서 그만큼만 읽는다. 다 읽으면 길이만큼 메모리를 쓴다(44.1kHz 에서
+    1분에 약 29MB, 표본·제곱·절댓값을 따로 들기 때문).
+    """
     with wave.open(str(path), "rb") as w:
         rate = w.getframerate()
-        raw = w.readframes(w.getnframes())
+        frames = w.getnframes()
+        if max_seconds is not None:
+            frames = min(frames, int(max_seconds * rate))
+        raw = w.readframes(frames)
     pcm = np.frombuffer(raw, dtype=np.int16).astype(np.float32) / 32768.0
     return measure(pcm, rate)
 

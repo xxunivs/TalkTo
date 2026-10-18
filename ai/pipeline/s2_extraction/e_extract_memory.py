@@ -5,12 +5,10 @@ LLM은 memoryText·근거·인물·확실성만 제안한다. 시간 구간(star
 민감플래그는 민감정보 분석 결과와 근거 구간 교집합으로 코드가 조인한다.
 """
 
-import json
 import logging
-import re
 import unicodedata
 
-from infra.external_api.openai_client import create_openai_client
+from infra.external_api.openai_client import analysis_client, analysis_completion, json_reply
 
 from infra.setting import Settings
 from infra.schema.subject import SubjectContext
@@ -19,13 +17,33 @@ from infra.schema.transcript import TranscriptSegment
 logger = logging.getLogger(__name__)
 
 _CONFIDENCE_VALUES = {"confirmed", "inferred"}
-# 허용 문자: 한글(완성형·자모), 영숫자, 공백, 기본 문장부호 — 그 외 스크립트가
-# 섞이면 LLM 출력 오염(예: 벵골어 혼입)으로 보고 그 기억을 버린다
-_FOREIGN_CHARS = re.compile(r"[^가-힣ㄱ-ㅎㅏ-ㅣa-zA-Z0-9\s.,!?~%:;'\"()\[\]·\-—…]+")
+
+
+def _allowed_letter(ch: str) -> bool:
+    """한글(완성형·자모·옛 자모, 'ㆍ' 포함)과 라틴 글자만 허용한다."""
+    o = ord(ch)
+    return (
+        0xAC00 <= o <= 0xD7A3  # 한글 완성형
+        or 0x1100 <= o <= 0x11FF  # 한글 자모
+        or 0x3130 <= o <= 0x318F  # 한글 호환 자모(ㄱ·ㅏ·ㆍ)
+        or ch.isascii()
+        or 0x00C0 <= o <= 0x024F  # 라틴 확장(café 등)
+    )
 
 
 def has_foreign_script(text: str) -> bool:
-    return bool(_FOREIGN_CHARS.search(text))
+    """한글·라틴이 아닌 '글자'가 섞였나 — LLM 출력 오염(예: 벵골어·한자·가나 혼입)으로 보고 그 기억을 버린다.
+
+    문장부호·기호·숫자는 보지 않는다. 예전에는 허용 문자 목록 밖이면 다 버려서 “밥은 먹었냐”(둥근 따옴표),
+    3/1절, 김치&된장, 5°C, 서울ㆍ부산 같은 멀쩡한 기억(특히 입버릇 인용)이 조용히 사라졌다.
+    """
+    for ch in text:
+        category = unicodedata.category(ch)
+        if category in ("Co", "Cn"):  # 사용자 정의·없는 글자 = 깨진 출력
+            return True
+        if category.startswith("L") and not _allowed_letter(ch):
+            return True
+    return False
 
 
 # 태그 통제 어휘 — 이 밖의 값은 게이트에서 버린다
@@ -51,8 +69,10 @@ def extract_memory_segments(
     conversation_partner_name: str | None = None,
 ) -> dict:
 
-    client = create_openai_client(settings, "memory extraction")
-    response = client.chat.completions.create(
+    client = analysis_client(settings, "memory extraction")
+    response = analysis_completion(
+        client,
+        "memory extraction",
         model=settings.openai_analysis_model,
         response_format={"type": "json_object"},
         messages=[
@@ -66,7 +86,7 @@ def extract_memory_segments(
             },
         ],
     )
-    payload = json.loads(response.choices[0].message.content or "{}")
+    payload = json_reply(response, "memory extraction")
     subject = subject_context.subject if subject_context is not None else None
     return validate_memory_payload(
         payload,

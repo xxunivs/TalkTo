@@ -5,11 +5,10 @@
 근거를 요구하지 않는다.
 """
 
-import json
 import logging
 
 from infra.setting import Settings
-from infra.external_api.openai_client import create_openai_client
+from infra.external_api.openai_client import analysis_client, analysis_completion, json_reply
 from infra.schema.subject import SubjectContext
 from infra.schema.transcript import TranscriptSegment
 
@@ -24,8 +23,10 @@ def run_linguistic_style_analysis(
     settings: Settings,
 ) -> dict:
 
-    client = create_openai_client(settings, "linguistic style analysis")
-    response = client.chat.completions.create(
+    client = analysis_client(settings, "linguistic style analysis")
+    response = analysis_completion(
+        client,
+        "linguistic style analysis",
         model=settings.openai_analysis_model,
         response_format={"type": "json_object"},
         messages=[
@@ -38,7 +39,7 @@ def run_linguistic_style_analysis(
             },
         ],
     )
-    payload = json.loads(response.choices[0].message.content or "{}")
+    payload = json_reply(response, "linguistic style analysis")
     return validate_linguistic_style_payload(payload, segments)
 
 

@@ -20,6 +20,7 @@ from infra.error import (
 )
 from infra.external_api.audio import download_audio
 from infra.external_api.openai_client import create_openai_client
+from infra.scratch import scratch_dir
 from infra.external_api.tts import TTSResult, create_clone_provider, create_tts_provider
 from infra.external_api.tts.fish import strip_fish_cues
 from pipeline.s4_voice import c_sample_quality as quality
@@ -49,6 +50,12 @@ _CLONE_GAP_SECONDS = 0.3  # 구간 사이 쉼. 딱 붙이면 말이 이어 붙�
 # (BE가 클론 voiceId를 persona.voiceId에 저장하기 시작하면 이 처리는 무해해진다.)
 _PLACEHOLDER_VOICE_IDS = frozenset({"default-voice"})
 
+# 음성 메시지 받아쓰기 시간 한도. BE 는 60초만 기다린다(ai.TRANSCRIBE_TIMEOUT). 기본 한도(60초 × 3번)로
+# 두면 BE 가 포기한 뒤에도 3분까지 돌며 돈과 스레드를 쓴다. 25초 × 2번(+재시도 대기)이면 그 안에 끝난다.
+# 화면은 2분에서 녹음을 멈춘다(몇 초면 받아쓴다).
+VOICE_STT_TIMEOUT_SECONDS = 25.0
+VOICE_STT_MAX_RETRIES = 1
+
 
 def transcribe_voice_message(
     audio: bytes,
@@ -57,7 +64,12 @@ def transcribe_voice_message(
     language: str,
     settings: Settings,
 ) -> VoiceTranscriptionResponse:
-    client = create_openai_client(settings, "voice message stt")
+    client = create_openai_client(
+        settings,
+        "voice message stt",
+        timeout=VOICE_STT_TIMEOUT_SECONDS,
+        max_retries=VOICE_STT_MAX_RETRIES,
+    )
     buffer = io.BytesIO(audio)
     buffer.name = filename or "audio.wav"
     response = client.audio.transcriptions.create(
@@ -144,7 +156,8 @@ def _build_multi_sample(segments: list[VoiceSampleSegment], *, settings: Setting
     """
     if shutil.which("ffmpeg") is None:  # 배포엔 설치돼 있음(Dockerfile). 로컬/설정 문제.
         raise TTSProviderError("ffmpeg가 필요합니다(다구간 샘플 이어붙이기).")
-    workdir = Path(tempfile.mkdtemp(prefix="voice_clone_"))
+    # 임시 폴더는 서버가 뜰 때 비우는 곳에 둔다(강제 종료로 남은 녹음이 디스크에 쌓이지 않게, infra/scratch.py)
+    workdir = Path(tempfile.mkdtemp(prefix="voice_clone_", dir=scratch_dir(settings)))
     try:
         # 서명된 주소는 곧 만료된다. 자르기 전에 녹음마다 한 번씩 먼저 다 받아 둔다.
         sources: dict[str, Path] = {}
@@ -161,6 +174,10 @@ def _build_multi_sample(segments: list[VoiceSampleSegment], *, settings: Setting
             start_ms, end_ms = seg.start_ms, seg.end_ms
             if end_ms - start_ms > _CLONE_MIN_SEGMENT_MS + 2 * _CLONE_EDGE_TRIM_MS:
                 start_ms, end_ms = start_ms + _CLONE_EDGE_TRIM_MS, end_ms - _CLONE_EDGE_TRIM_MS
+            # 재는 것도 앞쪽 상한(60초)까지만 자른다. 실제로 담는 길이(pick_seconds)도 이 앞에서 끝나서 결과는
+            # 같다. 예전에는 구간을 통째로 44.1kHz 로 잘라 메모리에 펼쳐(10분에 약 290MB), 혼자 한 시간 넘게
+            # 말한 구간 하나로 AI 컨테이너(2.5GB)가 강제 종료될 수 있었다(2026-10-18 과 같은 종류).
+            end_ms = min(end_ms, start_ms + int(_CLONE_SAMPLE_MAX_SECONDS * 1000))
             raw = workdir / f"raw_{i}.wav"
             try:
                 _ffmpeg_normalize(sources[url], raw, start_ms, end_ms)
@@ -170,7 +187,7 @@ def _build_multi_sample(segments: list[VoiceSampleSegment], *, settings: Setting
                     f"구간 {i}(startMs={seg.start_ms}, endMs={seg.end_ms}) 컷 실패: {detail}"
                 ) from exc
             # 선언된 구간이 아니라 '실제로 잘린 길이'로 판단 — 오디오 밖 구간은 0초가 된다.
-            q = quality.measure_wav(raw)
+            q = quality.measure_wav(raw, max_seconds=_CLONE_SAMPLE_MAX_SECONDS)
             raw.unlink(missing_ok=True)
             if q.seconds * 1000 < _CLONE_MIN_SEGMENT_MS:
                 continue
@@ -331,6 +348,7 @@ def clone_voice_from_sample(
         str(request.sample_audio_url),
         timeout_seconds=settings.audio_download_timeout_seconds,
         max_bytes=settings.max_audio_bytes,
+        temp_dir=scratch_dir(settings),
     )
     try:
         voice_id = provider.clone_voice(request.name, audio_path)

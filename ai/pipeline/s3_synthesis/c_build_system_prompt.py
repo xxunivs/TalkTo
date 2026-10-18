@@ -9,8 +9,9 @@ import json
 import logging
 from collections import Counter
 
+from infra.error import EmptyReplyError
 from infra.setting import Settings
-from infra.external_api.openai_client import create_openai_client
+from infra.external_api.openai_client import chat_client, create_openai_client
 from infra.schema.subject import FamilyNote, IntakeContext, SubjectContext
 from infra.schema.persona import (
     MemoryCandidate,
@@ -155,7 +156,8 @@ def generate_persona_response(
     request: PersonaResponseRequest, *, settings: Settings
 ) -> PersonaResponseResult:
     warn_if_over_full_max(len(request.memories), settings)
-    client = create_openai_client(settings, "persona response")
+    # BE 가 45초에 끊으므로 대화용 시간 한도(기본 20초 × 2번)로 부른다
+    client = chat_client(settings, "persona response")
 
     messages = [{"role": "system", "content": request.persona.instructions}]
     # 음성 감정 지침(MiniMax VOICE_EMOTION · Fish FISH_EMOTION). 같은 호출에 system 하나만 더한다(LLM 을 더 부르지 않는다).
@@ -184,6 +186,11 @@ def generate_persona_response(
     content = (response.choices[0].message.content or "").strip()
     # 감정·연기 표시를 떼어 낸다. content 는 표시 없는 글(화면·대화 기록·기억), speech_text 는 목소리용(inline)
     voice = split_voice(content, mode, deceased=request.persona.deceased)
+    if not voice.text.strip():
+        # 빈 대답(내용 걸러짐·감정 표시만 옴)을 돌려주면 BE 가 저장하고, 그 대화의 다음 턴이 모두 422 로 막혔다
+        logger.warning("persona reply was empty (finish_reason=%s)",
+                       getattr(response.choices[0], "finish_reason", None))
+        raise EmptyReplyError()
 
     # 주입한 기억 전부를 '사용됨'으로 반환한다. 실제로 인용됐는지는 가리지 않는다.
     return PersonaResponseResult(

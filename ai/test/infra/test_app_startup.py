@@ -12,7 +12,9 @@ def _app(settings: Settings):
     """설정을 바꿔 앱을 새로 만든다(요청의 설정 의존성도 같은 설정으로)."""
     from main import create_app
 
-    with patch("main.get_settings", return_value=settings):
+    # 배포 설정이면 시작할 때 임시 폴더를 비운다. 테스트가 이 PC 의 진짜 임시 폴더를 비우지 않게 막는다
+    # (그 동작은 test_scratch.py 가 따로 본다)
+    with patch("main.get_settings", return_value=settings), patch("main.reset_scratch_dir"):
         app = create_app()
     app.dependency_overrides[get_settings] = lambda: settings
     return app

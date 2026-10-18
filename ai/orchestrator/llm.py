@@ -4,7 +4,7 @@ from __future__ import annotations
 import time
 from collections.abc import Callable
 
-from infra.external_api.openai_client import create_openai_client
+from infra.external_api.openai_client import chat_client
 from infra.setting import Settings
 from orchestrator.contracts import Generation
 
@@ -19,7 +19,8 @@ class OpenAIChatLLM:
         self.model = model or settings.openai_chat_model
 
     def generate(self, messages: list[dict[str, str]]) -> Generation:
-        client = create_openai_client(self.settings, "persona response")
+        # BE 가 45초에 끊으므로 대화용 시간 한도(기본 20초 × 2번)로 부른다
+        client = chat_client(self.settings, "persona response")
         t0 = time.perf_counter()
         # 추론 정도: 기본값이면 답 전에 오래 생각해 느리다(infra/setting.py openai_chat_reasoning_effort)
         effort = getattr(self.settings, "openai_chat_reasoning_effort", None)
