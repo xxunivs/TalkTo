@@ -2,6 +2,9 @@
 
 어느 문항이 어디로 가는지는 docs/Persona_Intake_문항분류.md 를 따른다.
 A 는 프롬프트 슬롯으로, B 는 기억DB 로 간다. C 는 앱 운영이라 둘 다 아니다.
+2026-10-21 개정(docs/Persona_Intake.md PART 0)에서 새로 생긴 M6-08(그분 하면 떠오르는 것 + 까닭)은
+B 다(문항분류.md 는 그 전 것이라 이 문항이 없다). 웹앱(BE intake.build_intake_memories)과 같은 문장
+으로 기억 하나를 만든다. '기억이 안 나요'·'따로 없었어요'는 모름과 같아 어느 칸에도 가지 않는다.
 """
 
 from __future__ import annotations
@@ -10,7 +13,7 @@ import json
 import re
 from pathlib import Path
 
-from pipeline.s0_intake.a_read_intake import Answer, parse
+from pipeline.s0_intake.a_read_intake import UNKNOWN_CELL_MARK, Answer, parse
 
 # ── B 문항: 기억 한 줄로 바꿀 때 앞에 붙일 말 ──────────────────
 # 선지는 이미 프롬프트(A)로 갔고, 기억에는 서술로 적은 답만 넣을 문항
@@ -60,6 +63,10 @@ MEMORY_TABLES = {
     "M7-01": "기억 카드",
     "T1-03": "마지막 시기에 곁에 있던 가족",
 }
+# M6-08 → 기억 하나: "<앞말>: <떠오르는 것> — <까닭>". 기억은 그분이 1인칭으로 읽어 '그분'이라 쓰지
+# 않는다(BE app/services/intake.py M6_08_LEAD·M6_08_TAG 와 같다).
+M6_08_LEAD = "가족이 나를 떠올리면 생각나는 것"
+M6_08_TAG = "떠오르는 것"
 SCOPES = ("자유", "물으면만", "회상 참고만")
 
 
@@ -166,11 +173,24 @@ def to_memories(answers: dict[str, Answer]) -> list[dict]:
                 "usageScope": scope if scope in SCOPES else "자유",
             })
 
+    thing = answers.get("M6-08")
+    if thing and not thing.skipped:
+        pairs = [(_plain(c[0]) if c else None, _plain(c[1]) if len(c) > 1 else None)
+                 for c in thing.rows]
+        if not thing.rows:  # 표가 아니라 빈칸에 적었으면 첫 값이 떠오르는 것, 둘째가 까닭
+            values = [v for v in thing.values if v != "__추정__"]
+            pairs = [(values[0] if values else None, values[1] if len(values) > 1 else None)]
+        for what, why in pairs:
+            if what:
+                add("M6-08", f"{M6_08_LEAD}: {what}" + (f" — {why}" if why else ""),
+                    tag=M6_08_TAG, a=thing)
+
     for qid, tag in MEMORY_TABLES.items():
         a = answers.get(qid)
         if qid == "M7-01" or not a or a.skipped or not a.rows:
             continue
         for cells in a.rows:
+            cells = [UNKNOWN_CELL_MARK.sub("", c).strip() for c in cells]  # '■ 모름' 같은 표시는 기억이 아니다
             parts = [c for c in cells if c and c not in ("□", "■") and not c.startswith("_")]
             if not parts:
                 continue
@@ -343,7 +363,8 @@ def to_intake(answers: dict[str, Answer], *, name: str | None = None) -> dict:
 
 
 def _plain(cell: str) -> str | None:
-    cell = re.sub(r"[□■]\s*모름", "", cell).strip()
+    # □/■ 모름 · 기억이 안 나요 · 따로 없었어요 — 답이 아니다(체크했으면 모른다는 뜻이라 빈칸과 같다)
+    cell = UNKNOWN_CELL_MARK.sub("", cell).strip()
     # 표에 직접 채우는 행이라는 표시. 답이 아니라 양식 메모라 프롬프트로 새면 안 된다.
     cell = re.sub(r"^\(?직접\s*(입력|적기)\)?\s*(\(0~\d행\))?\s*", "", cell)
     cell = cell.strip("_ ").strip()

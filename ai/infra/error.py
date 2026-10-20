@@ -64,6 +64,20 @@ class EmptyTranscriptError(AppError):
         )
 
 
+class NoSpeechError(AppError):
+    """말로 답하기(/v1/voice/answer-transcriptions) 녹음에서 말소리를 찾지 못했다.
+
+    BE 는 이 코드를 보고 '다시 한번 말씀해 주세요'(422 no_speech)로 알린다. 다시 해도 같은 녹음이라 422.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(
+            code="NO_SPEECH",
+            message="No speech was recognized in the answer recording.",
+            status_code=422,
+        )
+
+
 class AudioTooLargeError(AppError):
     def __init__(self, max_bytes: int) -> None:
         super().__init__(

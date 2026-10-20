@@ -9,7 +9,10 @@ from pipeline.s3_synthesis.c_build_system_prompt import (
     extract_memory_candidates,
     generate_persona_response,
 )
+from pipeline.s3_synthesis.e_memory_gap import make_gap_question
 from infra.schema.persona import (
+    GapQuestionRequest,
+    GapQuestionResponse,
     MemoryCandidateRequest,
     MemoryCandidateResponse,
     PersonaAssemblyRequest,
@@ -46,6 +49,19 @@ def create_persona_response(
     if settings.persona_orchestrator and not request.persona.fixed_prompt:
         return orchestrate_persona_response(request, settings=settings)
     return generate_persona_response(request, settings=settings)
+
+
+@router.post("/gap-question", response_model=GapQuestionResponse, response_model_exclude_none=True)
+def create_gap_question(
+    request: GapQuestionRequest,
+    _authorized: InternalRequest,
+    settings: SettingsDependency,
+) -> GapQuestionResponse:
+    """대화가 끝난 뒤(BE 뒤 작업) 기억 빈틈 후보 하나 → 가족에게 물을 질문 / 열린 질문에 합치기 / 건너뛰기.
+
+    대답 경로 밖의 LLM 호출이다. 대화 중에는 부르지 않는다.
+    """
+    return make_gap_question(request, settings=settings)
 
 
 @router.post("/memory-candidates", response_model=MemoryCandidateResponse)

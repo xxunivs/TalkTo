@@ -46,6 +46,12 @@ class MemoryItem(Contract):
     conflict_group: str | None = None
 
 
+class StyleFix(Contract):
+    """가족이 고쳐 준 말투 한 쌍(BE styleExamples). 조립기가 '말투를 이렇게 고쳐 달라고 했어요' 절로 넣는다."""
+    original: str
+    corrected: str
+
+
 class TurnInput(Contract):
     """BE 요청을 중간계층 형식으로 옮긴 것. 한 턴의 입력 전부."""
     subject_id: str
@@ -60,6 +66,10 @@ class TurnInput(Contract):
     # 고인 페르소나인가(BE persona.deceased). 음성 감정 안전선(모르면(None) 고인으로 본다)과, 등록부가 없을 때
     # 공통 규칙 변형(사후·사망 정책, PersonaRegistry.profile_for: 값이 있으면 지시문 추정보다 우선)에 쓴다.
     deceased: bool | None = None
+    # 기억 빈틈 표시를 받을까(BE flagGaps). 켜면 조립기가 빈틈 표시 지침을 넣고, 결과에 memory_gap 을 싣는다.
+    flag_gaps: bool = False
+    # 가족이 고쳐 준 말투(BE styleExamples, 최근 10개)
+    style_examples: list[StyleFix] = Field(default_factory=list)
 
 
 class Replacement(Contract):
@@ -186,6 +196,9 @@ class TurnResult(Contract):
     # 대답 음성 표시(FISH_EMOTION, orchestrator/voice.py). off 면 둘 다 None.
     emotion: str | None = None
     speech_text: str | None = None
+    # 기억 빈틈 주제(turn.flag_gaps 일 때만). 대답 끝 [기억없음:주제] 표시, 없으면 사전 판정의 '기억에 없다' 화제어.
+    # 주제를 모르면 빈 글, 빈틈이 없으면 None.
+    memory_gap: str | None = None
     trace: list[StageTrace] = Field(default_factory=list)
 
 

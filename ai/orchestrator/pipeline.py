@@ -14,6 +14,7 @@ from orchestrator.contracts import (
     TurnInput, TurnResult,
 )
 from orchestrator.voice import VoiceMarks, VoiceRun
+from pipeline.s3_synthesis.e_memory_gap import split_gap, turn_gap
 
 STAGES = ("session", "select", "precheck", "assemble", "generate", "guard", "post_turn")
 
@@ -30,6 +31,8 @@ class TurnRun:
     generation: Generation | None = None
     # 음성 표시를 떼어 낸 결과(FISH_EMOTION 이 켜진 Fish 목소리일 때만)
     voice: VoiceRun | None = None
+    # 대답에서 뗀 기억 빈틈 표시의 주제(표시가 없으면 None, 주제 없이 붙었으면 빈 글)
+    gap: str | None = None
     guard: GuardResult | None = None
     next_state: SessionState | None = None
     result: TurnResult | None = None
@@ -96,12 +99,16 @@ class PersonaOrchestrator:
             lambda g: {"model": g.model, "chars": len(g.text), **g.usage})
         if until == "generate":
             return r
+        # 기억 빈틈 표시([기억없음:주제])를 가장 먼저 뗀다(음성 표시는 [ ] 를 모두 지워 주제를 잃는다). 요청하지 않았는데
+        # 붙여도 지운다. 가드·세션·대화 기록에는 표시 없는 글만 간다.
+        r.gap, gap_text = split_gap(r.generation.text)
+        generated = r.generation if r.gap is None else r.generation.model_copy(update={"text": gap_text})
         # 감정 이름·연기 표시는 가드 앞에서 뗀다. 가드·언어 가드·턴 뒤 처리는 표시 없는 글만 본다.
-        clean = r.generation
+        clean = generated
         if self.voice.mode(turn) != "off":
-            r.voice = self._timed(r, "voice", self.voice.impl, lambda: self.voice.split(r.generation.text, turn),
+            r.voice = self._timed(r, "voice", self.voice.impl, lambda: self.voice.split(generated.text, turn),
                                   lambda v: v.summary())
-            clean = r.generation.model_copy(update={"text": r.voice.guard_text})
+            clean = generated.model_copy(update={"text": r.voice.guard_text})
         r.guard = self._timed(
             r, "guard", self.guard.impl, lambda: self.guard.apply(clean, turn, r.state, r.selection),
             lambda g: {"action": g.action, "reasons": g.reasons, "cited": g.cited_memory_ids})
@@ -122,5 +129,20 @@ class PersonaOrchestrator:
         emotion, speech_text = self.voice.finish(r.voice, r.guard)
         r.result = TurnResult(content=r.guard.text, retrieved_memory_ids=ids,
                               provider=r.generation.provider, model=r.generation.model,
-                              emotion=emotion, speech_text=speech_text, trace=r.trace)
+                              emotion=emotion, speech_text=speech_text, memory_gap=memory_gap(turn, r),
+                              trace=r.trace)
         return r
+
+
+def memory_gap(turn: TurnInput, run: TurnRun) -> str | None:
+    """기억 빈틈 주제(turn.flag_gaps 일 때만). 모델 표시가 먼저, 없으면 사전 판정이 '기억에 없다'고 본 화제어.
+
+    죽음·장례·임종·위기·건강·종교 화제면 None(가족에게 묻지 않는다, e_memory_gap.turn_gap — 기존 경로와 같다).
+    """
+    if not turn.flag_gaps:
+        return None
+    if run.gap is not None:
+        return turn_gap(turn.message, run.gap)
+    if run.precheck is not None and run.precheck.known is False:
+        return turn_gap(turn.message, "·".join(run.precheck.topic_terms[:3])[:60])
+    return None

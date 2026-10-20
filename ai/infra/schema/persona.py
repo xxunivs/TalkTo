@@ -48,6 +48,12 @@ class PersonaContext(ApiModel):
     fixed_prompt: bool = False
 
 
+class StyleExample(ApiModel):
+    """가족이 고쳐 준 말투 한 쌍(BE StyleExample). 예전 대답 → 그분이라면 했을 말."""
+    original: str = Field(min_length=1, max_length=2_000)
+    corrected: str = Field(min_length=1, max_length=300)
+
+
 class PersonaResponseRequest(ApiModel):
     message: str = Field(min_length=1, max_length=20_000)
     history: list[ConversationMessage] = Field(default_factory=list)
@@ -57,8 +63,19 @@ class PersonaResponseRequest(ApiModel):
     session_id: str | None = Field(default=None, max_length=200)
     # 앱에서 고른 가족 프로필 등 "지금 누가 말하나" 힌트
     speaker_hint: str | None = Field(default=None, max_length=200)
+    # 기억 빈틈 표시를 받을까(BE '더 알려 주실 기억'). 켜면 같은 호출에서 대답 끝에 [기억없음:주제] 를 붙이게 하고
+    # 떼어 내 memoryGap 으로 돌려준다(pipeline/s3_synthesis/e_memory_gap.py). 꺼져 있으면 예전과 같은 메시지다.
+    flag_gaps: bool = False
+    # 가족이 고쳐 준 말투(최근 10개). 있으면 '말투를 이렇게 고쳐 달라고 했어요' 절을 넣는다(두 경로 모두).
+    style_examples: list[StyleExample] = Field(default_factory=list, max_length=10)
 
     _drop_empty_history = field_validator("history", mode="before")(drop_empty_turns)
+
+
+class MemoryGap(ApiModel):
+    """이번 대답에서 그분 기억에 없던 것(BE 가 대화가 끝난 뒤 가족에게 물을 질문 후보로 쓴다)."""
+    # 모델이 붙인 주제(없으면 빈 글 — 빈틈은 있었다)
+    topic: str = Field(default="", max_length=60)
 
 
 class PersonaResponseResult(ApiModel):
@@ -70,18 +87,64 @@ class PersonaResponseResult(ApiModel):
     # 정해진 연기 표시([웃으며] 등)만 들어 있다. BE 는 이것을 저장했다가 읽기에 쓰고, 없으면 content 를 읽는다.
     # 화면·대화 기록·기억 추출에는 content(표시 없음)만 쓴다.
     speech_text: str | None = None
+    # 기억 빈틈(요청 flagGaps 일 때만). 대답 끝 [기억없음:주제] 표시나 중간계층 사전 판정('기억에 없다')에서 온다.
+    # 표시는 content·speechText 에서 이미 떼어 냈다(화면·가드·대화 기록·기억에 가지 않는다).
+    memory_gap: MemoryGap | None = None
     provider: str
     model: str
 
     @model_serializer(mode="wrap")
     def _omit_empty_speech_text(self, handler):
-        # speechText 가 없으면 칸을 아예 빼서 FISH_EMOTION=off 응답이 예전과 글자까지 같게 둔다
+        # speechText·memoryGap 이 없으면 칸을 아예 빼서 FISH_EMOTION=off 응답이 예전과 글자까지 같게 둔다
         data = handler(self)
         if isinstance(data, dict):
-            for key in ("speechText", "speech_text"):
+            for key in ("speechText", "speech_text", "memoryGap", "memory_gap"):
                 if key in data and data[key] is None:
                     del data[key]
         return data
+
+
+class GapCandidate(ApiModel):
+    """대화 한 번에서 나온 기억 빈틈 후보(BE 가 대화 뒤에 보낸다)."""
+    user_message: str = Field(min_length=1, max_length=4_000)
+    reply: str = Field(default="", max_length=4_000)
+    # 대답 모델이 붙인 주제(signal=model). 없으면 빈 글
+    topic: str = Field(default="", max_length=60)
+    # model = 대답 모델 표시 · low_recall = 기억 검색이 비었음 · feedback = 가족이 '내용이 틀려요'
+    signal: Literal["model", "low_recall", "feedback"] = "model"
+    # '내용이 틀려요'에 가족이 적은 한 줄(있으면)
+    correction: str | None = Field(default=None, max_length=300)
+
+
+class OpenGapQuestion(ApiModel):
+    id: str = Field(min_length=1, max_length=64)
+    topic: str = Field(default="", max_length=60)
+    question: str = Field(min_length=1, max_length=300)
+
+
+class GapQuestionRequest(ApiModel):
+    candidate: GapCandidate
+    # 이 대화 상대에 아직 열려 있는 질문(같은 것을 또 만들지 않게). BE 는 10개까지만 연다.
+    open_questions: list[OpenGapQuestion] = Field(default_factory=list, max_length=20)
+    # 질문에 쓸 그분 호칭(예: 할머니). 없으면 '그분'
+    subject_label: str | None = Field(default=None, max_length=40)
+    # 나 자신으로 만든 대화 상대(만든 분 = 그분)
+    subject_self: bool = False
+    # 돌아가신 분인가(질문 시제). 모르면 None → 지난 일로 묻는다
+    deceased: bool | None = None
+    # 후보가 함께 쓰는 가족의 대화·고침에서 왔다(질문은 만든 분이 본다). 그 가족이 한 말의 이름·날짜·사건·
+    # 그 가족 자신의 사정은 질문·주제에 넣지 않고, 대답 모델이 붙인 주제로 대신 채우지 않는다.
+    from_member: bool = False
+
+
+class GapQuestionResponse(ApiModel):
+    # new = 새 질문 · merge = 열린 질문 mergeInto 와 같은 것 · skip = 물을 것이 아님
+    action: Literal["new", "merge", "skip"]
+    question: str | None = None
+    topic: str | None = None
+    merge_into: str | None = None
+    provider: str
+    model: str
 
 
 class MemoryCandidateRequest(ApiModel):

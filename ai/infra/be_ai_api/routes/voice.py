@@ -12,7 +12,12 @@ from pipeline.s4_voice.a_voice import (
     transcribe_voice_message,
 )
 from infra.external_api.tts import create_tts_provider, provider_for_voice
+from pipeline.s4_voice.d_answer_transcription import (
+    ANSWER_AUDIO_MAX_BYTES,
+    transcribe_answer,
+)
 from infra.schema.voice import (
+    AnswerTranscriptionResponse,
     OkResponse,
     SpeechSynthesisRequest,
     SubjectSampleCollectionRequest,
@@ -49,6 +54,24 @@ def create_voice_transcription(
     return transcribe_voice_message(
         content, audio_file.filename or "audio.wav", language=language, settings=settings
     )
+
+
+@router.post("/answer-transcriptions", response_model=AnswerTranscriptionResponse)
+def create_answer_transcription(
+    _authorized: InternalRequest,
+    settings: SettingsDependency,
+    audio_file: Annotated[UploadFile, File()],
+) -> AnswerTranscriptionResponse:
+    """말로 답하기 — 멀티파트 audio_file(webm·m4a·wav, 3분까지) → 받아쓴 글(ElevenLabs Scribe).
+
+    화자 나누기 없이 한국어로 받아쓴다. 녹음은 임시 파일로만 두고 바로 지우며, ElevenLabs 의
+    받아쓰기 기록도 바로 지운다. 말소리가 없으면 422 NO_SPEECH. 받아쓰기 호출이 블로킹이라
+    일반 def 로 둔다(스레드풀에서 돈다).
+    """
+    content = audio_file.file.read(ANSWER_AUDIO_MAX_BYTES + 1)
+    if len(content) > ANSWER_AUDIO_MAX_BYTES:
+        raise AudioTooLargeError(ANSWER_AUDIO_MAX_BYTES)
+    return transcribe_answer(content, audio_file.filename or "answer.webm", settings=settings)
 
 
 @router.post("/speech")

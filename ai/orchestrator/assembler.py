@@ -16,6 +16,7 @@ from orchestrator.contracts import (
     MemoryItem, MemorySelection, PrecheckResult, PromptBundle, PromptSection, SessionState, TurnInput,
 )
 from pipeline.s3_synthesis.c_build_system_prompt import build_memory_block, late_style_note
+from pipeline.s3_synthesis.e_memory_gap import extra_system
 from orchestrator.guard import HEADER_RULE, header_block
 from orchestrator.persona import has_layered_rules
 from orchestrator.restricted import brief_rule, redact_instructions
@@ -46,6 +47,16 @@ def voice_section(voice: VoiceMarks | None, turn: TurnInput) -> list[PromptSecti
     return [PromptSection(name="voice", role="system", content=instruction)] if instruction else []
 
 
+def extra_sections(turn: TurnInput) -> list[PromptSection]:
+    """기억 빈틈 표시 지침(flag_gaps)·가족이 고쳐 준 말투(style_examples). 음성 지침 바로 뒤, 기존 경로와 같은 자리.
+
+    요청에 없으면 빈 목록(예전과 같은 메시지). 둘 다 자주 바뀌지 않는 글이라 기억 앞에 둔다(프롬프트 캐시).
+    """
+    names = ("gap", "style") if turn.flag_gaps else ("style",)
+    texts = extra_system(turn.flag_gaps, turn.style_examples)
+    return [PromptSection(name=name, role="system", content=text) for name, text in zip(names, texts)]
+
+
 class LegacyAssembler:
     impl = "legacy_v0"
 
@@ -57,6 +68,7 @@ class LegacyAssembler:
                  precheck: PrecheckResult) -> PromptBundle:
         sections = [PromptSection(name="persona", role="system", content=turn.persona_instructions)]
         sections += voice_section(self.voice, turn)
+        sections += extra_sections(turn)
         block = legacy_memory_block(selection.memories)
         if block:
             sections.append(PromptSection(name="memories", role="system", content=block))
@@ -214,8 +226,9 @@ class StructuredAssembler:
             dblock = delta_block(selection.delta)
             if dblock:
                 sections.append(PromptSection(name="delta", role="system", content=dblock))
-        # 음성 지침은 첫 system 과 따로 둔다(지시문 글을 바꾸지 않아 말투 덧붙임·존댓말 판정이 그대로다)
-        sections[1:1] = voice_section(self.voice, turn)
+        # 음성 지침은 첫 system 과 따로 둔다(지시문 글을 바꾸지 않아 말투 덧붙임·존댓말 판정이 그대로다).
+        # 기억 빈틈 표시·고친 말투도 그 바로 뒤에 따로 둔다(같은 까닭).
+        sections[1:1] = voice_section(self.voice, turn) + extra_sections(turn)
         if prof.shots and self.shots_mode == "messages" and not shots_in_text:
             for i, sh in enumerate(prof.shots):
                 sections += [PromptSection(name=f"shot{i}u", role="user", content=sh.user),

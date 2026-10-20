@@ -12,6 +12,17 @@ class VoiceTranscriptionResponse(ApiModel):
     model: str
 
 
+class AnswerTranscriptionResponse(ApiModel):
+    """말로 답하기(/v1/voice/answer-transcriptions): 질문 답 칸에 넣을 받아쓴 글 한 덩어리.
+
+    화자 나누기 없이 한국어로 받아쓴 글이다. 녹음과 ElevenLabs 의 받아쓰기 기록은 남기지 않는다.
+    """
+
+    text: str
+    provider: str
+    model: str
+
+
 class VoiceSampleSegment(ApiModel):
     """대상자 화자 구간 하나. 녹음 오디오 URL + 구간 [startMs, endMs).
 

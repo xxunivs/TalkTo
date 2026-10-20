@@ -17,6 +17,7 @@ from infra.schema.persona import (
     MemoryCandidate,
     MemoryCandidateRequest,
     MemoryCandidateResponse,
+    MemoryGap,
     PersonaAssemblyRequest,
     PersonaAssemblyResponse,
     PersonaResponseRequest,
@@ -25,6 +26,7 @@ from infra.schema.persona import (
 from infra.schema.transcript import TranscriptSegment
 from orchestrator.text import listener_speech_level
 from pipeline.s3_synthesis.common_rules import family_guide, render_common_rules
+from pipeline.s3_synthesis.e_memory_gap import extra_system, split_gap, turn_gap
 from pipeline.s4_voice.b_emotion import split_voice, voice_instruction, voice_mode
 
 logger = logging.getLogger(__name__)
@@ -166,6 +168,9 @@ def generate_persona_response(
     instruction = voice_instruction(mode)
     if instruction:
         messages.append({"role": "system", "content": instruction})
+    # 기억 빈틈 표시(flagGaps)·가족이 고쳐 준 말투(styleExamples). 요청에 없으면 넣지 않는다(예전과 같은 메시지).
+    for extra in extra_system(request.flag_gaps, request.style_examples):
+        messages.append({"role": "system", "content": extra})
     memory_block = build_memory_block(request.memories)
     if memory_block:
         messages.append({"role": "system", "content": memory_block})
@@ -184,6 +189,11 @@ def generate_persona_response(
         **chat_reasoning(settings),
     )
     content = (response.choices[0].message.content or "").strip()
+    # 기억 빈틈 표시([기억없음:주제])를 가장 먼저 뗀다. 음성 표시(cue·inline)는 [ ] 를 모두 지우므로 그 앞에서 떼야
+    # 주제를 잃지 않고, off 여도 표시가 화면·대화 기록·기억에 남지 않는다(요청하지 않았는데 붙여도 지운다).
+    gap_topic, content = split_gap(content)
+    # 죽음·장례·임종·위기·건강·종교 화제면 빈틈 후보를 돌려주지 않는다(표시는 위에서 이미 뗐다). 중간계층과 같다.
+    gap_topic = turn_gap(request.message, gap_topic) if request.flag_gaps else None
     # 감정·연기 표시를 떼어 낸다. content 는 표시 없는 글(화면·대화 기록·기억), speech_text 는 목소리용(inline)
     voice = split_voice(content, mode, deceased=request.persona.deceased)
     if not voice.text.strip():
@@ -198,6 +208,7 @@ def generate_persona_response(
         retrieved_memory_ids=[memory.id for memory in request.memories],
         emotion=voice.emotion,
         speech_text=voice.speech_text(),
+        memory_gap=MemoryGap(topic=gap_topic) if gap_topic is not None else None,
         provider=PROVIDER,
         model=settings.openai_chat_model,
     )

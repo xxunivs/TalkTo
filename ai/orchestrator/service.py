@@ -12,11 +12,11 @@ import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
-from infra.schema.persona import MemoryContext, PersonaResponseRequest, PersonaResponseResult
+from infra.schema.persona import MemoryContext, MemoryGap, PersonaResponseRequest, PersonaResponseResult
 from infra.setting import Settings
 from orchestrator.assembler import LegacyAssembler, StructuredAssembler
 from orchestrator.lang_guard import LanguageGuard
-from orchestrator.contracts import MemoryItem, Turn, TurnInput
+from orchestrator.contracts import MemoryItem, StyleFix, Turn, TurnInput
 from orchestrator.guard import GuardV1, GuardV11, PassGuard
 from orchestrator.llm import OpenAIChatLLM
 from orchestrator.memory import (
@@ -52,6 +52,8 @@ def turn_from_request(request: PersonaResponseRequest) -> TurnInput:
         speaker_hint=request.speaker_hint,
         voice_id=request.persona.voice_id,
         deceased=request.persona.deceased,
+        flag_gaps=request.flag_gaps,
+        style_examples=[StyleFix(original=s.original, corrected=s.corrected) for s in request.style_examples],
     )
 
 
@@ -179,6 +181,7 @@ def orchestrate_persona_response(request: PersonaResponseRequest, *, settings: S
         except OSError:  # 추적 로그 실패가 응답을 막으면 안 된다
             log.exception("orchestrator trace write failed")
     res = run.result
+    gap = MemoryGap(topic=res.memory_gap) if res.memory_gap is not None else None
     return PersonaResponseResult(content=res.content, retrieved_memory_ids=res.retrieved_memory_ids,
-                                 emotion=res.emotion, speech_text=res.speech_text,
+                                 emotion=res.emotion, speech_text=res.speech_text, memory_gap=gap,
                                  provider=res.provider, model=res.model)
