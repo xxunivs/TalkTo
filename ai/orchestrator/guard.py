@@ -15,6 +15,9 @@ GuardV1(ORCHESTRATOR_GUARD=v1) — 규칙은 서로 독립인 순수 함수, 아
   3. 애정   '사랑' 문장은 가족이 먼저 사랑을 말했거나(되받기) 마무리 인사일 때만, 세션당 1번(실제 통화도 마무리에 한 번 정도).
             그 밖엔 문장 삭제.
   4. 챙김   밥·건강 챙김 문장은 세션당 care_limit 번까지(모델은 절반 넘는 턴에 넣는다). 넘으면 그 문장 삭제(다른 문장이 남을 때만).
+  고인   비공개 고인 페르소나면 잊은 듯 말한 문장(forgot)을 지운다(잠금 2). 지어내기 검사 앞에서 한 번, 모든 반환에서 한 번.
+         다 지워지면 고인 되묻기. 위기·죽음 턴은 되묻기로 바꾸지 않고(남는 문장이 있을 때만 지운다), 상담 번호 문장은 지우지 않는다.
+         지어내기 검사는 이야기를 청하는 되묻기(TELL_ME)일 때만 건너뛴다('글쎄·몰라'로는 건너뛰지 않는다).
 되묻기 문구는 같은 세션에서 연속이면 짧은 '모름'으로 바꾼다(취조처럼 들리지 않게).
 가족 표의 '지금 대화하는 사람' 줄이 존댓말이면 높인 되묻기(family_polite)를 쓴다(가드 문구는 모델을 거치지 않는다).
 GuardV11(ORCHESTRATOR_GUARD=v11): v1 의 오차단을 줄인 판정(아래 클래스 설명).
@@ -83,6 +86,9 @@ def parse_header(text: str, selection: MemorySelection) -> tuple[str, list[Memor
 DONT_KNOW = re.compile(r"(몰라|모르겠|모른다|기억이\s?(잘\s?)?안|생각이\s?(잘\s?)?안\s?나|가물가물|글쎄|잊어버|까먹|얘기\s?(좀\s?)?해\s?줄래|말해\s?줄래"
                        # 고인 페르소나의 되묻기(잊은 듯 말하지 않고 가족에게 듣고 싶어 한다: ASK_BACK *_deceased)
                        r"|얘기[^.?!\n]{0,8}해\s?줄래|이야기[^.?!\n]{0,10}(들려|해)\s?주실래|들려\s?줄래)")
+# DONT_KNOW 중 이야기를 청하는 되묻기만. 고인은 이 말일 때만 지어내기 검사를 건너뛴다('글쎄·몰라' 뒤에 지어낸 말이 숨지 않게)
+TELL_ME = re.compile(r"얘기\s?(좀\s?)?해\s?줄래|말해\s?줄래|얘기[^.?!\n]{0,8}해\s?줄래|이야기[^.?!\n]{0,10}(들려|해)\s?주실래"
+                     r"|들려\s?줄래")
 AFFECTION = re.compile(r"사랑")
 USER_LOVE = re.compile(r"사랑|보고\s?싶")
 CLOSING = re.compile(r"(끊(어|을게|는다|자|을께)|들어가(세요|요|라|볼게)|잘\s?(자|있어|지내)|또\s?(전화|연락)|안녕히|다음에\s?(또|전화)|이만)")
@@ -104,6 +110,62 @@ ASK_BACK = {
 
 def sentences(text: str) -> list[str]:
     return [s.strip() for s in SENT.split(text) if s and s.strip()] or [text]
+
+
+# 고인 페르소나가 잊은 듯 말하는 말(잠금 2). 내가 기억이 안 난다·잊었다·모르겠다는 말만 좁게 잡는다
+# (기억에 없다·깜빡했다·가물거린다도. BE app/services/forgetting.py 와 같은 말을 잡는다).
+# 안 걸리는 말: '잊지 마라'·'잊어버리지 마라'(챙김), '기억이 안 나면'·'안 나도'·'잊었으면'(조건·바람),
+# '안 잊었다'·'못 잊었지'(기억한다), '네 생각이 안 나는 날이 없다'·'잊었을 리가'·'잊었던 일'(그리움),
+# '보고 싶은지 모르겠다'·'어쩔 줄을 모르겠다'(감탄), '아무·다른 생각이 안 나더라'(마음), '잘 모르겠으면'(조건).
+# 맨 '몰라·모른다'는 넣지 않는다(no_advice 의 "그건 내가 잘 모른다" 같은 약 이야기 피하기까지 지워진다).
+_ADV = r"(?:잘|하나도|전혀|통|영|도통|도무지|이젠|이제는|이제|요즘|요새|다)"  # 둘까지(이젠 잘 안 나)
+_NA = r"안\s?(?:나(?!면|도|는\s?(?:날|때|적))|난(?!다면|다고|\s?(?:날|때|적))|났|납)"  # 안 나·난다·났어·납니다
+FORGOT = re.compile(
+    rf"기억(?:이|도)?\s?(?:{_ADV}\s?){{0,2}}{_NA}|기억(?:이|도)?\s?(?:잘\s?)?나지\s?않(?!는\s?(?:날|때|적))"
+    r"|기억(?:을|도)?\s?(?:잘\s?)?못\s?하겠|기억이\s?가물|가물\s?(?:가물|거)|기억(?:에|이)\s?없(?!는|으면|다면)"
+    r"|(?<!안)(?<!안\s)(?<!못)(?<!못\s)(?:잊어\s?버렸|잊어먹었|잊었|까먹었|까먹어\s?버렸|깜[빡박]\s?했|다\s?잊어서)"
+    r"(?!을\s?(?:리|까)|으면|던|다고|다면)"
+    rf"|(?<!아무)(?<!아무\s)(?<!다른\s)(?<!딴\s)생각이\s?(?:{_ADV}\s?){{0,2}}{_NA}"
+    r"|(?<!지)(?<!지\s)(?<!줄\s)(?<!줄을\s)(?<!바\s)(?<!바를\s)(?:잘\s?)?모르겠(?!으면|나요?[?？])")  # '내가 모르겠나?'는 안다는 말
+# 걸린 말이 묻는 꼴이면("까먹었니?", "기억 안 나지?", "잊었어?", "내가 너를 잊었겠니?") 잊은 말이 아니다
+_ASKS = re.compile(r"[^\s,.!…~]*?(?:[?？]|(?:니|냐)(?=$|[\s,.!…~]))")
+# 단, 혼잣말로 묻는 꼴("잊어버렸나?", "안 나네?", "왜 이렇게 기억이 안 나지?")은 잊은 말이다
+_WONDER = re.compile(r"(?:나|네|는가)요?[?？]")
+_WHY = re.compile(r"왜\s?(?:이렇게|이리|자꾸)")
+# 걸린 말 앞 마디(쉼표부터)가 듣는 사람 이야기면("너 또 까먹었구나", "넌 모르겠지만") 잊은 말이 아니다.
+# 단, 듣는 사람이 한 말을 내가 잊은 꼴("네가 말한 거 다 까먹었다", "네가 해 준 얘기는 기억이 안 나네")은 잊은 말이다
+_YOU = re.compile(r"(?<![가-힣])(?:너|넌|너는|너도|네가|니가|자네|당신)(?![가-힣])")
+_ME = re.compile(r"(?<![가-힣])(?:난|나는|나도|내가|저는|저도|제가)(?![가-힣])")  # 맨 '나'는 '안 나'와 겹쳐 뺀다
+_TOLD = re.compile(r"(?:한|준|던|낸)\s?(?:거|건|걸|것|얘기|이야기|말|일)(?:[은는을를도]|(?![가-힣]))")
+
+
+def forgot(sentence: str) -> bool:
+    """페르소나 자신이 기억이 안 난다·잊었다·모르겠다고 하는 문장인가. 묻는 말·듣는 사람 이야기·상담 번호 문장은 아니다."""
+    if CRISIS_LINE.search(sentence):
+        return False
+    for m in FORGOT.finditer(sentence):
+        head = sentence[max(sentence.rfind(",", 0, m.start()), sentence.rfind("，", 0, m.start())) + 1:m.start()]
+        tail = sentence[m.end():]
+        if _ASKS.match(tail) and not (_WONDER.match(tail) or _WHY.search(head)):
+            continue
+        you = _YOU.search(head)
+        if you and not _ME.search(head) and not _TOLD.search(head, you.end()):
+            continue
+        return True
+    return False
+
+
+def says_forgot(text: str) -> bool:
+    return any(forgot(s) for s in sentences(text))
+
+
+def drop_forgetting(text: str, fallback: str) -> str:
+    """잊은 듯 말한 문장을 지운다. 다 지워지면 fallback. 지울 것이 없으면 글을 한 글자도 바꾸지 않는다."""
+    sents = sentences(text)
+    kept = [s for s in sents if not forgot(s)]
+    if len(kept) == len(sents):
+        return text
+    return " ".join(kept) if kept else fallback
 
 
 def _deceased(turn: TurnInput, prof) -> bool:
@@ -183,6 +245,7 @@ class GuardV1:
             "family_polite" if listener_speech_level(turn.persona_instructions) == "존댓말" else "family")
         if kind != "public" and _deceased(turn, prof):
             kind += "_deceased"
+        deceased = kind.endswith("_deceased")
         streak = state.counters.get("ask_back_streak", 0)
         ask_back = ASK_BACK[kind][1 if streak >= 1 else 0]
         reasons: list[str] = []
@@ -192,6 +255,17 @@ class GuardV1:
         cited_ids = None if cited is None else [m.id for m in cited]
 
         def done(text: str, action: str) -> GuardResult:
+            if deceased:  # 고인은 잊은 듯 말하지 않는다(잠금 2). 모든 반환 경로(가림 답·위기 턴 포함)에서 거른다
+                kept = drop_forgetting(text, "")
+                if kept != text:
+                    if kept:
+                        reasons.append("forgot_drop")
+                        text, action = kept, ("trim" if action == "pass" else action)
+                    elif "safety_skip" in reasons:  # 위기·죽음 대답은 되묻기로 바꾸지 않는다
+                        reasons.append("forgot_kept_safety")
+                    else:
+                        reasons.append("forgot_drop")
+                        text, action = ask_back, "ask_back"
             if action == "ask_back":
                 delta["ask_back_streak"] = 1
             elif streak:
@@ -215,9 +289,18 @@ class GuardV1:
             reasons.append("safety_skip")
             return done(body, "trim" if "leak" in reasons else "pass")
 
-        # 2. 지어내기 (질문일 때만)
+        # 고인: 잊은 듯 말한 문장을 먼저 지운다. '기억이 안 나네'가 DONT_KNOW 에 걸려 나머지 말이 지어내기 검사를 건너뛰지 않게
+        if deceased:
+            kept = drop_forgetting(body, "")
+            if kept != body:
+                reasons.append("forgot_drop")
+                if not kept:
+                    return done(ask_back, "ask_back")
+                body = kept
+
+        # 2. 지어내기 (질문일 때만). 고인은 이야기를 청하는 되묻기일 때만 건너뛴다(TELL_ME)
         msg = self.question_text(turn)
-        if msg and is_question(msg) and not DONT_KNOW.search(body):
+        if msg and is_question(msg) and not (TELL_ME if deceased else DONT_KNOW).search(body):
             instructions, _ = redact_instructions(turn.persona_instructions, restricted)
             profile = profile_section(instructions)
             # 안부·인사·마음만 있는 질문("편안하게 잘 계시죠?")은 기억을 묻는 게 아니라 근거 기억이 없는 게 정상이다.
@@ -270,7 +353,7 @@ class GuardV1:
             reasons.append("all_dropped_keep_first")
             kept = sents[:1]
         text = " ".join(kept) if len(kept) < len(sents) else body
-        trimmed = len(kept) < len(sents) or "leak" in reasons
+        trimmed = len(kept) < len(sents) or "leak" in reasons or "forgot_drop" in reasons
         return done(text, "trim" if trimmed else "pass")
 
 

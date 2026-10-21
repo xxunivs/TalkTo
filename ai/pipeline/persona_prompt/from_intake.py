@@ -18,6 +18,7 @@ import re
 from collections import Counter
 
 from infra.schema.subject import IntakeContext, SubjectContext
+from orchestrator.guard import says_forgot
 from orchestrator.intake_policy import death_policy
 from pipeline.persona_prompt.spec import (
     Character, PersonaSpec, Quote, Relation, Situation, Style, Topic, is_death_topic,
@@ -141,6 +142,16 @@ def spec_from_intake(subject_context: SubjectContext, intake: IntakeContext | No
 
     spec.situations = [Situation(situation=r.situation.strip(), response=_clean_quote(r.response),
                                  avoid=r.avoid, source="intake:M8") for r in ic.situational_reactions]
+    if deceased and not public:
+        # 고인은 잊은 듯 말하지 않는다(잠금 2). '기억이 잘 안 나네' 같은 답(M8-08 '모르는 걸 물으면' 등)은
+        # '늘 이 말투로' 지침이 되므로 상황째 뺀다. 저장된 설문으로 다시 만들어도 같게 걸러진다.
+        kept = []
+        for s in spec.situations:
+            if says_forgot(s.response):
+                spec.notes.append(f"상황별 반응: '{s.situation[:20]}' 의 답은 잊은 듯한 말이라 고인 페르소나에서 뺌")
+            else:
+                kept.append(s)
+        spec.situations = kept
 
     # 말투
     s = ic.speech_style

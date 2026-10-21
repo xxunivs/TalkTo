@@ -24,6 +24,9 @@ from infra.schema.persona import (
     PersonaResponseResult,
 )
 from infra.schema.transcript import TranscriptSegment
+from orchestrator.guard import ASK_BACK, CRISIS_LINE, drop_forgetting, says_forgot
+from orchestrator.persona import infer_profile
+from orchestrator.precheck import is_safety_turn
 from orchestrator.text import listener_speech_level
 from pipeline.s3_synthesis.common_rules import family_guide, render_common_rules
 from pipeline.s3_synthesis.e_memory_gap import extra_system, split_gap, turn_gap
@@ -201,13 +204,26 @@ def generate_persona_response(
         logger.warning("persona reply was empty (finish_reason=%s)",
                        getattr(response.choices[0], "finish_reason", None))
         raise EmptyReplyError()
+    text, emotion, speech_text = voice.text, voice.emotion, voice.speech_text()
+    # 고인은 잊은 듯 말하지 않는다(잠금 2). 가드가 없는 이 경로(가져온 지침 fixedPrompt 등)도 같은 문장을 지운다.
+    # 표시를 뗀 글에서 지우고 연기 표시는 남은 글에 다시 꽂는다(화면·목소리 같은 글). 다 지워지면 고인 되묻기(감정·표시 버림).
+    # 공개 판정·위기 예외는 가드와 같다: 위기·죽음 턴은 되묻기로 바꾸지 않는다(남는 문장이 있을 때만 지운다).
+    if request.persona.deceased and not infer_profile(request.persona.instructions).public:
+        kept = drop_forgetting(voice.text, "")
+        if kept != voice.text:
+            if kept:
+                text, speech_text = kept, voice.speech_text(kept)
+            elif not (is_safety_turn(request.message) or CRISIS_LINE.search(voice.text)):
+                polite = listener_speech_level(request.persona.instructions) == "존댓말"
+                text = ASK_BACK["family_polite_deceased" if polite else "family_deceased"][0]
+                emotion, speech_text = None, None
 
     # 주입한 기억 전부를 '사용됨'으로 반환한다. 실제로 인용됐는지는 가리지 않는다.
     return PersonaResponseResult(
-        content=voice.text,
+        content=text,
         retrieved_memory_ids=[memory.id for memory in request.memories],
-        emotion=voice.emotion,
-        speech_text=voice.speech_text(),
+        emotion=emotion,
+        speech_text=speech_text,
         memory_gap=MemoryGap(topic=gap_topic) if gap_topic is not None else None,
         provider=PROVIDER,
         model=settings.openai_chat_model,
@@ -687,14 +703,18 @@ def assemble_persona_prompt(
         personality = f"{personality}\n{insight_block}".strip() if personality else insight_block
     if not personality:
         personality = "(파악된 성격 정보 없음)"
+    deceased = _is_deceased(intake_context)
     if intake_context and intake_context.situational_reactions:
         sit_lines = []
         for r in intake_context.situational_reactions:
+            # 고인은 잊은 듯 말하지 않는다(잠금 2): '기억이 안 나네' 같은 답(M8-08 등)은 지침으로 넣지 않는다
+            if deceased and not public and says_forgot(r.response):
+                continue
             line = f'- "{r.situation}" → {r.response}'
             if r.avoid:
                 line += f" (피할 것: {r.avoid})"
             sit_lines.append(line)
-        situational = "\n".join(sit_lines)
+        situational = "\n".join(sit_lines) or "(별도 지침 없음 — 위 원칙을 따른다)"
     else:
         situational = "(별도 지침 없음 — 위 원칙을 따른다)"
     # Intake 금기를 앞에 두고 전사에서 잡힌 것을 뒤에 붙인다
@@ -702,7 +722,6 @@ def assemble_persona_prompt(
         taboo_topics = list(intake_context.taboo_topics) + taboo_topics
     taboo = render_taboo_block(taboo_topics)
 
-    deceased = _is_deceased(intake_context)
     has_family = bool(ordered_names)
     return PERSONA_TEMPLATE.format(
         subject_name=subject_name,
