@@ -118,9 +118,20 @@ def load_synonyms(path: Path = SYNONYMS_PATH) -> dict[str, tuple[str, ...]]:
     return {k: tuple(v) for k, v in raw.items() if not k.startswith("_")}
 
 
-def _directive(terms: list[str], public: bool, polite: bool = False) -> str:
-    """polite: 가족 표의 '지금 대화하는 사람' 줄이 존댓말(orchestrator.text.listener_speech_level)."""
+def _directive(terms: list[str], public: bool, polite: bool = False, deceased: bool = False) -> str:
+    """polite: 가족 표의 '지금 대화하는 사람' 줄이 존댓말(orchestrator.text.listener_speech_level).
+
+    deceased: 고인 페르소나는 '기억이 안 난다'·'모르겠다'고 말하지 않는다(잠금 2, 대표 지시 2026-10-21).
+    지어내지 않는 것은 같고, 잊은 듯 말하는 대신 가족에게서 그 이야기를 듣고 싶어 하며 되묻는다.
+    """
     topic = "·".join(terms[:4])
+    if deceased and not public:
+        ask = ("\"그 이야기 한번 들려주실래요? 듣고 싶네요\"처럼 존댓말로" if polite
+               else "\"그 얘기 네가 한번 해 줄래? 듣고 싶구나\"처럼")
+        return ("# 이번 질문에 대해 (코드 판정)\n"
+                f"가족이 물은 것({topic})은 기억에 없다. 지어내지 말고, '기억이 안 난다'·'잊어버렸다'·"
+                f"'모르겠다'처럼 잊은 듯 말하지도 말고, 그 이야기를 가족에게서 듣고 싶다는 마음으로 {ask} "
+                "다정하게 되물어라. 장소·날짜·이름 같은 세부를 만들지 않는다.")
     if public:
         return ("# 이번 질문에 대해 (코드 판정)\n"
                 f"방문자가 물은 것({topic})은 기억에 없다. 지어내지 말고 \"그건 제가 잘 모르겠네요\"처럼 "
@@ -185,7 +196,16 @@ class CoveragePrecheck:
         known = best >= self.threshold
         public = bool(self.profiles and self.profiles.profile_for(turn).public)
         return PrecheckResult(known=known, coverage=round(best, 3), topic_terms=terms,
-                              directive=None if known else _directive(terms, public, polite=_polite(turn)))
+                              directive=None if known else _directive(
+                                  terms, public, polite=_polite(turn),
+                                  deceased=_is_deceased(turn, self.profiles)))
+
+
+def _is_deceased(turn: TurnInput, profiles) -> bool:
+    """고인 페르소나인가. BE 가 보낸 persona.deceased 가 먼저이고, 없으면 프로필 추정."""
+    if turn.deceased is not None:
+        return bool(turn.deceased)
+    return bool(profiles and profiles.profile_for(turn).deceased)
 
 
 def _polite(turn: TurnInput) -> bool:
@@ -293,4 +313,6 @@ class CoveragePrecheckV11(CoveragePrecheck):
         known = best >= self.threshold
         public = bool(self.profiles and self.profiles.profile_for(turn).public)
         return PrecheckResult(known=known, coverage=round(best, 3), topic_terms=terms,
-                              directive=None if known else _directive(terms, public, polite=_polite(turn)))
+                              directive=None if known else _directive(
+                                  terms, public, polite=_polite(turn),
+                                  deceased=_is_deceased(turn, self.profiles)))

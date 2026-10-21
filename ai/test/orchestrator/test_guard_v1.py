@@ -23,6 +23,8 @@ def g(text):
 
 
 def turn(msg, **kw):
+    # 살아 계신 분의 되묻기 문구를 본다(고인은 test_deceased_no_forgetting.py)
+    kw.setdefault("deceased", False)
     return TurnInput(subject_id="s", message=msg, persona_instructions=PERSONA, be_memories=MEMS, **kw)
 
 

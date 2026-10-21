@@ -77,8 +77,10 @@ def _g(text: str) -> Generation:
     return Generation(text=text, provider="t", model="t")
 
 
-def _turn(instructions: str, msg: str = "된장찌개 어떻게 끓였어요?") -> TurnInput:
-    return TurnInput(subject_id="s", message=msg, persona_instructions=instructions, be_memories=MEMS)
+def _turn(instructions: str, msg: str = "된장찌개 어떻게 끓였어요?", deceased: bool = False) -> TurnInput:
+    # 살아 계신 분의 되묻기 문구를 본다(고인은 test_deceased_no_forgetting.py)
+    return TurnInput(subject_id="s", message=msg, persona_instructions=instructions, be_memories=MEMS,
+                     deceased=deceased)
 
 
 def _st(**counters) -> SessionState:

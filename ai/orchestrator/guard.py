@@ -80,7 +80,9 @@ def parse_header(text: str, selection: MemorySelection) -> tuple[str, list[Memor
 
 # ---------------------------------------------------------------- 규칙 재료
 
-DONT_KNOW = re.compile(r"(몰라|모르겠|모른다|기억이\s?(잘\s?)?안|생각이\s?(잘\s?)?안\s?나|가물가물|글쎄|잊어버|까먹|얘기\s?(좀\s?)?해\s?줄래|말해\s?줄래)")
+DONT_KNOW = re.compile(r"(몰라|모르겠|모른다|기억이\s?(잘\s?)?안|생각이\s?(잘\s?)?안\s?나|가물가물|글쎄|잊어버|까먹|얘기\s?(좀\s?)?해\s?줄래|말해\s?줄래"
+                       # 고인 페르소나의 되묻기(잊은 듯 말하지 않고 가족에게 듣고 싶어 한다: ASK_BACK *_deceased)
+                       r"|얘기[^.?!\n]{0,8}해\s?줄래|이야기[^.?!\n]{0,10}(들려|해)\s?주실래|들려\s?줄래)")
 AFFECTION = re.compile(r"사랑")
 USER_LOVE = re.compile(r"사랑|보고\s?싶")
 CLOSING = re.compile(r"(끊(어|을게|는다|자|을께)|들어가(세요|요|라|볼게)|잘\s?(자|있어|지내)|또\s?(전화|연락)|안녕히|다음에\s?(또|전화)|이만)")
@@ -93,11 +95,22 @@ ASK_BACK = {
     "family": ("글쎄, 그건 기억이 잘 안 나네. 네가 얘기 좀 해 줄래?", "그건 잘 모르겠다."),
     "family_polite": ("글쎄요, 그건 기억이 잘 안 나네요. 이야기 좀 해 주실래요?", "그건 잘 모르겠어요."),
     "public": ("그건 제가 잘 모르겠네요. 어떤 이야기인지 조금 더 말씀해 주실래요?", "그 부분은 제가 잘 모르겠어요."),
+    # 고인 페르소나는 '기억이 안 난다'·'모르겠다'고 말하지 않는다(잠금 2, 대표 지시 2026-10-21).
+    # 지어내지도 않고, 가족에게서 그 이야기를 듣고 싶어 하며 되묻는다.
+    "family_deceased": ("그 얘기 네가 한번 해 줄래? 듣고 싶구나.", "그래, 네 얘기 더 들려줄래?"),
+    "family_polite_deceased": ("그 이야기 한번 들려주실래요? 듣고 싶네요.", "이야기 더 들려주실래요?"),
 }
 
 
 def sentences(text: str) -> list[str]:
     return [s.strip() for s in SENT.split(text) if s and s.strip()] or [text]
+
+
+def _deceased(turn: TurnInput, prof) -> bool:
+    """고인 페르소나인가. BE 가 보낸 persona.deceased 가 먼저이고, 없으면 프로필 추정."""
+    if turn.deceased is not None:
+        return bool(turn.deceased)
+    return bool(getattr(prof, "deceased", False))
 
 
 # 화제 확인(R1t)에서 빼는 말: 가벼운 동사·빈도어(질문 화제가 아님). 오차단 사례를 보고 정했다.
@@ -168,6 +181,8 @@ class GuardV1:
         restricted = prof.restricted
         kind = "public" if prof.public else (
             "family_polite" if listener_speech_level(turn.persona_instructions) == "존댓말" else "family")
+        if kind != "public" and _deceased(turn, prof):
+            kind += "_deceased"
         streak = state.counters.get("ask_back_streak", 0)
         ask_back = ASK_BACK[kind][1 if streak >= 1 else 0]
         reasons: list[str] = []
