@@ -204,8 +204,10 @@ def _deceased(turn: TurnInput, prof) -> bool:
     return bool(getattr(prof, "deceased", False))
 
 
+# 지어내기(R1b) 근거로 함께 보는 앞 대화 줄 수(가족 말만 쓴다. BE 는 최근 12줄을 보낸다)
+HEARD_TURNS = 12
 # 화제 확인(R1t)에서 빼는 말: 가벼운 동사·빈도어(질문 화제가 아님). 오차단 사례를 보고 정했다.
-TOPIC_LIGHT = frozenset({"하", "있", "되", "어떻", "가", "오", "보", "알", "말하", "그렇", "이렇", "기억나", "맨날", "자주", "늘"})
+TOPIC_LIGHT =frozenset({"하", "있", "되", "어떻", "가", "오", "보", "알", "말하", "그렇", "이렇", "기억나", "맨날", "자주", "늘"})
 # 가족 호칭 ↔ 기억에 쓰인 말(가드 전용, 사전 판정 사전은 그대로)
 TOPIC_ALIASES = {"아빠": ("아버지",), "엄마": ("어머니",)}
 # 되묻기 문구의 화제어에서 빼는 명사: 때·호칭·인사·묻는 말·막연한 말(화제가 아니라 "글쎄, 그때 얘기는…"·
@@ -403,8 +405,11 @@ class GuardV1:
             else:
                 ground = cited if cited is not None else labeled(selection)
                 speakers = ""
+            # 가족이 앞 대화에서 직접 말한 것(부산으로 이사 간다 등)도 근거다 — 들은 걸 되받는 걸 지어내기로 보지 않는다.
+            # 페르소나가 앞서 한 말은 넣지 않는다(그때 지어낸 말이 근거가 되지 않게)
+            heard = " ".join(t.content for t in turn.history[-HEARD_TURNS:] if t.role == "user")
             base = (" ".join(f"{m.title} {m.text}" for m in ground) + " " + turn.message + " " + instructions
-                    + " " + self.extra_ground(turn) + " " + speakers)
+                    + " " + self.extra_ground(turn) + " " + speakers + " " + heard)
             bad = unsupported_tokens(body, base)
             if bad:
                 reasons.append("R1b_unsupported:" + ",".join(bad))

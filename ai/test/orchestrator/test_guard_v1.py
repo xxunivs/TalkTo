@@ -60,6 +60,22 @@ class GuardV1Test(unittest.TestCase):
         r = self.run_g("[근거: m0]\n멸치 육수에 두부 넣고 30분 끓였지.")
         self.assertTrue(any(x.startswith("R1b_unsupported:30") for x in r.reasons))
 
+    def test_what_the_family_said_earlier_is_ground(self) -> None:
+        # 앞 대화에서 가족이 직접 말한 고유명사·숫자는 되받아도 지어내기가 아니다(기억 0개 페르소나 운영 사례)
+        from orchestrator.contracts import Turn
+        history = [Turn(role="user", content="할머니, 나 다음 달에 부산으로 이사 가. 3월 2일이야."),
+                   Turn(role="assistant", content="아이고, 준비는 잘돼 가나?")]
+        empty = MemorySelection(memories=[], strategy="t")
+        r = self.guard.apply(g("[근거: 없음]\n부산으로 간다고 했잖아. 3월 2일이라며."),
+                             turn("내가 어디로 간다고 했지?", history=history), st(), empty)
+        self.assertEqual(r.action, "pass")
+        # 가족이 말하지 않은 곳은 그대로 되묻는다. 페르소나가 앞서 한 말은 근거가 아니다
+        history.append(Turn(role="assistant", content="대구도 좋제."))
+        r = self.guard.apply(g("[근거: 없음]\n대구로 간다고 했잖아."), turn("내가 어디로 간다고 했지?", history=history),
+                             st(), empty)
+        self.assertEqual(r.action, "ask_back")
+        self.assertTrue(any(x.startswith("R1b_unsupported") for x in r.reasons))
+
     def test_dont_know_answer_passes(self) -> None:
         r = self.run_g("[근거: 없음]\n글쎄, 그건 기억이 잘 안 나네.")
         self.assertEqual(r.action, "pass")
