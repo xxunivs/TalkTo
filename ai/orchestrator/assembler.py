@@ -1,7 +1,8 @@
 """④ 프롬프트 조립.
 
 LegacyAssembler: 기존 generate_persona_response 와 같은 메시지를 만든다(동일성 테스트로 고정).
-  [system 페르소나 지시문] [system 음성 지침(FISH_EMOTION, 있으면)] [system 참고 기억 블록(있으면)] [history…] [user 발화]
+  [system 페르소나 지시문] [system 음성 지침(FISH_EMOTION, 있으면)] [system 빈틈·말투·미성년 규칙(있으면)]
+  [system 참고 기억 블록(있으면)] [history…] [user 발화]
 사전 판정 directive·델타 기억이 있으면 별도 system 절로 붙인다(둘 다 없으면 기존과 같다).
 StructuredAssembler: 공통 규칙 → 페르소나 → 말투 → 음성 지침 → 기억 → 델타 → 세션 상태 순으로 조립한다.
 """
@@ -25,6 +26,7 @@ from pipeline.persona_prompt.layers import SHOTS_MODES, RuntimeContext, runtime_
 from pipeline.s3_synthesis.common_rules import (
     DEATH_POLICIES, RULES_DIR, render_block_file, render_common_rules, render_rules,
 )
+from pipeline.safety.minor_guard import MINOR_NOTE
 
 
 def legacy_memory_block(memories: list[MemoryItem]) -> str:
@@ -48,13 +50,18 @@ def voice_section(voice: VoiceMarks | None, turn: TurnInput) -> list[PromptSecti
 
 
 def extra_sections(turn: TurnInput) -> list[PromptSection]:
-    """기억 빈틈 표시 지침(flag_gaps)·가족이 고쳐 준 말투(style_examples). 음성 지침 바로 뒤, 기존 경로와 같은 자리.
+    """기억 빈틈 표시 지침(flag_gaps)·가족이 고쳐 준 말투(style_examples)·미성년 규칙(minor). 음성 지침 바로 뒤,
+    기존 경로와 같은 자리.
 
-    요청에 없으면 빈 목록(예전과 같은 메시지). 둘 다 자주 바뀌지 않는 글이라 기억 앞에 둔다(프롬프트 캐시).
+    요청에 없으면 빈 목록(예전과 같은 메시지). 모두 자주 바뀌지 않는 글이라 기억 앞에 둔다(프롬프트 캐시).
+    미성년 규칙은 이미 조립된 지침(L1 에 규칙이 없던 때 만든 것)에도 듣게 매 턴 넣는다.
     """
     names = ("gap", "style") if turn.flag_gaps else ("style",)
     texts = extra_system(turn.flag_gaps, turn.style_examples)
-    return [PromptSection(name=name, role="system", content=text) for name, text in zip(names, texts)]
+    sections = [PromptSection(name=name, role="system", content=text) for name, text in zip(names, texts)]
+    if turn.minor:
+        sections.append(PromptSection(name="minor", role="system", content=MINOR_NOTE))
+    return sections
 
 
 class LegacyAssembler:
@@ -179,7 +186,8 @@ class StructuredAssembler:
     def assemble(self, turn: TurnInput, state: SessionState, selection: MemorySelection,
                  precheck: PrecheckResult) -> PromptBundle:
         prof = self.profiles.profile_for(turn)
-        flags = dict(public=prof.public, deceased=prof.deceased, has_family=prof.has_family)
+        # 미성년 규칙(turn.minor)은 L1 안전 절 self_harm 뒤에도 넣는다(고인이면 공통 규칙이 빼 준다)
+        flags = dict(public=prof.public, deceased=prof.deceased, has_family=prof.has_family, minor=turn.minor)
         instructions, _ = redact_instructions(turn.persona_instructions, prof.restricted)
         if self.rules == "layered" and prof.source == "inferred" and has_layered_rules(instructions):
             # 등록부 없이 4층 지시문을 받았다: L1(만들 때 정한 사망 정책 포함)이 이미 들어 있다. 앞에 다시 붙이면

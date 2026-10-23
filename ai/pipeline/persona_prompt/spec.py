@@ -97,6 +97,8 @@ class PersonaSpec(BaseModel):
     name: str
     public: bool = False
     deceased: bool = False
+    # 만 19세 미만 살아 계신 대화 상대(BE basicProfile.minor). L1 안전 절에 미성년 규칙. 고인이면 False.
+    minor: bool = False
     period: str | None = None
     family_calls_subject: str | None = None  # 가족 모두가 그분을 같은 말로 부를 때만(아니면 가족 표에 사람마다)
     visitor_address: str | None = None  # 공개: 방문자를 부르는 말(P1-07B)

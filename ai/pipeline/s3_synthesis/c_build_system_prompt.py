@@ -31,6 +31,9 @@ from orchestrator.text import listener_speech_level
 from pipeline.s3_synthesis.common_rules import family_guide, render_common_rules
 from pipeline.s3_synthesis.e_memory_gap import extra_system, split_gap, turn_gap
 from pipeline.s4_voice.b_emotion import split_voice, voice_instruction, voice_mode
+from pipeline.safety.minor_guard import (
+    MINOR_NOTE, blocked_result, filter_reply, input_blocked, is_minor, is_polite, safe_history,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -161,6 +164,12 @@ def generate_persona_response(
     request: PersonaResponseRequest, *, settings: Settings
 ) -> PersonaResponseResult:
     warn_if_over_full_max(len(request.memories), settings)
+    # 만 19세 미만 살아 계신 대화 상대(BE persona.minor, 고인이면 끔). 가져온 지침(fixedPrompt)도 같다.
+    minor = is_minor(request.persona.minor, request.persona.deceased)
+    if minor and input_blocked(request.message):
+        # 성적인 이야기·비밀 만남이면 모델을 부르지 않고 대체 글(말 높이별)로 답한다. 내용은 남기지 않는다.
+        logger.info("minor guard skipped the model for subject %s", request.persona.subject_id)
+        return blocked_result(request.persona.instructions)
     # BE 가 45초에 끊으므로 대화용 시간 한도(기본 20초 × 2번)로 부른다
     client = chat_client(settings, "persona response")
 
@@ -174,10 +183,14 @@ def generate_persona_response(
     # 기억 빈틈 표시(flagGaps)·가족이 고쳐 준 말투(styleExamples). 요청에 없으면 넣지 않는다(예전과 같은 메시지).
     for extra in extra_system(request.flag_gaps, request.style_examples):
         messages.append({"role": "system", "content": extra})
+    # 미성년 규칙 — 이미 조립된 지침(규칙이 L1 에 없던 때 만든 것)·가져온 지침에도 듣게 매 턴 넣는다
+    if minor:
+        messages.append({"role": "system", "content": MINOR_NOTE})
     memory_block = build_memory_block(request.memories)
     if memory_block:
         messages.append({"role": "system", "content": memory_block})
-    for turn in request.history:
+    # 미성년이면 입력 검사에 걸렸던 가족 말과 그 대답은 앞 대화에서 뺀다(BE 는 기록에 남겨 보낸다)
+    for turn in safe_history(request.history) if minor else request.history:
         messages.append({"role": turn.role, "content": turn.content})
     # 가져온 지침(fixedPrompt)은 MVP 때와 같은 메시지(지침 + 기억 + 대화)만 보낸다 — 덧붙임은 4층 지시문용
     late = settings.style_late_note == "on" and not request.persona.fixed_prompt
@@ -217,6 +230,14 @@ def generate_persona_response(
                 polite = listener_speech_level(request.persona.instructions) == "존댓말"
                 text = ASK_BACK["family_polite_deceased" if polite else "family_deceased"][0]
                 emotion, speech_text = None, None
+    # 미성년 대답 검사: 성적·비밀 만남·위험한 내용이면 대답 전체를 대체 글로(위기 대응 턴·상담 번호는 그대로).
+    # 바뀌면 감정·목소리 글과 기억 빈틈 후보도 버린다(그 화제로 가족에게 묻지 않게).
+    if minor:
+        safe, replaced = filter_reply(text, polite=is_polite(request.persona.instructions),
+                                      safety_turn=is_safety_turn(request.message))
+        if replaced:
+            text, emotion, speech_text, gap_topic = safe, None, None, None
+            logger.warning("minor guard replaced reply for subject %s", request.persona.subject_id)
 
     # 주입한 기억 전부를 '사용됨'으로 반환한다. 실제로 인용됐는지는 가리지 않는다.
     return PersonaResponseResult(
@@ -360,6 +381,12 @@ def _is_deceased(intake_context) -> bool:
     return profile.get("status") == "사망"
 
 
+def _is_minor(intake_context) -> bool:
+    """만 19세 미만(BE basicProfile.minor, bool 만 온다). 고인이면 공통 규칙이 미성년 규칙을 빼 준다."""
+    profile = getattr(intake_context, "basic_profile", None) or {}
+    return profile.get("minor") is True
+
+
 def _wants_long_answers(intake_context) -> bool:
     """C-01 말의 길이. '길게'를 고른 사람에게 1~2문장 규칙을 씌우면 서로 어긋난다."""
     style = getattr(intake_context, "speech_style", None)
@@ -487,13 +514,13 @@ def audience_heading(*, public: bool) -> str:
             else "# 가족 (사용자에 따라 아래 톤으로 응답)")
 
 
-def fixed_rules(*, public: bool, deceased: bool, has_family: bool) -> str:
+def fixed_rules(*, public: bool, deceased: bool, has_family: bool, minor: bool = False) -> str:
     """대화 흐름 원칙과 안전 가드레일. 대상에 따라 문장이 갈린다.
 
     문장은 prompts/rules/ 모듈(legacy 세트, 변형 블록 포함)에 있다. 8개 변형의 출력은
-    test/pipeline/test_common_rules.py 골든 파일로 고정돼 있다.
+    test/pipeline/test_common_rules.py 골든 파일로 고정돼 있다(minor 면 안전 절에 미성년 규칙이 더해진다).
     """
-    return render_common_rules(public=public, deceased=deceased, has_family=has_family)
+    return render_common_rules(public=public, deceased=deceased, has_family=has_family, minor=minor)
 
 
 def _line(label: str, value) -> str | None:
@@ -741,7 +768,8 @@ def assemble_persona_prompt(
         speech_examples=speech_examples,
         situational=situational,
         taboo=taboo,
-        fixed_rules=fixed_rules(public=public, deceased=deceased, has_family=has_family),
+        fixed_rules=fixed_rules(public=public, deceased=deceased, has_family=has_family,
+                                minor=_is_minor(intake_context)),
         memories=memories,
     )
 

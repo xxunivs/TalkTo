@@ -70,6 +70,9 @@ class TurnInput(Contract):
     flag_gaps: bool = False
     # 가족이 고쳐 준 말투(BE styleExamples, 최근 10개)
     style_examples: list[StyleFix] = Field(default_factory=list)
+    # 만 19세 미만 살아 계신 대화 상대(BE persona.minor, 고인이면 False). 조립기가 미성년 규칙을 넣고,
+    # 입력 검사(service)·대답 검사(MinorGuard)가 켜진다.
+    minor: bool = False
 
 
 class Replacement(Contract):

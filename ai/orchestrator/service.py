@@ -22,6 +22,7 @@ from orchestrator.llm import OpenAIChatLLM
 from orchestrator.memory import (
     CachedEmbedder, EmbedOnDemandVectors, OpenAIEmbedder, PassThroughSelector, RequestMemoryStore, TieredSelector,
 )
+from orchestrator.minor_guard import MinorGuard
 from orchestrator.persona import PersonaRegistry
 from orchestrator.restricted import RestrictedSelector
 from orchestrator.pipeline import PersonaOrchestrator, TurnRun
@@ -30,6 +31,7 @@ from orchestrator.precheck import CoveragePrecheck, CoveragePrecheckV11, NoopPre
 from orchestrator.session import InMemorySessionStore
 from orchestrator.voice import VoiceMarks
 from pipeline.s3_synthesis.c_build_system_prompt import warn_if_over_full_max
+from pipeline.safety.minor_guard import blocked_result, input_blocked, is_minor, safe_history
 
 log = logging.getLogger(__name__)
 _lock = threading.Lock()
@@ -42,11 +44,14 @@ def memory_from_context(m: MemoryContext) -> MemoryItem:
 
 
 def turn_from_request(request: PersonaResponseRequest) -> TurnInput:
+    minor = is_minor(request.persona.minor, request.persona.deceased)
+    # 미성년이면 입력 검사에 걸렸던 가족 말과 그 대답은 앞 대화에서 뺀다(기존 경로와 같다)
+    history = safe_history(request.history) if minor else request.history
     return TurnInput(
         subject_id=request.persona.subject_id,
         message=request.message,
         persona_instructions=request.persona.instructions,
-        history=[Turn(role=h.role, content=h.content) for h in request.history],
+        history=[Turn(role=h.role, content=h.content) for h in history],
         be_memories=[memory_from_context(m) for m in request.memories],
         session_id=request.session_id,
         speaker_hint=request.speaker_hint,
@@ -54,6 +59,7 @@ def turn_from_request(request: PersonaResponseRequest) -> TurnInput:
         deceased=request.persona.deceased,
         flag_gaps=request.flag_gaps,
         style_examples=[StyleFix(original=s.original, corrected=s.corrected) for s in request.style_examples],
+        minor=minor,
     )
 
 
@@ -78,7 +84,8 @@ def build_assembler(settings: Settings, kind: str | None = None, registry: Perso
 
 
 def build_guard(settings: Settings, kind: str | None = None, registry: PersonaRegistry | None = None):
-    """v1: 헤더(structured 일 때)·누출·지어내기·애정·챙김 검사. legacy 조립이면 헤더 없이 넣은 기억 전부를 근거로 본다."""
+    """v1: 헤더(structured 일 때)·누출·지어내기·애정·챙김 검사. legacy 조립이면 헤더 없이 넣은 기억 전부를 근거로 본다.
+    맨 바깥은 늘 미성년 가드(turn.minor 일 때만 대답을 본다 — 설정과 상관없이)."""
     kind = kind or settings.orchestrator_guard
     registry = registry or build_registry(settings)
     if kind in ("v1", "v11"):
@@ -89,7 +96,7 @@ def build_guard(settings: Settings, kind: str | None = None, registry: PersonaRe
         guard = PassGuard()
     if settings.orchestrator_lang_guard != "off":
         guard = LanguageGuard(guard, registry, mode=settings.orchestrator_lang_guard)
-    return guard
+    return MinorGuard(guard)
 
 
 def build_inner_selector(settings: Settings, registry: PersonaRegistry | None = None, embedder=None):
@@ -172,8 +179,13 @@ def write_trace(trace_dir: Path, run: TurnRun, components: dict[str, str], flags
 def orchestrate_persona_response(request: PersonaResponseRequest, *, settings: Settings,
                                  orchestrator: PersonaOrchestrator | None = None) -> PersonaResponseResult:
     over = warn_if_over_full_max(len(request.memories), settings)
+    turn = turn_from_request(request)
+    if turn.minor and input_blocked(request.message):
+        # 미성년 대화 상대에 성적인 이야기·비밀 만남: 모델을 부르지 않는다(기존 경로와 같은 대체 글, 세션에 남기지 않음)
+        log.info("minor guard skipped the model for subject %s", turn.subject_id)
+        return blocked_result(turn.persona_instructions)
     orch = orchestrator or get_orchestrator(settings)
-    run = orch.run(turn_from_request(request))
+    run = orch.run(turn)
     if settings.orchestrator_trace_dir:
         flags = {"memory_over_full_max": {"n": len(request.memories), "max": settings.memory_full_max}} if over else None
         try:
@@ -182,6 +194,8 @@ def orchestrate_persona_response(request: PersonaResponseRequest, *, settings: S
             log.exception("orchestrator trace write failed")
     res = run.result
     gap = MemoryGap(topic=res.memory_gap) if res.memory_gap is not None else None
+    if any(r.startswith("minor:") for r in run.guard.reasons):
+        gap = None  # 미성년 가드가 대답을 바꿨으면 그 화제로 가족에게 묻지 않는다(기존 경로와 같다)
     return PersonaResponseResult(content=res.content, retrieved_memory_ids=res.retrieved_memory_ids,
                                  emotion=res.emotion, speech_text=res.speech_text, memory_gap=gap,
                                  provider=res.provider, model=res.model)

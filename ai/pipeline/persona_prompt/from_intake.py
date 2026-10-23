@@ -11,6 +11,8 @@
   - '사랑'이 든 말끝은 말끝 칸에서 빼고, 끝인사는 '통화를 끝낼 때만'으로 둔다.
   - 말투 예시는 설문에 적힌 실제 표현(추정 제외)과 통화 주고받기만 쓴다. 길이로 고른 전사 발화는 쓰지 않는다.
   - 이름이 같은 주제가 여러 문항에 있으면 가장 엄한 등급 하나로 합친다.
+  - basicProfile.minor(BE 가 bool 만 보냄 — 생년월은 오지 않는다)가 true 이고 살아 계신 분이면 spec.minor.
+    떠나신 자녀는 고인 규칙만 쓴다.
 """
 from __future__ import annotations
 
@@ -108,7 +110,8 @@ def spec_from_intake(subject_context: SubjectContext, intake: IntakeContext | No
     rels = _relations(ic)
     calls, notes = _family_calls_subject(sc, rels, public)
     spec = PersonaSpec(
-        name=name, public=public, deceased=deceased, period=_period(bp.get("period")),
+        name=name, public=public, deceased=deceased, minor=bp.get("minor") is True and not deceased,
+        period=_period(bp.get("period")),
         family_calls_subject=calls,
         visitor_address=(sc.subject.address_term if public and sc.subject else None),
         visitor_tone=ic.visitor_tone, visitor_context=ic.visitor_context, relations=rels, notes=notes)

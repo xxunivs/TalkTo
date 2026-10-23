@@ -46,6 +46,10 @@ class PersonaContext(ApiModel):
     # 지침 + 참고 기억 + 대화로만 대답한다. 그 지침은 등록부·가족 사전 없이 만들어져, 사전 점검이
     # 있는 기억도 '기억에 없다'로 판정해 모른다고 답하게 만들었다(2026-10-17 할머니 MVP 복원).
     fixed_prompt: bool = False
+    # 만 19세 미만 살아 계신 대화 상대(BE 는 true 일 때만 싣는다 — 예전 BE 요청도 그대로 받는다).
+    # 켜지면 두 경로 모두 매 턴 미성년 규칙 system·입력 검사·대답 검사를 한다(pipeline/safety/minor_guard.py).
+    # 고인(deceased)이면 쓰지 않는다.
+    minor: bool = False
 
 
 class StyleExample(ApiModel):

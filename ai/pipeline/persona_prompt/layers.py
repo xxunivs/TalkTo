@@ -4,7 +4,7 @@
 런타임 모듈(runtime)은 턴마다 바뀌므로 기억 블록 뒤에 별도 system 절로 붙는다(runtime_section).
 
 조건 이름
-    페르소나 종류  public / private, deceased / alive, family / nofamily
+    페르소나 종류  public / private, deceased / alive, family / nofamily, minor(만 19세 미만 살아 계신 분만, 반대 조건 없음)
     재료           has_intake / has_transcript / has_interview (spec.materials)
     주고받기 위치  shots_in_system / shots_as_messages
     런타임         speaker_known / speaker_unknown / long_conversation
@@ -25,7 +25,7 @@ LAYERS_FILE = Path(__file__).resolve().parents[2] / "prompts" / "layers.json"
 ShotsMode = Literal["system", "messages"]
 SHOTS_MODES = ("system", "messages")
 
-STATIC_CONDITIONS = {"public", "private", "deceased", "alive", "family", "nofamily",
+STATIC_CONDITIONS = {"public", "private", "deceased", "alive", "family", "nofamily", "minor",
                      "has_intake", "has_transcript", "has_interview", "shots_in_system", "shots_as_messages"}
 RUNTIME_CONDITIONS = {"speaker_known", "speaker_unknown", "long_conversation"}
 
@@ -55,6 +55,8 @@ def static_flags(spec: PersonaSpec, *, shots_mode: ShotsMode = "system") -> set[
         "family" if spec.relations else "nofamily",
         "shots_in_system" if shots_mode == "system" else "shots_as_messages",
     }
+    if spec.minor and not spec.deceased:
+        flags.add("minor")  # 아니면 더하지 않는다(예전 구성 그대로)
     return flags | {f"has_{m}" for m in spec.materials}
 
 

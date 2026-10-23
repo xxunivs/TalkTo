@@ -10,7 +10,8 @@
     - 규칙 줄
     :::
 조건: public / private(=not public), deceased / alive, family / nofamily,
-      death_deny / death_brief / death_ask_only / death_open(사망·임종 정책, 기본 deny — 설문 M9-01 에서 고름).
+      death_deny / death_brief / death_ask_only / death_open(사망·임종 정책, 기본 deny — 설문 M9-01 에서 고름),
+      minor(만 19세 미만 살아 계신 대화 상대일 때만 켜짐. 반대 조건은 없다 — 꺼져 있으면 예전 출력 그대로).
 `<!-- -->` 로 시작하는 줄은 주석(출력 안 함). 블록 밖 줄은 항상 넣는다. `{{이름}}` 은 vars 로 채운다.
 섹션 안 모듈이 전부 비면 그 섹션 제목도 뺀다.
 """
@@ -24,21 +25,27 @@ from pathlib import Path
 
 RULES_DIR = Path(__file__).resolve().parents[2] / "prompts" / "rules"
 DEATH_POLICIES = ("deny", "brief", "ask_only", "open")
-TOKENS = {"public", "private", "deceased", "alive", "family", "nofamily"} | {f"death_{p}" for p in DEATH_POLICIES}
+TOKENS = ({"public", "private", "deceased", "alive", "family", "nofamily", "minor"}
+          | {f"death_{p}" for p in DEATH_POLICIES})
 VAR = re.compile(r"\{\{(\w+)\}\}")
 # 모든 세트에 들어가는 기본값. legacy 는 가족 목록이 규칙보다 위에 있다(예전 템플릿 순서).
 DEFAULT_VARS = {"family_list": "위 가족 목록"}
 
 
-def _flags(*, public: bool, deceased: bool, has_family: bool, death_policy: str = "deny") -> set[str]:
+def _flags(*, public: bool, deceased: bool, has_family: bool, death_policy: str = "deny",
+           minor: bool = False) -> set[str]:
     if death_policy not in DEATH_POLICIES:
         raise ValueError(f"unknown death policy {death_policy!r}")
-    return {
+    flags = {
         "public" if public else "private",
         "deceased" if deceased else "alive",
         "family" if has_family else "nofamily",
         f"death_{death_policy}",
     }
+    # 미성년 규칙은 살아 계신 분만(떠나신 자녀는 고인 규칙). 아니면 아무것도 더하지 않는다(골든 그대로)
+    if minor and not deceased:
+        flags.add("minor")
+    return flags
 
 
 @lru_cache(maxsize=64)
@@ -84,8 +91,9 @@ def render_block_file(path: Path, flags: set[str], vars: dict[str, str] | None =
 
 def render_rules(set_name: str, *, public: bool, deceased: bool, has_family: bool,
                  death_policy: str = "deny", vars: dict[str, str] | None = None,
-                 rules_dir: Path = RULES_DIR) -> str:
-    flags = _flags(public=public, deceased=deceased, has_family=has_family, death_policy=death_policy)
+                 rules_dir: Path = RULES_DIR, minor: bool = False) -> str:
+    flags = _flags(public=public, deceased=deceased, has_family=has_family, death_policy=death_policy,
+                   minor=minor)
     vars = {**DEFAULT_VARS, **(vars or {})}
     sections = []
     for title, modules in _manifest(rules_dir)["sets"][set_name]:
@@ -97,9 +105,9 @@ def render_rules(set_name: str, *, public: bool, deceased: bool, has_family: boo
     return "\n\n".join(sections)
 
 
-def render_common_rules(*, public: bool, deceased: bool, has_family: bool) -> str:
-    """예전 출력(legacy 세트) — 조립기·중간계층이 쓰는 공통 규칙. 골든 8개로 고정."""
-    return render_rules("legacy", public=public, deceased=deceased, has_family=has_family)
+def render_common_rules(*, public: bool, deceased: bool, has_family: bool, minor: bool = False) -> str:
+    """예전 출력(legacy 세트) — 조립기·중간계층이 쓰는 공통 규칙. 골든 8개로 고정(minor 면 안전 절에 미성년 규칙)."""
+    return render_rules("legacy", public=public, deceased=deceased, has_family=has_family, minor=minor)
 
 
 def common_rule_lines(*, public: bool, deceased: bool, has_family: bool) -> set[str]:

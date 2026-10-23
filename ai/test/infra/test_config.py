@@ -47,7 +47,8 @@ class ConfigTest(unittest.TestCase):
 
         parts = build_default(Settings(openai_api_key=SecretStr("k"))).describe()
         self.assertEqual(parts["precheck"], "noop_v0")
-        self.assertEqual(parts["guard"], "pass_v0")
+        # 미성년 가드는 늘 바깥에 붙지만 minor 턴에만 대답을 본다(그 밖에는 통과 그대로)
+        self.assertEqual(parts["guard"], "pass_v0+minor")
 
     def test_legacy_prompt_flags_still_selectable(self) -> None:
         env = {"PERSONA_PROMPT_BUILDER": "legacy", "ORCHESTRATOR_RULES": "legacy", "ORCHESTRATOR_SHOTS": "system",

@@ -31,7 +31,7 @@ PersonaResponseRequest ─turn_from_request→ TurnInput
 | ④ 조립 | → PromptBundle(sections: name·role·content) | `LegacyAssembler`(기본) / `StructuredAssembler`(`ORCHESTRATOR_ASSEMBLER=structured`) |
 | ⑤ 생성 | messages → Generation(text, model, usage) | `OpenAIChatLLM`(비스트리밍) / `FakeLLM`(테스트) |
 | 음성 표시 | Generation.text → VoiceRun(guard_text, 감정·연기 표시) | `VoiceMarks`(`FISH_EMOTION` = off · cue · inline, 기본 off 면 아무것도 안 함). 아래 "음성 감정" |
-| ⑥ 가드 | → GuardResult(text, action, reasons, cited_memory_ids, counter_delta) | `PassGuard`(기본) / `GuardV1`(`v1`) / `GuardV11`(`v11`), 그 뒤에 `LanguageGuard`(`ORCHESTRATOR_LANG_GUARD=flag|fix`) |
+| ⑥ 가드 | → GuardResult(text, action, reasons, cited_memory_ids, counter_delta) | `PassGuard`(기본) / `GuardV1`(`v1`) / `GuardV11`(`v11`), 그 뒤에 `LanguageGuard`(`ORCHESTRATOR_LANG_GUARD=flag|fix`), 맨 바깥은 늘 `MinorGuard`(`orchestrator/minor_guard.py`, `impl` 끝에 `+minor` — `turn.minor` 일 때만 대답을 본다) |
 | ⑦ 턴 뒤 | → SessionState | `RecordTurn`(최근 8턴, 카운터 반영) |
 
 `retrieved_memory_ids` 는 가드가 근거 헤더로 인용 기억을 확인하면 그것만, 아니면 넣은 기억 전부다.
@@ -103,6 +103,8 @@ structured 경로에서만 적용한다.
 순서: 헤더 떼기 → 누출(leak_terms 문장 삭제, 다 지워지면 brief_answer) → 지어내기(질문일 때만: 근거 없음·없는 id / 인용 기억이 질문 화제어를 못 덮음 / 근거에 없는 숫자·고유명사) → 애정(가족이 먼저 사랑·보고 싶다를 말했거나 마무리 인사일 때만, 세션당 1번) → 챙김(세션당 2번). 연속 되묻기는 짧은 '모름' 문구로 바꾼다. action: pass / trim / ask_back / redact.
 
 언어 누출 가드(`ORCHESTRATOR_LANG_GUARD`)는 그 뒤에 붙는다. 한글이 아닌 글자를 일괄로 막지 않고, 이번 턴 맥락(가족 말·지시문·넣은 기억·앞 대화)에 없던 문자 체계, 맥락에 없던 영어 낱말, "Wait"·"The user" 같은 추론 문장만 본다. 가족이 영어로 말하는 중이면 영어 답은 통과한다. `flag` 는 이유만 기록, `fix` 는 걸린 문장을 지우고 다 지워지면 되묻는다.
+
+미성년 가드(`MinorGuard`, 2026-10-22 법률 자문)는 설정과 상관없이 늘 맨 바깥에 붙는다(`impl` 끝 `+minor`). `persona.minor`(BE 는 true 일 때만 싣는다)이고 고인이 아니면(`TurnInput.minor`): (1) 대답 만들기 **앞에서** 가족 말이 성적·비밀 만남이면 LLM 을 부르지 않고 대체 글을 돌려주고, (2) 조립기가 `MINOR_NOTE` system 을 넣고, (3) 다른 가드 뒤 대답에 성적·비밀 만남·위험한 내용이 있으면 대체 글로 통째로 바꾼다(`redact` — 감정·표시 버림). 위기 턴이거나 대답에 위기 상담 번호가 있으면 바꾸지 않는다. 판정·문구는 `pipeline/safety/minor_guard.py`(기존 경로와 같다).
 
 ## 음성 감정 (FISH_EMOTION, `orchestrator/voice.py`)
 

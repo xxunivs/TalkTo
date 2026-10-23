@@ -91,7 +91,8 @@ def relation_bits(r: Relation, *, listener_view: bool = True) -> list[str]:
 def common_rules(spec: PersonaSpec) -> str:
     return render_rules("layered", public=spec.public, deceased=spec.deceased, has_family=bool(spec.relations),
                         death_policy=spec.death_policy if spec.deceased else "deny",
-                        vars={"death_answer": spec.death_answer or "그렇게 됐지", "family_list": "아래 가족 표"})
+                        vars={"death_answer": spec.death_answer or "그렇게 됐지", "family_list": "아래 가족 표"},
+                        minor=spec.minor)
 
 
 # ---------------------------------------------------------------- L2
