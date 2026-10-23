@@ -86,7 +86,7 @@ class CoveragePrecheckTest(unittest.TestCase):
         orch = build_default(s)
         orch.llm = FakeLLM()
         run = orch.run(TurnInput(subject_id="s", message="제주도 갔던 거 기억나?", persona_instructions=PERSONA,
-                                 be_memories=MEMS))
+                                 be_memories=MEMS, memory_total=300))  # 기억 많은 페르소나(적으면 판정 안 함)
         self.assertEqual(orch.precheck.impl, "coverage_v1")
         self.assertIn("directive", [sec.name for sec in run.bundle.sections])
         self.assertIn("코드 판정", orch.llm.calls[0][2]["content"])

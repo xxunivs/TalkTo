@@ -19,7 +19,7 @@ WITH = f"당신은 김가상이다.\n\n{SHORT}\n\n{CARD}"
 
 def _request(instructions: str) -> PersonaResponseRequest:
     return PersonaResponseRequest.model_validate({
-        "message": "밥 먹었어?", "memories": [],
+        "message": "밥 먹었어?", "memories": [], "memoryTotal": 300,  # 기억 많은 페르소나(기억 적음 절 없음)
         "history": [{"role": "user", "content": "할머니"}, {"role": "assistant", "content": "어, 왜."}],
         "persona": {"subjectId": "s", "instructions": instructions},
     })
@@ -87,7 +87,7 @@ class LateStyleNoteTest(unittest.TestCase):
             self.assertNotIn(STYLE_LATE_NOTE, [m["content"] for m in msgs])
 
     def test_orchestrator_assemblers_same_place(self) -> None:
-        turn = TurnInput(subject_id="s", message="밥 먹었어?", persona_instructions=WITH,
+        turn = TurnInput(subject_id="s", message="밥 먹었어?", persona_instructions=WITH, memory_total=300,
                          history=[Turn(role="user", content="할머니"), Turn(role="assistant", content="어, 왜.")])
         args = (SessionState(session_id=None, subject_id="s"), MemorySelection(memories=[], strategy="test"), PrecheckResult())
         for kind in ("legacy", "structured"):

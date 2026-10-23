@@ -264,7 +264,7 @@ class OrchestratorTest(unittest.TestCase):
 
     def test_no_flags_keep_old_sections(self) -> None:
         run = build_default(_settings()).run(
-            TurnInput(subject_id="s", message="노래?", persona_instructions="p"), until="assemble")
+            TurnInput(subject_id="s", message="노래?", persona_instructions="p", memory_total=300), until="assemble")
         self.assertEqual([s.name for s in run.bundle.sections], ["persona", "message"])
 
 

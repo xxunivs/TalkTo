@@ -53,6 +53,7 @@ def turn_from_request(request: PersonaResponseRequest) -> TurnInput:
         persona_instructions=request.persona.instructions,
         history=[Turn(role=h.role, content=h.content) for h in history],
         be_memories=[memory_from_context(m) for m in request.memories],
+        memory_total=request.memory_total,
         session_id=request.session_id,
         speaker_hint=request.speaker_hint,
         voice_id=request.persona.voice_id,
@@ -76,11 +77,12 @@ def build_assembler(settings: Settings, kind: str | None = None, registry: Perso
     kind = kind or settings.orchestrator_assembler
     late = settings.style_late_note == "on"
     voice = build_voice(settings)
+    low = settings.low_memory_max if settings.low_memory_note == "on" else None  # None = '기억이 적을 때' 절 끔
     if kind == "structured":
         return StructuredAssembler(registry or build_registry(settings), header=settings.orchestrator_guard in ("v1", "v11"),
                                    rules=settings.orchestrator_rules, shots_mode=settings.orchestrator_shots, late_note=late,
-                                   voice=voice)
-    return LegacyAssembler(late_note=late, voice=voice)
+                                   voice=voice, low_memory_max=low)
+    return LegacyAssembler(late_note=late, voice=voice, low_memory_max=low)
 
 
 def build_guard(settings: Settings, kind: str | None = None, registry: PersonaRegistry | None = None):
@@ -125,7 +127,8 @@ def build_precheck(settings: Settings, kind: str | None = None, registry: Person
         from orchestrator.text import morphs
         morphs("준비")  # 형태소 분석기 로드(약 1.6초)를 첫 사용자 응답이 아니라 여기서 치른다
         cls = CoveragePrecheckV11 if kind == "coverage_v11" else CoveragePrecheck
-        return cls(registry or build_registry(settings), threshold=settings.orchestrator_precheck_threshold)
+        return cls(registry or build_registry(settings), threshold=settings.orchestrator_precheck_threshold,
+                   min_memories=settings.orchestrator_precheck_min_memories)
     return NoopPrecheck()
 
 

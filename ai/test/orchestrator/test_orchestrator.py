@@ -66,6 +66,10 @@ class LegacyEquivalenceTest(unittest.TestCase):
         req = dict(REQUEST, memories=[], history=[])
         run = build_default(_settings()).run(
             TurnInput(subject_id="s", message=req["message"], persona_instructions="p"), until="assemble")
+        # 기억이 0개면 '기억이 적을 때' 절이 붙는다(LOW_MEMORY_NOTE=on 기본)
+        self.assertEqual([s.name for s in run.bundle.sections], ["persona", "low_memory", "message"])
+        run = build_default(_settings(low_memory_note="off")).run(
+            TurnInput(subject_id="s", message=req["message"], persona_instructions="p"), until="assemble")
         self.assertEqual([s.name for s in run.bundle.sections], ["persona", "message"])
 
 

@@ -2,9 +2,10 @@
 
 LegacyAssembler: 기존 generate_persona_response 와 같은 메시지를 만든다(동일성 테스트로 고정).
   [system 페르소나 지시문] [system 음성 지침(FISH_EMOTION, 있으면)] [system 빈틈·말투·미성년 규칙(있으면)]
-  [system 참고 기억 블록(있으면)] [history…] [user 발화]
+  [system 참고 기억 블록(있으면)] [history…] [system 기억이 적을 때(있으면)] [user 발화]
 사전 판정 directive·델타 기억이 있으면 별도 system 절로 붙인다(둘 다 없으면 기존과 같다).
 StructuredAssembler: 공통 규칙 → 페르소나 → 말투 → 음성 지침 → 기억 → 델타 → 세션 상태 순으로 조립한다.
+'기억이 적을 때' 절(LOW_MEMORY_NOTE, pipeline/persona_prompt/low_memory.py)은 structured 에서 세션 상태 절 안에 든다.
 """
 from __future__ import annotations
 
@@ -18,11 +19,14 @@ from orchestrator.contracts import (
 )
 from pipeline.s3_synthesis.c_build_system_prompt import build_memory_block, late_style_note
 from pipeline.s3_synthesis.e_memory_gap import extra_system
-from orchestrator.guard import HEADER_RULE, header_block
-from orchestrator.persona import has_layered_rules
+from orchestrator.guard import HEADER_RULE, _deceased, header_block
+from orchestrator.persona import has_layered_rules, infer_profile
+from orchestrator.precheck import sent_memories
 from orchestrator.restricted import brief_rule, redact_instructions
+from orchestrator.text import listener_speech_level
 from orchestrator.voice import VoiceMarks
 from pipeline.persona_prompt.layers import SHOTS_MODES, RuntimeContext, runtime_section
+from pipeline.persona_prompt.low_memory import LOW_MEMORY_MAX, low_memory_note, memory_count
 from pipeline.s3_synthesis.common_rules import (
     DEATH_POLICIES, RULES_DIR, render_block_file, render_common_rules, render_rules,
 )
@@ -64,12 +68,30 @@ def extra_sections(turn: TurnInput) -> list[PromptSection]:
     return sections
 
 
+def turn_memory_count(turn: TurnInput, selection: MemorySelection, low_max: int | None) -> int | None:
+    """이 페르소나의 기억 수(BE memoryTotal, 없으면 받은 수로 짐작). low_max=None(LOW_MEMORY_NOTE=off)·모름이면 None."""
+    if low_max is None:
+        return None
+    return memory_count(sent_memories(turn, selection), turn.memory_total)
+
+
+def low_memory_text(turn: TurnInput, prof, n: int | None, low_max: int | None) -> str:
+    """'기억이 적을 때' 절. 기억 수가 low_max 이하일 때만. 고인 판정은 가드와 같다(BE persona.deceased 먼저) —
+    비공개 고인은 잊은 듯 말하지 않는 문구(잠금 2), 존댓말 상대면 예시도 존댓말."""
+    if n is None or low_max is None or n > low_max:
+        return ""
+    return low_memory_note(n, public=prof.public, deceased=_deceased(turn, prof),
+                           polite=listener_speech_level(turn.persona_instructions) == "존댓말")
+
+
 class LegacyAssembler:
     impl = "legacy_v0"
 
-    def __init__(self, *, late_note: bool = False, voice: VoiceMarks | None = None) -> None:
+    def __init__(self, *, late_note: bool = False, voice: VoiceMarks | None = None,
+                 low_memory_max: int | None = LOW_MEMORY_MAX) -> None:
         self.late_note = late_note  # STYLE_LATE_NOTE=on: 기존 경로와 같게 마지막 말 앞에 말투 덧붙임
         self.voice = voice  # FISH_EMOTION: 기존 경로와 같은 자리(지시문 바로 뒤)에 음성 지침
+        self.low_memory_max = low_memory_max  # None = LOW_MEMORY_NOTE=off
 
     def assemble(self, turn: TurnInput, state: SessionState, selection: MemorySelection,
                  precheck: PrecheckResult) -> PromptBundle:
@@ -86,6 +108,11 @@ class LegacyAssembler:
             sections.append(PromptSection(name="directive", role="system", content=precheck.directive))
         for i, t in enumerate(turn.history):
             sections.append(PromptSection(name=f"history{i}", role=t.role, content=t.content))
+        # 기억이 적을 때 절: 기존 경로와 같은 자리(앞 대화 뒤, 말투 덧붙임 앞). 등록부가 없어 지시문으로 추정한다
+        lm = low_memory_text(turn, infer_profile(turn.persona_instructions),
+                             turn_memory_count(turn, selection, self.low_memory_max), self.low_memory_max)
+        if lm:
+            sections.append(PromptSection(name="low_memory", role="system", content=lm))
         note = late_style_note(turn.persona_instructions) if self.late_note else ""
         if note:
             sections.append(PromptSection(name="late_style", role="system", content=note))
@@ -163,8 +190,10 @@ class StructuredAssembler:
     impl = "structured_v1"
 
     def __init__(self, profiles, *, max_recent_turns: int = 6, header: bool = False, rules: str = "legacy",
-                 shots_mode: str = "system", late_note: bool = False, voice: VoiceMarks | None = None) -> None:
+                 shots_mode: str = "system", late_note: bool = False, voice: VoiceMarks | None = None,
+                 low_memory_max: int | None = LOW_MEMORY_MAX) -> None:
         self.profiles = profiles
+        self.low_memory_max = low_memory_max  # None = LOW_MEMORY_NOTE=off. 런타임 모듈 low_memory 도 이 값을 쓴다
         self.late_note = late_note  # STYLE_LATE_NOTE=on: 마지막 말 앞에 말투 덧붙임(카드가 등록부에서 와도 head 로 가린다)
         self.voice = voice  # FISH_EMOTION: 첫 system(규칙+페르소나) 바로 뒤에 음성 지침
         # shots_mode="messages": 실제 주고받기를 지시문 글 대신 기억 뒤 user/assistant 메시지로 넣는다
@@ -244,7 +273,7 @@ class StructuredAssembler:
         if precheck.directive:
             sections.append(PromptSection(name="directive", role="system", content=precheck.directive))
         history = turn.history or state.recent_turns[-self.max_recent_turns:]
-        session = self.session_text(prof, state, history)
+        session = self.session_text(prof, state, history, turn=turn, selection=selection)
         if session:
             sections.append(PromptSection(name="session", role="system", content=session))
         for i, t in enumerate(history):
@@ -255,10 +284,22 @@ class StructuredAssembler:
         sections.append(PromptSection(name="message", role="user", content=turn.message))
         return PromptBundle(sections=sections)
 
-    def session_text(self, prof, state: SessionState, history) -> str:
+    def session_text(self, prof, state: SessionState, history, *, turn: TurnInput | None = None,
+                     selection: MemorySelection | None = None) -> str:
         """턴마다 바뀌는 절. layered 이고 등록부에 명세가 있으면 layers.json 의 런타임 모듈로 만든다.
-        명세가 없으면(손으로 쓴 지시문) 가족 표를 모르니 화자 이름만 알린다."""
+        명세가 없으면(손으로 쓴 지시문 · 운영) 가족 표를 모르니 화자 이름만 알리고, 기억이 적으면 그 절을 붙인다."""
+        n = None
+        if turn is not None and selection is not None:
+            n = turn_memory_count(turn, selection, self.low_memory_max)
         if self.rules == "layered" and prof.persona_spec is not None:
-            ctx = RuntimeContext(speaker=state.speaker, history=[(t.role, t.content) for t in history])
+            ctx = RuntimeContext(speaker=state.speaker, history=[(t.role, t.content) for t in history],
+                                 memory_count=n, low_memory_max=self.low_memory_max or 0)
+            if turn is not None:  # 고인·말 높이 판정은 가드와 같게(BE persona.deceased 먼저, 듣는 사람 줄)
+                ctx.deceased = _deceased(turn, prof)
+                ctx.polite = listener_speech_level(turn.persona_instructions) == "존댓말"
             return runtime_section(prof.persona_spec, ctx)
-        return f"# 지금 상황\n- 지금 말하는 사람: {state.speaker}" if state.speaker else ""
+        parts = [f"# 지금 상황\n- 지금 말하는 사람: {state.speaker}"] if state.speaker else []
+        lm = low_memory_text(turn, prof, n, self.low_memory_max) if turn is not None else ""
+        if lm:
+            parts.append(lm)
+        return "\n\n".join(parts)

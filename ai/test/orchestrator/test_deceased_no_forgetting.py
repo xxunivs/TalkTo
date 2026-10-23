@@ -17,6 +17,7 @@ from infra.setting import Settings
 from orchestrator.contracts import Generation, MemoryItem, MemorySelection, SessionState, TurnInput
 from orchestrator.guard import (
     ASK_BACK,
+    ASK_BACK_TOPIC,
     DONT_KNOW,
     TELL_ME,
     GuardV1,
@@ -39,6 +40,8 @@ FORGET = ("기억이 안", "기억이 잘 안", "모르겠", "잊어버", "까�
 MEMS = [MemoryItem(id="m1", title="장 담그기", text="해마다 늦가을에 메주를 쑤어 장을 담갔다.")]
 SEL = MemorySelection(memories=MEMS, strategy="t")
 PERSONA = "# 페르소나\n너는 손녀 지우의 할머니다. 반말로 짧게 말한다."
+# "된장찌개 어떻게 끓였어?"에 되묻는 첫 문구. 고인은 화제어를 넣지 않는다(병명·자세한 말을 되받지 않게, 10/24 리뷰)
+DEC_FIRST = ASK_BACK["family_deceased"][0]
 
 
 def _ask(guard, *, deceased, polite=False):
@@ -63,12 +66,14 @@ class DeceasedAskBackTest(unittest.TestCase):
         for guard in (GuardV1(PersonaRegistry(None)), GuardV11(PersonaRegistry(None))):
             r = _ask(guard, deceased=True)
             self.assertEqual(r.action, "ask_back")
-            self.assertEqual(r.text, ASK_BACK["family_deceased"][0])
+            self.assertEqual(r.text, DEC_FIRST)
+            self.assertNotIn("된장찌개", r.text)
             self.assertFalse(any(w in r.text for w in FORGET))
+            self.assertFalse(says_forgot(r.text))
 
-    def test_living_keeps_todays_text(self) -> None:
+    def test_living_keeps_living_wording(self) -> None:
         r = _ask(GuardV1(PersonaRegistry(None)), deceased=False)
-        self.assertEqual(r.text, ASK_BACK["family"][0])
+        self.assertEqual(r.text, ASK_BACK_TOPIC["family"].format(topic="된장찌개"))
 
 
 class DeceasedDirectiveTest(unittest.TestCase):
@@ -168,7 +173,7 @@ class DeceasedGuardOutputTest(unittest.TestCase):
     def test_forgot_line_no_longer_hides_fabrication(self) -> None:
         reply = "[근거: 없음]\n글쎄, 기억이 가물가물하구나. 된장은 3년 묵혔지."
         r = _guard(reply, "된장찌개 어떻게 끓였어?")
-        self.assertEqual((r.text, r.action), (ASK_BACK["family_deceased"][0], "ask_back"))
+        self.assertEqual((r.text, r.action), (DEC_FIRST, "ask_back"))
         # 살아 계신 분은 예전 그대로('모른다'로 보고 지어내기 검사를 건너뛴다)
         living = _guard(reply, "된장찌개 어떻게 끓였어?", deceased=False)
         self.assertEqual((living.text, living.action), ("글쎄, 기억이 가물가물하구나. 된장은 3년 묵혔지.", "pass"))
@@ -178,13 +183,13 @@ class DeceasedGuardOutputTest(unittest.TestCase):
             r = _guard("그건 기억이 안 난다.", guard=guard)
             self.assertEqual((r.text, r.action), (ASK_BACK["family_deceased"][0], "ask_back"))
         r = _guard("[근거: 없음]\n글쎄다, 그건 기억이 안 난다. 된장은 3년 묵혔지.", "된장찌개 어떻게 끓였어?")
-        self.assertEqual((r.text, r.action), (ASK_BACK["family_deceased"][0], "ask_back"))
+        self.assertEqual((r.text, r.action), (DEC_FIRST, "ask_back"))
 
     def test_hedge_does_not_hide_fabrication_for_deceased(self) -> None:
         # 고인은 '글쎄·몰라'가 있어도 지어내기 검사를 한다(이야기를 청하는 되묻기일 때만 건너뛴다)
         reply = "[근거: 없음]\n글쎄다, 그건 몰라. 된장은 3년 묵혔지."
         r = _guard(reply, "된장찌개 어떻게 끓였어?")
-        self.assertEqual((r.text, r.action), (ASK_BACK["family_deceased"][0], "ask_back"))
+        self.assertEqual((r.text, r.action), (DEC_FIRST, "ask_back"))
         living = _guard(reply, "된장찌개 어떻게 끓였어?", deceased=False)
         self.assertEqual((living.text, living.action), ("글쎄다, 그건 몰라. 된장은 3년 묵혔지.", "pass"))
         asked = _guard("[근거: 없음]\n글쎄다, 그 얘기 네가 한번 해 줄래?", "된장찌개 어떻게 끓였어?")

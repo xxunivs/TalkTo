@@ -7,7 +7,7 @@
     페르소나 종류  public / private, deceased / alive, family / nofamily, minor(만 19세 미만 살아 계신 분만, 반대 조건 없음)
     재료           has_intake / has_transcript / has_interview (spec.materials)
     주고받기 위치  shots_in_system / shots_as_messages
-    런타임         speaker_known / speaker_unknown / long_conversation
+    런타임         speaker_known / speaker_unknown / long_conversation / low_memory(기억 수 ≤ LOW_MEMORY_MAX)
 when 의 조건이 전부 맞아야 모듈이 켜진다. 내용이 빈 모듈은 조건과 상관없이 빠진다.
 """
 from __future__ import annotations
@@ -19,6 +19,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
+from pipeline.persona_prompt.low_memory import LOW_MEMORY_MAX, low_memory_note
 from pipeline.persona_prompt.spec import PersonaSpec
 
 LAYERS_FILE = Path(__file__).resolve().parents[2] / "prompts" / "layers.json"
@@ -27,7 +28,7 @@ SHOTS_MODES = ("system", "messages")
 
 STATIC_CONDITIONS = {"public", "private", "deceased", "alive", "family", "nofamily", "minor",
                      "has_intake", "has_transcript", "has_interview", "shots_in_system", "shots_as_messages"}
-RUNTIME_CONDITIONS = {"speaker_known", "speaker_unknown", "long_conversation"}
+RUNTIME_CONDITIONS = {"speaker_known", "speaker_unknown", "long_conversation", "low_memory"}
 
 # 이미 한 말을 알아보는 패턴(말투 카드와 같은 기준)
 CARE = re.compile(r"밥\s*(은|잘|챙|먹|꼭|거르)|챙겨\s*먹|끼니|건강\s*(해|하|챙|조심)|몸\s*(조심|챙|상하|잘)|조심\s*해|감기\s*조심")
@@ -73,6 +74,12 @@ class RuntimeContext:
     speaker: str | None = None
     history: list[tuple[str, str]] = field(default_factory=list)
     long_after: int = LONG_CONVERSATION_TURNS
+    # 이 페르소나의 기억 수. None 이면 모름(= 적다고 보지 않는다). pipeline/persona_prompt/low_memory.py
+    memory_count: int | None = None
+    low_memory_max: int = LOW_MEMORY_MAX
+    # 고인 여부(None 이면 spec.deceased)·존댓말 상대 — '기억이 적을 때' 문구를 고른다(가드와 같은 판정을 조립기가 넣음)
+    deceased: bool | None = None
+    polite: bool = False
 
 
 def runtime_flags(spec: PersonaSpec, ctx: RuntimeContext) -> set[str]:
@@ -80,6 +87,8 @@ def runtime_flags(spec: PersonaSpec, ctx: RuntimeContext) -> set[str]:
     flags.add("speaker_known" if ctx.speaker else "speaker_unknown")
     if len(ctx.history) >= ctx.long_after:
         flags.add("long_conversation")
+    if ctx.memory_count is not None and ctx.memory_count <= ctx.low_memory_max:
+        flags.add("low_memory")
     return flags
 
 
@@ -117,7 +126,14 @@ def already_said(spec: PersonaSpec, ctx: RuntimeContext) -> str:
     return "# 이번 대화에서 이미 한 말\n" + "\n".join(lines) if lines else ""
 
 
-RUNTIME_MODULES = {"current_speaker": current_speaker, "unknown_speaker": unknown_speaker, "already_said": already_said}
+def low_memory(spec: PersonaSpec, ctx: RuntimeContext) -> str:
+    """기억이 적을 때. 비공개 고인은 잊은 듯 말하지 않는 문구(잠금 2)."""
+    deceased = spec.deceased if ctx.deceased is None else ctx.deceased
+    return low_memory_note(ctx.memory_count or 0, public=bool(spec.public), deceased=bool(deceased), polite=ctx.polite)
+
+
+RUNTIME_MODULES = {"current_speaker": current_speaker, "unknown_speaker": unknown_speaker, "already_said": already_said,
+                   "low_memory": low_memory}
 
 
 def runtime_section(spec: PersonaSpec, ctx: RuntimeContext, *, path: Path = LAYERS_FILE) -> str:

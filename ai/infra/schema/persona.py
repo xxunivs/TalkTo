@@ -62,6 +62,9 @@ class PersonaResponseRequest(ApiModel):
     message: str = Field(min_length=1, max_length=20_000)
     history: list[ConversationMessage] = Field(default_factory=list)
     memories: list[MemoryContext] = Field(default_factory=list)
+    # 이 페르소나의 총 기억 수(memoryTotal, 선택). 검색 결과(memories)만 보내는 BE 가 이 값을 주면
+    # '기억이 적을 때' 지시·사전 판정 건너뛰기를 정확히 켠다. 없으면 받은 기억 수로 짐작(pipeline/persona_prompt/low_memory.py).
+    memory_total: int | None = Field(default=None, ge=0, le=1_000_000)
     persona: PersonaContext
     # 중간계층용(선택). 기존 경로는 쓰지 않는다.
     session_id: str | None = Field(default=None, max_length=200)

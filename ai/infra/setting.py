@@ -139,6 +139,12 @@ class Settings(BaseModel):
     # 가져온 지침(persona.fixedPrompt)에는 넣지 않는다(4층 생성기 글이 아니라 실험 범위 밖). 덧붙임 예시가 반말이라
     # 존댓말로 대하는 상대(가족 표 듣는 사람 줄이 존댓말)·공개 본인 페르소나에도 넣지 않는다(late_style_note).
     style_late_note: Literal["off", "on"] = "on"
+    # 기억이 적을 때 지시(LOW_MEMORY_NOTE). 기억 수가 LOW_MEMORY_MAX 이하일 때만 턴마다 붙는다(4층 레포 세션 19).
+    # 가져온 지침(persona.fixedPrompt)에는 넣지 않는다(MVP 때와 같은 메시지).
+    low_memory_note: Literal["off", "on"] = "on"
+    low_memory_max: int = Field(default=5, ge=0)
+    # 사전 판정은 기억이 이 수 이상일 때만(적으면 모든 질문이 '모른다'가 된다). 기억 0개면 늘 건너뜀.
+    orchestrator_precheck_min_memories: int = Field(default=30, ge=0)
 
     @field_validator(
         "ai_server_token",
@@ -249,6 +255,9 @@ def load_settings(env_file: str | Path | None = ".env") -> Settings:
         memory_full_max=os.getenv("MEMORY_FULL_MAX", "400"),
         query_rewrite=os.getenv("QUERY_REWRITE", "off").strip() or "off",
         style_late_note=os.getenv("STYLE_LATE_NOTE", "on").strip() or "on",
+        low_memory_note=os.getenv("LOW_MEMORY_NOTE", "on").strip() or "on",
+        low_memory_max=os.getenv("LOW_MEMORY_MAX", "5"),
+        orchestrator_precheck_min_memories=os.getenv("ORCHESTRATOR_PRECHECK_MIN_MEMORIES", "30"),
     )
 
 

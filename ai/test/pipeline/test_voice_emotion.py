@@ -126,7 +126,7 @@ class InlineEmotionResponseTest(unittest.TestCase):
 def _fish_request(voice_id: str | None = "fish_0123abcd", deceased: bool | None = True,
                   fixed_prompt: bool = False) -> PersonaResponseRequest:
     return PersonaResponseRequest.model_validate({
-        "message": "할머니 나 취직했어",
+        "message": "할머니 나 취직했어", "memoryTotal": 300,  # 기억 많은 페르소나(기억 적음 절 없음)
         "persona": {"subjectId": "s1", "instructions": "너는 할머니다.", "deceased": deceased,
                     "voiceId": voice_id, "fixedPrompt": fixed_prompt},
     })

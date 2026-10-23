@@ -49,7 +49,7 @@ class GuardV1Test(unittest.TestCase):
             r = self.run_g(head + "\n된장은 3년 묵혔지.")
             self.assertEqual(r.action, "ask_back")
             self.assertIn(reason, r.reasons)
-            self.assertEqual(r.text, ASK_BACK["family"][0])
+            self.assertEqual(r.text, "글쎄, 된장찌개 얘기는 기억이 잘 안 나네. 그게 언제 적 일이야?")  # 화제어(명사)가 든 되묻기
 
     def test_cited_memory_off_topic_asks_back(self) -> None:  # 질문과 엉뚱한 기억 id 인용
         r = self.run_g("[근거: m1]\n제주도 바닷가 좋았지.", msg="우리 제주도 갔던 거 기억나?")
@@ -71,6 +71,8 @@ class GuardV1Test(unittest.TestCase):
     def test_second_ask_back_is_short(self) -> None:
         r = self.run_g("[근거: 없음]\n된장은 3년 묵혔지.", state=st(ask_back_streak=1))
         self.assertEqual(r.text, ASK_BACK["family"][1])
+        third = self.run_g("[근거: 없음]\n된장은 3년 묵혔지.", state=st(ask_back_streak=2))
+        self.assertEqual(third.text, ASK_BACK["family"][2])  # 세 번째부터는 상대 근황으로
         ok = self.run_g("[근거: m0]\n멸치 육수에 두부 넣었지.", state=st(ask_back_streak=1))
         self.assertEqual(ok.counter_delta.get("ask_back_streak"), -1)
 

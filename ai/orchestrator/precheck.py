@@ -7,6 +7,8 @@ CoveragePrecheck(ORCHESTRATOR_PRECHECK=coverage): 질문이면 화제어(형태�
   - 동의어 사전(prompts/topic_synonyms.json): 화제어 대신 기억에 쓰인 말도 맞은 것으로 친다(고향↔태어났다)
   - 질문이 아니면(근황 알림·잡담) 판정하지 않는다 — 가족이 새 소식을 말할 때 "모른다"가 붙으면 안 된다
   - 화제어가 없으면(인사 등) 판정하지 않는다
+  - 기억이 하나도 없거나 min_memories(ORCHESTRATOR_PRECHECK_MIN_MEMORIES, 30)보다 적으면 판정하지 않는다
+    (기억 수는 BE memoryTotal, 없으면 받은 수로 짐작 — pipeline/persona_prompt/low_memory.memory_count)
 CoveragePrecheckV11(coverage_v11): v1 의 오판 원인을 고친 판정(아래 클래스 설명).
 """
 from __future__ import annotations
@@ -151,12 +153,24 @@ class CoveragePrecheck:
     impl = "coverage_v1"
 
     def __init__(self, profiles=None, *, threshold: float = 0.6,
-                 synonyms: dict[str, tuple[str, ...]] | None = None) -> None:
+                 synonyms: dict[str, tuple[str, ...]] | None = None, min_memories: int = 0) -> None:
         from orchestrator.text import morph_set  # kiwipiepy 를 이 구현을 쓸 때만 요구
         self._morph_set = morph_set
         self.profiles = profiles
         self.threshold = threshold
+        # 기억이 이 수보다 적으면 판정하지 않는다(ORCHESTRATOR_PRECHECK_MIN_MEMORIES). 기억이 몇 개뿐이면 거의 모든
+        # 질문이 임계를 못 넘어 매 턴 '모른다' 지시가 붙고 대화가 닫힌다(10/18 실사용, 4층 레포 세션 19).
+        self.min_memories = min_memories
         self.synonyms = load_synonyms() if synonyms is None else synonyms
+
+    def low_memory(self, turn: TurnInput, selection: MemorySelection) -> bool:
+        """기억이 min_memories 보다 적어 판정을 건너뛸 턴인가. 기억이 하나도 없으면 문턱과 상관없이 건너뛴다."""
+        from pipeline.persona_prompt.low_memory import memory_count
+        n_sent = sent_memories(turn, selection)
+        if n_sent == 0:
+            return True
+        n = memory_count(n_sent, turn.memory_total)
+        return n is not None and n < self.min_memories
 
     def topic_terms(self, text: str, extra_stop: set[str]) -> list[str]:
         from orchestrator.text import GENERIC_STOP
@@ -183,6 +197,8 @@ class CoveragePrecheck:
             return PrecheckResult()
         body = strip_preamble(turn.message)
         if not body or not is_question(body):
+            return PrecheckResult()
+        if self.low_memory(turn, selection):
             return PrecheckResult()
         names = {n for n in (subject_name_from(turn.persona_instructions), state.speaker, turn.speaker_hint) if n}
         terms = self.topic_terms(body, names)
@@ -211,6 +227,12 @@ def _is_deceased(turn: TurnInput, profiles) -> bool:
 def _polite(turn: TurnInput) -> bool:
     """지금 대화하는 사람에게 존댓말을 쓰는가(가족 표 그 사람 줄). 반말·모름이면 예전 되묻기 그대로."""
     return listener_speech_level(turn.persona_instructions) == "존댓말"
+
+
+def sent_memories(turn: TurnInput, selection: MemorySelection) -> int:
+    """이번 턴에 받은 기억 수(BE 가 보낸 것과 선택된 것 중 많은 쪽 + 델타). 제한 정보로 뺀 기억 때문에
+    top-5 를 다 받은 페르소나가 '기억이 적다'로 잘못 보이지 않게 BE 가 보낸 수도 본다."""
+    return max(len(turn.be_memories), len(selection.memories)) + len(selection.delta)
 
 
 def _doc_text(m: MemoryItem) -> str:
@@ -243,8 +265,8 @@ class CoveragePrecheckV11(CoveragePrecheck):
     impl = "coverage_v1.1"
 
     def __init__(self, profiles=None, *, threshold: float = 0.6, synonyms=None, extra_synonyms=None,
-                 address_words=ADDRESS_V11) -> None:
-        super().__init__(profiles, threshold=threshold, synonyms=synonyms)
+                 address_words=ADDRESS_V11, min_memories: int = 0) -> None:
+        super().__init__(profiles, threshold=threshold, synonyms=synonyms, min_memories=min_memories)
         self.extra = SYN_V11 if extra_synonyms is None else extra_synonyms
         self.address = frozenset(address_words)
         self._splitters: dict = {}
@@ -294,6 +316,8 @@ class CoveragePrecheckV11(CoveragePrecheck):
             return PrecheckResult()
         body, addr = self.question_text(turn)
         if not body or not is_question(body):
+            return PrecheckResult()
+        if self.low_memory(turn, selection):
             return PrecheckResult()
         names = {n for n in (subject_name_from(turn.persona_instructions), state.speaker, turn.speaker_hint) if n}
         terms = self.topic_terms(body, names | addr)

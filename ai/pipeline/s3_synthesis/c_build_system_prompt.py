@@ -160,6 +160,24 @@ def warn_if_over_full_max(n_memories: int, settings: Settings) -> bool:
     return True
 
 
+def low_memory_section(request: PersonaResponseRequest, settings: Settings) -> str:
+    """기억이 적을 때 붙이는 절(LOW_MEMORY_NOTE=on, 기억 수 <= LOW_MEMORY_MAX). 아니면 빈 문자열.
+
+    가져온 지침(fixedPrompt)에는 넣지 않는다(MVP 때와 같은 메시지). 고인 판정은 가드와 같다(BE persona.deceased 먼저,
+    없으면 지시문 추정) — 비공개 고인은 잊은 듯 말하지 않는 문구(잠금 2).
+    """
+    from pipeline.persona_prompt.low_memory import low_memory_note, memory_count
+    if settings.low_memory_note != "on" or request.persona.fixed_prompt:
+        return ""
+    n = memory_count(len(request.memories), request.memory_total)
+    if n is None or n > settings.low_memory_max:
+        return ""
+    prof = infer_profile(request.persona.instructions)
+    deceased = prof.deceased if request.persona.deceased is None else request.persona.deceased
+    return low_memory_note(n, public=prof.public, deceased=bool(deceased),
+                           polite=listener_speech_level(request.persona.instructions) == "존댓말")
+
+
 def generate_persona_response(
     request: PersonaResponseRequest, *, settings: Settings
 ) -> PersonaResponseResult:
@@ -192,6 +210,10 @@ def generate_persona_response(
     # 미성년이면 입력 검사에 걸렸던 가족 말과 그 대답은 앞 대화에서 뺀다(BE 는 기록에 남겨 보낸다)
     for turn in safe_history(request.history) if minor else request.history:
         messages.append({"role": turn.role, "content": turn.content})
+    # 기억이 적은 페르소나: 모르는 건 구체적으로 되묻고 안부는 기억 없이 받는다(말투 덧붙임 바로 앞, 중간계층과 같은 자리)
+    low = low_memory_section(request, settings)
+    if low:
+        messages.append({"role": "system", "content": low})
     # 가져온 지침(fixedPrompt)은 MVP 때와 같은 메시지(지침 + 기억 + 대화)만 보낸다 — 덧붙임은 4층 지시문용
     late = settings.style_late_note == "on" and not request.persona.fixed_prompt
     note = late_style_note(request.persona.instructions) if late else ""

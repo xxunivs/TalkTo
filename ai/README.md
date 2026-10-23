@@ -23,9 +23,10 @@ BE 가 사용자 인증·동의·운영 DB 저장과 기억 검색을 맡고, �
 | `ORCHESTRATOR_SHOTS` | `messages` | 중간계층을 켰을 때 실제 주고받기를 대화 메시지로 넣는다 |
 | `STYLE_LATE_NOTE` | `on` | 지시문에 말투 카드와 짧은 말투 규칙이 있으면 마지막 가족 말 바로 앞에 말투 덧붙임을 넣는다(존댓말로 대하는 상대·공개 본인 페르소나 제외) |
 | `PERSONA_ORCHESTRATOR` | `false` | 중간계층은 코드 기본으로 끈다. 사전 판정·가드는 지어내기를 줄이지만 답을 놓치는 일이 크게 늘었다 |
+| `LOW_MEMORY_NOTE` | `on` | 기억이 5개 이하인 페르소나에 턴마다 '기억이 적을 때' 지시를 넣는다(이미 만든 페르소나에도 바로 닿는다 — 대화 때 붙는 절). BE 가 `memoryTotal` 을 보내지 않으면 받은 기억이 5개 미만일 때만 '적다'로 본다(기억 5~29개 페르소나를 가리려면 `memoryTotal` 필요) |
 
 - **넣는 곳**: 로컬은 `.env`. 운영(AWS)은 BE `deploy/aws/deploy.py` 가 이 레포 `.env` 에서 `infra/setting.py` 가 읽는 이름만 골라 올린다. 값을 바꾼 뒤 다시 배포(재시작)해야 반영된다.
-- **예전으로 되돌리기**: `PERSONA_PROMPT_BUILDER=legacy` (중간계층을 켜 쓰던 경우 `ORCHESTRATOR_RULES=legacy`, `ORCHESTRATOR_SHOTS=system` 도). 말투 덧붙임은 `STYLE_LATE_NOTE=off`.
+- **예전으로 되돌리기**: `PERSONA_PROMPT_BUILDER=legacy` (중간계층을 켜 쓰던 경우 `ORCHESTRATOR_RULES=legacy`, `ORCHESTRATOR_SHOTS=system` 도). 말투 덧붙임은 `STYLE_LATE_NOTE=off`, 기억이 적을 때 절은 `LOW_MEMORY_NOTE=off`.
 - **이미 만든 페르소나는 바뀌지 않는다.** 페르소나 지시문은 만들 때 한 번 생성돼 BE DB 에 저장되고, 대화할 때는 저장된 글을 그대로 쓴다. 환경 변수를 바꿔도 기존 페르소나는 예전 지시문으로 대화한다. 확인하려면 배포 뒤 페르소나를 새로 만든다.
 - **중간계층 + 4층 지시문**: `ORCHESTRATOR_RULES=layered` 에서 등록부 없이 4층 지시문(L1 포함)이 오면 공통 규칙을 앞에 다시 붙이지 않는다(만들 때 정한 사망 정책이 한 벌만 남는다). 그래서 `prompts/rules` 를 고쳐도 이미 만든 4층 페르소나에는 닿지 않는다.
 - **가져온 지침**(BE '페르소나 가져오기', `persona.fixedPrompt`)은 늘 기존 경로이고 말투 덧붙임도 넣지 않는다(MVP 때와 같은 메시지).
@@ -103,7 +104,7 @@ python -m pipeline.persona_prompt extract-interview --subject <대상자>   # LL
 
 ## 환경 변수(기능 플래그)
 
-4층 프롬프트 관련 변수(`PERSONA_PROMPT_BUILDER`·`ORCHESTRATOR_RULES`·`ORCHESTRATOR_SHOTS`·`STYLE_LATE_NOTE`)만 기본이 새 동작이고, 나머지는 기존 동작이다.
+4층 프롬프트 관련 변수(`PERSONA_PROMPT_BUILDER`·`ORCHESTRATOR_RULES`·`ORCHESTRATOR_SHOTS`·`STYLE_LATE_NOTE`·`LOW_MEMORY_NOTE`·`ORCHESTRATOR_PRECHECK_MIN_MEMORIES`)만 기본이 새 동작이고, 나머지는 기존 동작이다.
 
 | 변수 | 기본 | 뜻 |
 |---|---|---|
@@ -120,6 +121,9 @@ python -m pipeline.persona_prompt extract-interview --subject <대상자>   # LL
 | `ORCHESTRATOR_LANG_GUARD` | `off` | `flag` 기록만 / `fix` 이번 턴 맥락에 없던 문자 체계·영어 낱말·추론 문장이 든 문장을 지움 |
 | `ORCHESTRATOR_TRACE_DIR` | 없음 | 턴마다 추적 로그(jsonl, 대화 원문 포함 — git 밖 경로에) |
 | `ORCHESTRATOR_PRECHECK_THRESHOLD` | `0.6` | 사전 판정 커버율 임계 |
+| `ORCHESTRATOR_PRECHECK_MIN_MEMORIES` | `30` | 기억이 이보다 적은 페르소나는 사전 판정을 하지 않는다(기억이 몇 개뿐이면 모든 질문이 '모른다'가 돼 대화가 닫힘, 4층 레포 세션 19). 기억 0개면 늘 건너뜀 |
+| `LOW_MEMORY_NOTE` | `on` | 기억이 `LOW_MEMORY_MAX` 이하인 페르소나에 턴마다 '기억이 적을 때' 지시를 붙인다(기존 경로·중간계층 모두, 가져온 지침 제외). 모르는 건 구체적으로 되묻고, 안부는 기억 없이 받고, 들은 건 다음 말에 쓴다. 비공개 고인은 잊은 듯 말하지 않는 문구, 존댓말 상대면 존댓말 예시. `off` 로 끔 |
+| `LOW_MEMORY_MAX` | `5` | '기억이 적다'의 기준. 기억 수는 BE 가 `memoryTotal` 을 보내면 그 값, 아니면 받은 기억이 top-5 보다 적을 때만 그 수(5개 이상 오면 모름 = 적지 않다고 봄) |
 | `ORCHESTRATOR_SELECTOR_ST_TOPK` / `_THRESHOLD` | `5` / `0.18` | tiered 선택의 단기 기억 개수·코사인 임계 |
 | `MEMORY_FULL_MAX` | `400` | `/responses` 에 기억이 이보다 많이 오면 경고 로그(+중간계층 trace). 자르지 않는다. 넘으면 검색으로 바꾸는 것은 BE |
 | `QUERY_REWRITE` | `off` | `on` 이면 `/v1/embeddings/query` 에 `history` 가 올 때 최근 메시지 4개로 질문을 다시 써서 임베딩(LLM 1회), 응답에 `rewrittenQuery`. BE 는 대화 때 최근 메시지 4개를 늘 보낸다(꺼져 있으면 쓰지 않는다) |

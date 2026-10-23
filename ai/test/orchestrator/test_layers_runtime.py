@@ -11,10 +11,11 @@ FIXTURES = Path(__file__).parent / "fixtures"
 TURN = TurnInput(subject_id="subj-spec", message="할머니 뭐 해?", persona_instructions="당신은 김할매의 페르소나다.")
 
 
-def assemble(*, shots_mode="system", rules="layered", speaker=None, history=(), persona_dir=FIXTURES / "personas_spec"):
+def assemble(*, shots_mode="system", rules="layered", speaker=None, history=(), persona_dir=FIXTURES / "personas_spec",
+             memory_total=300):  # 기본은 기억 많은 페르소나(기억 적음 절 없음)
     a = StructuredAssembler(PersonaRegistry(persona_dir), rules=rules, shots_mode=shots_mode)
     st = SessionState(session_id=None, subject_id=TURN.subject_id, speaker=speaker)
-    turn = TURN.model_copy(update={"history": list(history)})
+    turn = TURN.model_copy(update={"history": list(history), "memory_total": memory_total})
     sel = MemorySelection(memories=[MemoryItem(id="m1", text="된장찌개를 잘 끓였다")], strategy="t")
     return a.assemble(turn, st, sel, PrecheckResult())
 

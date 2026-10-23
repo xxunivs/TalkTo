@@ -21,7 +21,7 @@ PUBLIC = ("당신은 김공개 본인의 말투로 말하는 페르소나다.\n\
 
 
 def _assemble(turn, *, persona_dir=None, state=None, memories=(), directive=None):
-    a = StructuredAssembler(PersonaRegistry(persona_dir))
+    a = StructuredAssembler(PersonaRegistry(persona_dir), low_memory_max=None)  # 기억 적음 절은 test_low_memory
     st = state or SessionState(session_id=None, subject_id=turn.subject_id)
     return a.assemble(turn, st, MemorySelection(memories=list(memories), strategy="t"),
                       PrecheckResult(directive=directive))

@@ -60,6 +60,8 @@ class TurnInput(Contract):
     history: list[Turn] = Field(default_factory=list)
     # BE 가 검색해 보낸 기억(지금은 top-5). 선택기가 쓸지 말지 정한다.
     be_memories: list[MemoryItem] = Field(default_factory=list)
+    # 이 페르소나의 총 기억 수(BE memoryTotal). None 이면 받은 기억 수로 짐작(low_memory.memory_count).
+    memory_total: int | None = None
     session_id: str | None = None
     speaker_hint: str | None = None
     voice_id: str | None = None

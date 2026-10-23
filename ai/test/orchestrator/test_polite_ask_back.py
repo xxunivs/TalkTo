@@ -7,7 +7,7 @@ import unittest
 
 from infra.schema.subject import IntakeContext, SubjectContext
 from orchestrator.contracts import Generation, MemoryItem, MemorySelection, SessionState, TurnInput
-from orchestrator.guard import ASK_BACK, DONT_KNOW, GuardV1, GuardV11, PassGuard
+from orchestrator.guard import ASK_BACK, ASK_BACK_TOPIC, DONT_KNOW, GuardV1, GuardV11, PassGuard, ask_back_text
 from orchestrator.lang_guard import ASK_BACK as LANG_ASK_BACK
 from orchestrator.lang_guard import LanguageGuard
 from orchestrator.persona import PersonaRegistry
@@ -99,25 +99,32 @@ class GuardAskBackTest(unittest.TestCase):
 
     def test_polite_listener_gets_polite_ask_back(self) -> None:
         for guard in self.guards:
-            self.assertEqual(self.ask(guard, _layered("존댓말")), ASK_BACK["family_polite"][0])
+            self.assertEqual(self.ask(guard, _layered("존댓말")),
+                             "글쎄요, 된장찌개 이야기는 기억이 잘 안 나네요. 그게 언제 적 일이에요?")
             self.assertEqual(self.ask(guard, _layered("존댓말"), _st(ask_back_streak=1)), ASK_BACK["family_polite"][1])
+            self.assertEqual(self.ask(guard, _layered("존댓말"), _st(ask_back_streak=2)), ASK_BACK["family_polite"][2])
+            self.assertNotIn("너는", ASK_BACK["family_polite"][2])
 
-    def test_casual_or_unknown_keeps_todays_text(self) -> None:
-        self.assertEqual(ASK_BACK["family"], ("글쎄, 그건 기억이 잘 안 나네. 네가 얘기 좀 해 줄래?", "그건 잘 모르겠다."))
+    def test_casual_or_unknown_keeps_casual_text(self) -> None:
+        # 세션 19: 화제어를 넣어 구체적으로 되묻고(화제어 없으면 [0]) → 짧게 → 상대 근황
+        self.assertEqual(ASK_BACK["family"], ("글쎄, 그건 기억이 잘 안 나네. 그게 언제 적 일이야?", "그건 잘 모르겠다.",
+                                              "그건 잘 모르겠고, 너는 요즘 어떻게 지내?"))
         for guard in self.guards:
             for instructions in (_layered("반말"), _layered(None), "당신은 홍길동의 페르소나를 가진 챗봇이다.\n"):
-                self.assertEqual(self.ask(guard, instructions), ASK_BACK["family"][0])
+                self.assertEqual(self.ask(guard, instructions), ask_back_text("family", 0, "된장찌개"))
                 self.assertEqual(self.ask(guard, instructions, _st(ask_back_streak=1)), ASK_BACK["family"][1])
 
     def test_public_wins_over_polite(self) -> None:
         public = "당신은 김공개 본인의 말투로 말하는 페르소나다.\n# 방문자\n- 박민호: 지금 대화하는 사람 / 존댓말\n"
-        self.assertEqual(self.ask(self.guards[0], public), ASK_BACK["public"][0])
+        self.assertEqual(self.ask(self.guards[0], public), "된장찌개 이야기는 제가 잘 모르겠네요. 언제 적 이야기예요?")
 
     def test_polite_lines_count_as_dont_know(self) -> None:
         self.assertEqual(ASK_BACK["family_polite"],
-                         ("글쎄요, 그건 기억이 잘 안 나네요. 이야기 좀 해 주실래요?", "그건 잘 모르겠어요."))
-        for line in ASK_BACK["family_polite"]:
-            self.assertTrue(DONT_KNOW.search(line), line)
+                         ("글쎄요, 그건 기억이 잘 안 나네요. 그게 언제 적 일이에요?", "그건 잘 모르겠어요.",
+                          "그건 잘 모르겠고, 요즘은 어떻게 지내세요?"))
+        for kind in ("family", "family_polite", "public"):
+            for line in ASK_BACK[kind] + (ASK_BACK_TOPIC[kind],):
+                self.assertTrue(DONT_KNOW.search(line), line)
 
 
 class LangGuardAskBackTest(unittest.TestCase):

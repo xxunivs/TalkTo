@@ -41,6 +41,7 @@ REQUEST = {
     "message": "할머니 고향이 어디셨어요?",
     "history": [{"role": "user", "content": "안녕하세요"}, {"role": "assistant", "content": "어, 왔니"}],
     "memories": [{"id": "m1", "title": "고향", "content": "홍길동은 남원에서 태어났다."}],
+    "memoryTotal": 300,  # 기억 많은 페르소나(기억 적음 절 없음 — test_low_memory 가 따로 본다)
     "persona": {"subjectId": "subj-1", "instructions": "당신은 홍길동이다.", "voiceId": FISH},
 }
 

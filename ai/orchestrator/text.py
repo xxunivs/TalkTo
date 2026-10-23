@@ -38,6 +38,14 @@ def morphs(text: str) -> list[str]:
     return [t.form for t in tokens if t.tag.startswith(KEEP_TAGS)]
 
 
+def nouns(text: str) -> list[str]:
+    """일반·고유 명사(2글자 이상), 나온 순서 — 가드 되묻기 문구의 화제어용(어간은 말이 안 되므로 명사만)."""
+    kiwi = _get_kiwi()
+    with _lock:
+        tokens = kiwi.tokenize(text)
+    return [t.form for t in tokens if t.tag in ("NNG", "NNP") and len(t.form) >= 2]
+
+
 def proper_nouns(text: str) -> list[str]:
     """고유명사(NNP, 2글자 이상) — 가드 R1b 용."""
     kiwi = _get_kiwi()

@@ -70,6 +70,7 @@ PersonaResponseRequest ─turn_from_request→ TurnInput
   - 대화가 길어지면(앞 대화 6개 이상): 이미 한 챙김·'사랑해'만 짚어 반복하지 않게 한다.
   - 등록부 없이(추정 프로필) 4층 지시문(L1 표지 `# 말하는 형식`·`# 기억을 쓰는 법`)이 오면 공통 규칙을 앞에 다시 붙이지 않고 지시문을 그대로 첫 system 으로 쓴다. 만들 때 정한 사망 정책이 한 벌만 남고, 추정한 가족 유무로 다른 줄이 어긋나지 않는다(운영: 등록부 없음).
 - 말투 덧붙임(`STYLE_LATE_NOTE=on`, 기본): 첫 system 에 `# 말투 카드` 와 짧은 말투 줄(`- 기본은 1~2문장으로 짧게.`)이 함께 있으면 마지막 발화 바로 앞에 말투 덧붙임 system 을 넣는다. legacy 조립기와 기존 경로(`generate_persona_response`)도 같은 자리에 넣고, 가져온 지침(`fixedPrompt`)에는 넣지 않는다. 덧붙임 예시가 반말이라 지금 상대에게 존댓말을 쓰는 지시문(가족 표 듣는 사람 줄이 존댓말, 공개 본인 페르소나의 `# 방문자`)에도 넣지 않는다.
+- 기억이 적을 때(`LOW_MEMORY_NOTE=on`, 기본, 4층 레포 세션 19): 기억 수(`memoryTotal`, 없으면 짐작)가 `LOW_MEMORY_MAX`(5) 이하면 '기억이 적을 때' 절을 넣는다 — legacy 조립기와 기존 경로는 앞 대화 뒤·말투 덧붙임 앞 system, structured 는 지금 상황 절 안(등록부 명세가 있으면 런타임 모듈 `low_memory`). 가져온 지침(`fixedPrompt`)에는 넣지 않는다. 비공개 고인이면 잊은 듯 말하지 않는 문구(이야기를 청하는 되묻기), 존댓말 상대면 존댓말 예시, 공개 본인은 존댓말 문구. 가드 v1/v11 은 넣은 기억이 하나도 없으면 `[근거: 없음]` 을 R1a 로 되묻지 않고(R1b 만), 되묻기는 화제어를 넣은 첫 문구 → 짧은 문구 → 상대 근황 세 단계다(화제어는 살아 계신 분·공개 본인만, 가족 말에 병·돈·법·성·위험·위기 말이 있으면 넣지 않는다 — 가드 문구는 모델을 거치지 않으므로).
 - 참고 기억 블록(`build_memory_block`: 기존 경로·legacy 조립기·header 없는 structured)은 기억 id 순으로 고정해 넣는다(BE 가 보낸 순서와 무관 — 같은 기억이면 같은 글이라 프롬프트 캐시가 유지된다). guard v1/v11 의 (m번호) 블록(`header_block`)은 번호가 `parse_header` 와 맞아야 해서 선택 순서 그대로다. 기억이 `MEMORY_FULL_MAX`(400)보다 많으면 경고 로그와 trace `flags.memory_over_full_max` 만 남기고 자르지 않는다.
 
 ## 사망·임종 정책
@@ -119,7 +120,7 @@ Fish 목소리 대답에만 쓴다. 대답 LLM 이 같은 호출에서 정한다
 
 ## BE 요청에서 받을 수 있는 필드(선택)
 
-`sessionId`, `speakerHint` — 없으면 None. BE 가 보내기 시작하면 세션 상태가 이어진다. `memories[].memoryType` — 없으면 장기로 본다. `persona.deceased` — `TurnInput.deceased` 로 옮겨 음성 감정 안전선에 쓰고, 등록부가 없을 때는 지시문 추정 대신 이 값으로 공통 규칙 변형(사후·사망 정책)을 고른다(`PersonaRegistry.profile_for`).
+`sessionId`, `speakerHint` — 없으면 None. BE 가 보내기 시작하면 세션 상태가 이어진다. `memories[].memoryType` — 없으면 장기로 본다. `memoryTotal`(정수 ≥ 0) — 그 페르소나의 총 기억 수 → `TurnInput.memory_total`. '기억이 적을 때' 절(`LOW_MEMORY_NOTE`, 기억 ≤ `LOW_MEMORY_MAX`)과 사전 판정 건너뛰기(`ORCHESTRATOR_PRECHECK_MIN_MEMORIES`)에 쓴다. 없으면 받은 기억이 top-5 보다 적을 때만 그 수를 총수로 보고, 5개 이상이면 '적지 않다'로 본다(`pipeline/persona_prompt/low_memory.py`). `persona.deceased` — `TurnInput.deceased` 로 옮겨 음성 감정 안전선에 쓰고, 등록부가 없을 때는 지시문 추정 대신 이 값으로 공통 규칙 변형(사후·사망 정책)을 고른다(`PersonaRegistry.profile_for`).
 
 응답의 `emotion`·`speechText` 는 기존 경로와 같은 뜻이다. `speechText` 는 있을 때만 칸이 생긴다.
 
