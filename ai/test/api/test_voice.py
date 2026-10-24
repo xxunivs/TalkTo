@@ -565,6 +565,27 @@ class FishEmotionSpeechTest(unittest.TestCase):
         self.assertEqual(self._speak("응.", "neutral", fish_emotion="cue"), "응.")  # neutral 은 붙이지 않는다
         self.assertEqual(self._speak("응.", None, fish_emotion="cue"), "응.")
 
+    def _body(self, text: str, emotion: str | None = None, **extra) -> dict:
+        _use_settings(self, **extra)
+        fake = FakeFish(_audio())
+        with fake.patch():
+            response = TestClient(app).post(
+                "/v1/voice/speech", json={"text": text, "voiceId": "fish_0123abcd", "emotion": emotion}
+            )
+        self.assertEqual(response.status_code, 200, response.text)
+        return json.loads(fake.sent[0].content)
+
+    def test_happy_cue_is_read_calmer(self) -> None:
+        # 기쁨일 때 음이 너무 높아져(대표님 블라인드 청취 2026-10-25) 표시는 그대로 두고 표현 흔들림만 낮춘다
+        happy = self._body("합격했다고? 잘했다.", "happy", fish_emotion="cue")
+        self.assertEqual(happy["text"], "[반갑게 웃으며] 합격했다고? 잘했다.")
+        self.assertEqual(happy["temperature"], 0.5)
+        self.assertNotIn("temperature", self._body("밥은 먹었니?", "warm", fish_emotion="cue"))
+        self.assertNotIn("temperature", self._body("합격했다고?", "happy"))  # 감정을 끄면(off) 그대로
+        self.assertEqual(self._body("잘했다.", "happy", fish_emotion="cue", fish_happy_temperature=0.4)["temperature"],
+                         0.4)
+        self.assertNotIn("temperature", self._body("잘했다.", "happy", fish_emotion="cue", fish_happy_temperature=0))
+
     def test_inline_mode_keeps_cues_and_ignores_emotion(self) -> None:
         self.assertEqual(self._speak("[웃으며] 왔구나. [미소] 밥은?", "happy", fish_emotion="inline"),
                          "[웃으며] 왔구나. 밥은?")

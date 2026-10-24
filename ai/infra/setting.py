@@ -78,6 +78,9 @@ class Settings(BaseModel):
     # off = 지금처럼(표시 없이 글만), cue = 감정 이름 하나 → Fish 가 맨 앞에 한국어 연기 표시(FISH_CUES)를 붙인다,
     # inline = 대답 안 정해진 연기 표시 최대 2개(speechText). 대표님 청취 판정 전에는 운영에서 켜지 않는다.
     fish_emotion: Literal["off", "cue", "inline"] = "off"
+    # 기쁜 대답([반갑게 웃으며])의 표현 흔들림(Fish temperature, 기본 0.7). 낮을수록 차분하다. 기쁨일 때 음이 너무
+    # 높아진다는 대표님 블라인드 청취(2026-10-25 6가지 중 '지금 표시 + 0.5' 선택)로 0.5. 0 이하면 보내지 않는다.
+    fish_happy_temperature: float = Field(default=0.5, le=1)
 
     # 화자 식별(ECAPA) 유사도 임계값 — 실통화 13건으로 맞춘 값(대상자 0.605~0.948
     # vs 타화자 0.258~0.417, 중간점 0.511)
@@ -222,6 +225,7 @@ def load_settings(env_file: str | Path | None = ".env") -> Settings:
         minimax_model=os.getenv("MINIMAX_MODEL") or "speech-2.8-turbo",
         voice_emotion=os.getenv("VOICE_EMOTION") or "off",
         fish_emotion=os.getenv("FISH_EMOTION", "off").strip().lower() or "off",
+        fish_happy_temperature=os.getenv("FISH_HAPPY_TEMPERATURE", "0.5"),
         minimax_emotion=os.getenv("MINIMAX_EMOTION") or None,
         minimax_intensity=os.getenv("MINIMAX_INTENSITY") or "0",
         speaker_id_threshold=os.getenv("SPEAKER_ID_THRESHOLD", "0.5"),

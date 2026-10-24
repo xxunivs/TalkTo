@@ -174,12 +174,15 @@ class FishAudioTTSProvider:
         api_key: str,
         *,
         emotion_mode: str = "off",
+        happy_temperature: float | None = None,
         timeout_seconds: float = _TIMEOUT_SECONDS,
         clone_timeout_seconds: float = _CLONE_TIMEOUT_SECONDS,
     ) -> None:
         self.api_key = api_key
         # FISH_EMOTION. off 면 지금처럼 표시를 다 지우고 감정을 쓰지 않는다(켰다 끄면 저장된 표시도 바로 안 읽는다).
         self.emotion_mode = emotion_mode
+        # 기쁜 대답만 표현 흔들림을 낮춘다(FISH_HAPPY_TEMPERATURE). None·0 이하면 Fish 기본값 그대로
+        self.happy_temperature = happy_temperature if happy_temperature and happy_temperature > 0 else None
         self.timeout_seconds = timeout_seconds
         self.clone_timeout_seconds = clone_timeout_seconds
 
@@ -249,6 +252,9 @@ class FishAudioTTSProvider:
             "mp3_bitrate": 128,
             "latency": "normal",
         }
+        # [반갑게 웃으며]는 음이 너무 높게 연기될 때가 있어 기쁜 대답만 차분하게 읽힌다(표시는 그대로)
+        if cue and emotion == "happy" and self.happy_temperature is not None:
+            body["temperature"] = self.happy_temperature
         deadline = time.monotonic() + self.timeout_seconds  # 다시 하기까지 이 안에서 끝낸다
         response, audio = self._speak(body, deadline)
         if response.status_code in _RETRY_STATUS:

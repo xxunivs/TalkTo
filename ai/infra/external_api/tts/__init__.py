@@ -84,4 +84,5 @@ def _fish(settings: Settings) -> FishAudioTTSProvider:
     return FishAudioTTSProvider(
         api_key=settings.fish_audio_api_key.get_secret_value(),
         emotion_mode=getattr(settings, "fish_emotion", "off"),
+        happy_temperature=getattr(settings, "fish_happy_temperature", None),
     )
