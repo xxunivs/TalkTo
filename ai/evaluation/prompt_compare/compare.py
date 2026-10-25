@@ -5,10 +5,10 @@
   사전 판정·가드는 끄고 본다(프롬프트 자체의 차이를 보려고). 생성 모델은 .env 의 OPENAI_CHAT_MODEL(지금 gpt-6-luna).
 
 명령(Windows PowerShell, 레포 루트)
-  .venv\\Scripts\\python.exe experiments\\prompt_compare\\prepare.py                    # 한 번(OpenAI 없음)
-  .venv\\Scripts\\python.exe experiments\\prompt_compare\\compare.py cost               # 비용 추정만(OpenAI 없음)
-  .venv\\Scripts\\python.exe experiments\\prompt_compare\\compare.py all --limit 5      # 변형마다 5문항 시험
-  .venv\\Scripts\\python.exe experiments\\prompt_compare\\compare.py all                # 전체: run → judge → report
+  .venv\\Scripts\\python.exe evaluation\\prompt_compare\\prepare.py                    # 한 번(OpenAI 없음)
+  .venv\\Scripts\\python.exe evaluation\\prompt_compare\\compare.py cost               # 비용 추정만(OpenAI 없음)
+  .venv\\Scripts\\python.exe evaluation\\prompt_compare\\compare.py all --limit 5      # 변형마다 5문항 시험
+  .venv\\Scripts\\python.exe evaluation\\prompt_compare\\compare.py all                # 전체: run → judge → report
   --variants ops,auto_now(기본: variants/ 의 전부) --sets orig,ext --mock(OpenAI 없이 경로 점검)
 
 지표(보려는 것)
@@ -37,7 +37,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-REPO = HERE.parents[1]
+REPO = HERE.parents[2]
 sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(HERE))
 DATA, VAR, RES = HERE / "data", HERE / "variants", HERE / "results"

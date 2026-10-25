@@ -115,7 +115,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     out = (
         args.out
-        or REPO / "experiments" / "orchestrator" / "results" / f"{args.fixture.stem}{tag}.jsonl"
+        or REPO / "evaluation" / "orchestrator" / "results" / f"{args.fixture.stem}{tag}.jsonl"
     )
     out.parent.mkdir(parents=True, exist_ok=True)
     print(f"구성: {orch.describe()}")

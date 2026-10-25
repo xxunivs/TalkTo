@@ -21,7 +21,7 @@ build/
 tmp/
 
 # 중간계층 실행 결과·추적 로그(대화 원문 포함)
-experiments/orchestrator/results/
+evaluation/orchestrator/results/
 orchestrator_traces/
 
 # 로컬 전용 데이터(녹음·전사·페르소나 등록부 등 개인 정보) — 커밋하지 않는다
@@ -29,9 +29,9 @@ input/
 output/
 personas_local/
 외부데이터/
-experiments/prompt_compare/data/
-experiments/prompt_compare/variants/
-experiments/prompt_compare/results/
+evaluation/prompt_compare/data/
+evaluation/prompt_compare/variants/
+evaluation/prompt_compare/results/
 
 # 로컬 도구 작업 폴더
 .scratch/

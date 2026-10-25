@@ -1,6 +1,6 @@
 """비교 실험 준비 (OpenAI 호출 없음) — 프롬프트 변형·질문 세트·기억 선택을 미리 만들어 data/ 에 둔다.
 
-    .venv\\Scripts\\python.exe experiments\\prompt_compare\\prepare.py
+    .venv\\Scripts\\python.exe evaluation\\prompt_compare\\prepare.py
 
 만드는 것
   variants/ops.txt         운영 DB 에 있는 손으로 쓴 프롬프트(운영 export personas_<tag>.json)
@@ -27,7 +27,7 @@ import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-REPO = HERE.parents[1]
+REPO = HERE.parents[2]
 sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(HERE))
 DATA, VAR = HERE / "data", HERE / "variants"

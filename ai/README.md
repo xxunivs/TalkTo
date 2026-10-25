@@ -53,7 +53,7 @@ app/            서버 설정, API 라우트(api/), 스키마, 외부 API 연동
 pipeline/       제작 파이프라인 s0~s5, persona_prompt (4층 프롬프트 생성기)
 orchestrator/   대화 한 턴의 중간계층 (계약: orchestrator/CONTRACT.md)
 prompts/        공통 규칙 모듈(rules/), 상황별 층 구성(layers.json)
-tools/          수동 제작 페르소나 내보내기
+scripts/        운영 도구 (수동 제작 페르소나 내보내기, ElevenLabs 기록 정리)
 docs/           설문 양식, 운영 가이드
 test/           자동 테스트 (외부 API 호출 없음)
 evaluation/     STT 비교, 화자 식별, 페르소나 품질 평가

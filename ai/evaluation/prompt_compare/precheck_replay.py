@@ -5,7 +5,7 @@ known=False(= "모른다·되묻기" 지시가 붙음)였는지 보고, 채점 �
     놓침 = 사전 판정 지시 때문 / 가드 되묻기 때문 / 둘 다 아님(모델이 스스로 모른다고 함)
 근거 기억은 모든 문항에서 프롬프트에 들어가 있으므로(검색 문제 아님), 놓침은 판정·가드의 낱말 비교에서 나온다.
 
-    python experiments/prompt_compare/precheck_replay.py --batch <묶음 id>
+    python evaluation/prompt_compare/precheck_replay.py --batch <묶음 id>
 """
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from collections import Counter
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-sys.path.insert(0, str(HERE.parents[1]))
+sys.path.insert(0, str(HERE.parents[2]))
 sys.path.insert(0, str(HERE))
 import compare as C  # noqa: E402
 

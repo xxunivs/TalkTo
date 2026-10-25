@@ -22,7 +22,6 @@ output/
 **/*.mp3
 personas_local/
 외부데이터/
-experiments/
 test/
 docs/
 .scratch/

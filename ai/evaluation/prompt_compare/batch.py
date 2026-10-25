@@ -1,9 +1,9 @@
 """프롬프트 개선 실험 묶음 — 조건 여러 개 × 반복, 끊겨도 이어서, 끝나면 반복 평균·흔들림·조건 간 차이 신뢰구간.
 
-    .venv\\Scripts\\python.exe experiments\\prompt_compare\\batch.py cost                 # 비용 추정(OpenAI 없음)
-    .venv\\Scripts\\python.exe experiments\\prompt_compare\\batch.py all                  # 인터뷰 후보 → 변형 → 실행·판정 → 요약
-    .venv\\Scripts\\python.exe experiments\\prompt_compare\\batch.py all --batch <id>     # 끊긴 묶음 이어서(끝난 실행은 건너뜀)
-    .venv\\Scripts\\python.exe experiments\\prompt_compare\\batch.py summarize --batch <id>
+    .venv\\Scripts\\python.exe evaluation\\prompt_compare\\batch.py cost                 # 비용 추정(OpenAI 없음)
+    .venv\\Scripts\\python.exe evaluation\\prompt_compare\\batch.py all                  # 인터뷰 후보 → 변형 → 실행·판정 → 요약
+    .venv\\Scripts\\python.exe evaluation\\prompt_compare\\batch.py all --batch <id>     # 끊긴 묶음 이어서(끝난 실행은 건너뜀)
+    .venv\\Scripts\\python.exe evaluation\\prompt_compare\\batch.py summarize --batch <id>
     --tiers 1,2,3  --reps-scale 1.0  --mock
 
 모델: 생성·인터뷰 추출 = .env OPENAI_CHAT_MODEL(gpt-6-luna). 판정 = .env OPENAI_JUDGE_MODEL(gpt-6-luna, 비용 때문에 생성과 같은 모델)
@@ -37,7 +37,7 @@ import time
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-REPO = HERE.parents[1]
+REPO = HERE.parents[2]
 sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(HERE))
 import compare as C  # noqa: E402

@@ -6,7 +6,7 @@
 맥락 = 문항의 가족 말(여러 턴이면 전부) + 앞 대화 + 그 문항에 넣은 기억 + 그 조건의 지시문.
 원본 세트(orig, 실제 통화 질문)와 확장 세트(ext, 만든 문항)를 따로 센다.
 
-    python experiments/prompt_compare/lang_scan.py [--glob "answers_*_<묶음>.jsonl"]
+    python evaluation/prompt_compare/lang_scan.py [--glob "answers_*_<묶음>.jsonl"]
 결과: results/lang_scan_<시각>.md(요약) / .jsonl(걸린 답 전부)
 """
 from __future__ import annotations
@@ -17,7 +17,7 @@ from collections import Counter, defaultdict
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-sys.path.insert(0, str(HERE.parents[1]))
+sys.path.insert(0, str(HERE.parents[2]))
 sys.path.insert(0, str(HERE))
 import compare as C  # noqa: E402
 

@@ -132,7 +132,7 @@ class PurgeToolTest(_Base):
     def setUp(self) -> None:
         super().setUp()
         spec = importlib.util.spec_from_file_location(
-            "purge_elevenlabs_history", REPO / "tools" / "purge_elevenlabs_history.py")
+            "purge_elevenlabs_history", REPO / "scripts" / "purge_elevenlabs_history.py")
         self.tool = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(self.tool)
         self.pages = [

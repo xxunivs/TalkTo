@@ -1,4 +1,4 @@
-"""tools/export_manual_persona.py — 지어낸 자료로 묶음 모양·지침 조립·쓰기 막기를 본다(가족 자료를 쓰지 않는다)."""
+"""scripts/export_manual_persona.py — 지어낸 자료로 묶음 모양·지침 조립·쓰기 막기를 본다(가족 자료를 쓰지 않는다)."""
 import contextlib
 import hashlib
 import importlib.util
@@ -12,7 +12,7 @@ from pipeline.s3_synthesis.common_rules import DEATH_POLICIES, render_rules
 
 REPO = Path(__file__).resolve().parents[2]
 _spec = importlib.util.spec_from_file_location("export_manual_persona",
-                                               REPO / "tools" / "export_manual_persona.py")
+                                               REPO / "scripts" / "export_manual_persona.py")
 tool = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(tool)
 
@@ -192,7 +192,7 @@ class ExportManualPersonaTest(unittest.TestCase):
 
     def test_write_refuses_repo_and_source_folder(self) -> None:
         b = self.bundle()
-        inside_repo = REPO / "tools" / "should_not_be_written.json"
+        inside_repo = REPO / "scripts" / "should_not_be_written.json"
         with self.assertRaises(tool.BundleError):
             tool.write_bundle(b, inside_repo, src=self.src)
         self.assertFalse(inside_repo.exists())
