@@ -112,6 +112,5 @@ ai/                  AI 서버 (페르소나 제작 파이프라인, 대화, 평
 
 server/              백엔드 (FastAPI, 팀)
 web/                 웹 앱 (Flutter, 팀)
-archive/             이전 버전 (2026.04 텔레그램 시제품, 2026.05 할머니 챗봇 1차)
 .github/             CI 설정, README 그림
 ```
