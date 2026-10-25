@@ -1,19 +1,11 @@
-"""픽스처(계약2 JSON) → 페르소나 system prompt 조립·저장.
-
-lab.py가 쓰는 미리 조립된 persona .txt를 어느 인물이든 재현 가능하게 만든다.
-말투 예시는 픽스처의 `_speechExamples`(실오디오 근거 발화)를 세그먼트로 넣어 주입.
-
-Usage:
-    python -m evaluation.persona.build --fixture evaluation/persona/fixtures/subject_context_choiyoungja_gangwon.json
-"""
+"""픽스처(subjectContext, intakeContext, _speechExamples) -> 페르소나 system prompt 조립 저장"""
 
 import argparse
 import json
 from pathlib import Path
 
-from app.pipeline.persona.assembler import assemble_persona_prompt
-from app.pipeline.persona.service import _speech_segments
-from app.schemas.context import IntakeContext, SubjectContext
+from app.schema.subject import IntakeContext, SubjectContext
+from pipeline.s3_synthesis.c_build_system_prompt import _speech_segments, assemble_persona_prompt
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 OUT_DIR = REPO_ROOT / "evaluation" / "persona" / "results"
@@ -44,7 +36,7 @@ def main() -> int:
     out.write_text(prompt, encoding="utf-8")
     try:
         shown = out.relative_to(REPO_ROOT)
-    except ValueError:  # --out이 저장소 밖(예: 임시 폴더)일 수 있다
+    except ValueError:  # 저장소 밖 --out 경로
         shown = out
     print(f"조립 완료 {len(prompt)}자 → {shown}")
     return 0

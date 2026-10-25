@@ -1,50 +1,49 @@
 # TalkTo AI 파이프라인 평가
 
-전사, 화자 식별, 기억 검색, 페르소나 응답 품질을 확인하는 평가 도구와 기존 결과 정리
+전사, 화자 식별, 기억 검색, 페르소나 응답 품질 평가 도구와 기존 결과
 
-## 평가 항목
+## 평가 도구
 
 | 단계 | 평가 내용 | 평가 도구 |
 |---|---|---|
 | s1 전사 | 문자 오류율(CER), 화자 수, 처리 시간 | `transcription/e2e.py`, `transcription/bakeoff/run_bakeoff.py` |
+| s1 전사 일반화 | AI Hub 전화망 CER, 합성 용어집 오교정 안전 | `transcription/external_cer.py` |
 | s1 화자 식별 | 대상자 식별 정확도, 목소리 유사도 | `speaker_id/lab.py` |
-| s1 교정 | 고유명사 교정과 원문 보존 | `correction/lab.py` |
-| s2 분석 | 인물 귀속, 민감 정보, 기억 근거, 요약과 태그 | `analysis/`, `memory_segments/`, `enrichment/` |
 | s3 검색 | 정답 기억 검색률(Recall@k) | `embeddings/lab.py` |
 | s4 음성 | 대상자 샘플 수집, 클론 생성, 음성 합성 | 외부 5인 흐름 검증 기록 |
-| s5 대화 | 정확성, 말투, 안전, 반복 실행 시 일관성 | `persona/lab.py` |
-| 전체 흐름 | 외부 녹음으로 단계 연결과 일반화 확인 | `e2e_external.py` |
+| s5 대화 | 정확성, 말투, 안전, 반복 실행 시 일관성 | `persona/lab.py`, `persona/build.py`, `persona/chat.py` |
 
-## 현재 실행 상태
-
-전사 E2E와 STT 비교 도구는 도움말 확인 가능
-
-실제 평가 실행 시 녹음, 정답, 출력 경로 지정 필요
-
-전사 E2E의 `.env` 참조 위치와 인증 토큰 설정도 확인 필요
-
-분석, 기억, 검색, 화자 식별, 페르소나 평가 도구에는 이전 `app.*` 임포트가 남아 있어 현재 구조에서 실행 불가
-
-공용 로더의 저장소 루트, 자료 경로, 시나리오 모듈 경로도 수정 필요
+## 실행
 
 ```bash
-# 저장소 루트에서 실행
+# 저장소 루트(ai/)에서 실행
 python -m evaluation.transcription.e2e --help
 python -m evaluation.transcription.bakeoff.run_bakeoff --help
+python -m evaluation.transcription.external_cer --help
+python -m evaluation.speaker_id.lab --help
+python -m evaluation.embeddings.lab --help
+python -m evaluation.persona.build --help
+python -m evaluation.persona.lab --help
+python -m evaluation.persona.chat --help
 ```
 
-- 전사 E2E: 실행 중인 AI 서버 필요, 입력은 WAV 파일
-- STT 비교: ElevenLabs 또는 RTZR API 키 필요, `--providers`로 비교 대상 선택
-- CER 채점: 녹음과 정답 파일의 이름이 일치해야 함
-- 실제 평가: 외부 API 호출 비용 발생
+- `transcription/e2e.py`: 실행 중인 AI 서버로 WAV 전사 후 골드 대비 CER 채점
+- `transcription/bakeoff/run_bakeoff.py`: ElevenLabs, RTZR STT 비교 (`--providers`로 선택)
+- `transcription/external_cer.py`: AI Hub 자료 기준 일반화 검증 (자료 위치 기본값 `~/aihub_data`, `AIHUB_ROOT`로 변경)
+- `speaker_id/lab.py`: 골드 전사로 정답 화자 도출 후 ECAPA 유사도 임계값 실측 (speechbrain, ffmpeg 필요)
+- `embeddings/lab.py`: 저장된 기억 결과와 질의 세트(`embeddings/queries.py`)로 Recall@k 측정
+- `persona/build.py`: 인물 설정 픽스처로 페르소나 지시문 조립 (LLM 미사용)
+- `persona/lab.py`: 시나리오 모듈(`persona/scenarios*.py`)별 judge 채점, F 안전 미달 시 종료 코드 1
+- `persona/chat.py`: 픽스처와 기억 카드로 터미널 대화 (서빙과 같은 응답 경로)
+- 외부 API 사용 도구: 실행마다 비용 발생
 
 ## 자료와 결과 위치
 
 | 자료 | 위치 |
 |---|---|
-| 원본 녹음 | 저장소 루트의 `input/<대상자>/음성/` |
+| 원본 녹음 | 저장소 루트의 `input/<대상자>/음성/` (`할머니 목소리 N` 결과는 `통화NN` 녹음) |
 | 전사 정답과 용어집 | `transcription/gold/` |
-| 전사와 화자 식별 결과 | `transcription/results/` |
+| 전사, 화자 식별, 기억 결과 | `transcription/results/` |
 | STT 비교 결과 | `transcription/bakeoff/results/`, `results-kw/`, `results-spk2/` |
 | 외부 인물 설정 | `persona/fixtures/` |
 | 페르소나 평가 결과 | `persona/results/` |
@@ -80,4 +79,4 @@ python -m evaluation.transcription.bakeoff.run_bakeoff --help
 
 점수는 LLM 채점 결과이며, 해당 설정과 시나리오에서의 비교 지표
 
-현재 코드의 성능 확인에는 경로 수정 후 재평가 필요
+현재 코드의 성능 확인에는 재평가 필요

@@ -16,9 +16,9 @@ Outputs stay local: results contain transcripts and must never be committed.
 """
 
 import argparse
-import re
 import json
 import os
+import re
 import sys
 import time
 from pathlib import Path
@@ -26,7 +26,11 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from evaluation.metrics import cer, full_text, speaker_stats
-from evaluation.transcription.bakeoff.providers import ProviderError, transcribe_rtzr, transcribe_scribe
+from evaluation.transcription.bakeoff.providers import (
+    ProviderError,
+    transcribe_rtzr,
+    transcribe_scribe,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_OUT = REPO_ROOT / "evaluation" / "transcription" / "bakeoff" / "results"
@@ -55,9 +59,7 @@ def load_gold(args: argparse.Namespace, audio_path: Path) -> str | None:
     if text is None:
         return None
     # gold lines may carry speaker labels like "할머니: ..." — score text only
-    return "\n".join(
-        re.sub(r"^[^:\n]{1,10}:\s*", "", line) for line in text.splitlines()
-    )
+    return "\n".join(re.sub(r"^[^:\n]{1,10}:\s*", "", line) for line in text.splitlines())
 
 
 def run_provider(
@@ -80,9 +82,7 @@ def run_provider(
         api_key = os.environ.get("ELEVENLABS_API_KEY")
         if not api_key:
             raise ProviderError("ELEVENLABS_API_KEY not set in .env")
-        result = transcribe_scribe(
-            audio_path, api_key=api_key, num_speakers=args.num_speakers
-        )
+        result = transcribe_scribe(audio_path, api_key=api_key, num_speakers=args.num_speakers)
     else:
         raise ProviderError(f"Unknown provider: {name}")
     result["latencySeconds"] = round(time.monotonic() - started, 1)
@@ -94,7 +94,9 @@ def format_ms(ms: int) -> str:
     return f"{seconds // 60:02d}:{seconds % 60:02d}"
 
 
-def write_report(out_dir: Path, audio_path: Path, results: dict[str, dict], gold: str | None) -> None:
+def write_report(
+    out_dir: Path, audio_path: Path, results: dict[str, dict], gold: str | None
+) -> None:
     lines = [f"# Bake-off: {audio_path.name}", ""]
     lines.append("| provider | segments | speakers | latency(s) | CER |")
     lines.append("|---|---|---|---|---|")
@@ -139,7 +141,8 @@ def main() -> int:
     keywords = None
     if args.keywords and args.keywords.exists():
         keywords = [
-            line.strip() for line in args.keywords.read_text(encoding="utf-8").splitlines()
+            line.strip()
+            for line in args.keywords.read_text(encoding="utf-8").splitlines()
             if line.strip()
         ]
 

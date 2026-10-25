@@ -56,9 +56,7 @@ def transcribe_rtzr(
 
     deadline = time.monotonic() + timeout_seconds
     while True:
-        poll = httpx.get(
-            f"{RTZR_BASE}/v1/transcribe/{transcribe_id}", headers=headers, timeout=30
-        )
+        poll = httpx.get(f"{RTZR_BASE}/v1/transcribe/{transcribe_id}", headers=headers, timeout=30)
         poll.raise_for_status()
         body = poll.json()
         status = body.get("status")

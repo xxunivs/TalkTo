@@ -1,55 +1,67 @@
-"""페르소나와 터미널에서 직접 대화 — 실제 서빙 흐름(조립 + 기억 top-k 주입 + 응답 생성).
-
-BE UI 없이 fixture만으로 대화 체험. /assembly로 페르소나 프롬프트를 만들고, 매 입력마다
-memoryCards를 임베딩 검색해 관련 기억을 주입한 뒤 /responses 로직으로 답한다.
-
-Usage:
-    python -m evaluation.persona.chat --fixture data/fixtures/subject_context_singeumja.json
-    # 미리 조립된 프롬프트를 쓰려면:
-    python -m evaluation.persona.chat --fixture <fx> --persona evaluation/persona/results/persona_xxx.txt
-종료: 빈 줄 입력 또는 Ctrl-D.
-"""
+"""페르소나 터미널 대화, 서빙 흐름(조립 + 기억 top-k 주입 + 응답) 재현 (빈 줄 또는 Ctrl-D 로 종료)"""
 
 import argparse
 import json
 from pathlib import Path
 
-from app.core.config import load_settings
-from app.pipeline.embeddings.service import embed_texts
-from app.pipeline.persona.service import (
-    assemble_persona_instructions,
-    generate_persona_response,
-)
-from app.schemas.context import IntakeContext, SubjectContext
-from app.schemas.persona import (
+from app.schema.persona import (
     ConversationMessage,
     MemoryContext,
     PersonaAssemblyRequest,
     PersonaContext,
     PersonaResponseRequest,
+    PersonaResponseResult,
 )
+from app.schema.subject import IntakeContext, SubjectContext
+from app.setting import Settings, load_settings
+from evaluation.common import REPO_ROOT
+from orchestrator.service import orchestrate_persona_response
+from pipeline.s3_synthesis.c_build_system_prompt import (
+    assemble_persona_instructions,
+    generate_persona_response,
+)
+from pipeline.s3_synthesis.d_build_memory_embedding import embed_texts
 
 
 def _cosine(a: list[float], b: list[float]) -> float:
-    dot = sum(x * y for x, y in zip(a, b))
+    dot = sum(x * y for x, y in zip(a, b, strict=True))
     na = sum(x * x for x in a) ** 0.5
     nb = sum(y * y for y in b) ** 0.5
     return dot / (na * nb) if na and nb else 0.0
 
 
+def respond(request: PersonaResponseRequest, settings: Settings) -> PersonaResponseResult:
+    """/v1/persona/responses 와 같은 경로 선택 (PERSONA_ORCHESTRATOR 켜지면 중간계층)"""
+    if settings.persona_orchestrator and not request.persona.fixed_prompt:
+        return orchestrate_persona_response(request, settings=settings)
+    return generate_persona_response(request, settings=settings)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--fixture", type=Path, required=True)
-    parser.add_argument("--persona", type=Path, default=None,
-                        help="미리 조립된 프롬프트 파일(주면 fresh 조립 대신 이걸 사용)")
-    parser.add_argument("--memories", type=Path, default=None,
-                        help="누적 기억 파일(build_from_recordings 산출). 주면 fixture 카드 대신 사용")
+    parser.add_argument(
+        "--persona",
+        type=Path,
+        default=None,
+        help="미리 조립된 프롬프트 파일(주면 fresh 조립 대신 이걸 사용)",
+    )
+    parser.add_argument(
+        "--memories",
+        type=Path,
+        default=None,
+        help="기억 카드 JSON 목록(title, content, tags). 주면 fixture 카드 대신 사용",
+    )
     parser.add_argument("--memory-k", type=int, default=6)
-    parser.add_argument("--speech-examples", type=int, default=0,
-                        help="fixture _speechExamples 중 앞 N개를 말투 few-shot으로")
+    parser.add_argument(
+        "--speech-examples",
+        type=int,
+        default=0,
+        help="fixture _speechExamples 중 앞 N개를 말투 few-shot으로",
+    )
     args = parser.parse_args()
 
-    settings = load_settings(".env")
+    settings = load_settings(REPO_ROOT / ".env")
     payload = json.loads(args.fixture.read_text(encoding="utf-8"))
     subject_context = SubjectContext(**payload["subjectContext"])
     intake_raw = payload.get("intakeContext")
@@ -65,13 +77,16 @@ def main() -> int:
                 subject_context=subject_context,
                 intake_context=intake_context,
                 speech_examples=speech_examples,
-            )
+            ),
+            settings,
         )
         instructions = assembled.instructions
         name = assembled.subject_name
 
     if args.memories:
-        cards = [c for c in json.loads(args.memories.read_text(encoding="utf-8")) if c.get("content")]
+        cards = [
+            c for c in json.loads(args.memories.read_text(encoding="utf-8")) if c.get("content")
+        ]
     else:
         cards = [c for c in (intake_raw or {}).get("memoryCards", []) if c.get("content")]
     vectors = embed_texts([c["content"] for c in cards], settings=settings) if cards else []
@@ -92,21 +107,23 @@ def main() -> int:
         if cards:
             qvec = embed_texts([message], settings=settings)[0]
             ranked = sorted(
-                zip(cards, vectors), key=lambda cv: _cosine(qvec, cv[1]), reverse=True
+                zip(cards, vectors, strict=True), key=lambda cv: _cosine(qvec, cv[1]), reverse=True
             )[: args.memory_k]
             memories = [
                 MemoryContext(
-                    id=str(i), title=card.get("title", ""),
-                    content=card["content"], tags=card.get("tags", []),
+                    id=str(i),
+                    title=card.get("title", ""),
+                    content=card["content"],
+                    tags=card.get("tags", []),
                 )
                 for i, (card, _) in enumerate(ranked)
             ]
 
-        result = generate_persona_response(
+        result = respond(
             PersonaResponseRequest(
                 message=message, history=history, memories=memories, persona=persona
             ),
-            settings=settings,
+            settings,
         )
         print(f"{name}> {result.content}\n")
         history.append(ConversationMessage(role="user", content=message))

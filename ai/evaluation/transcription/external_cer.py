@@ -1,18 +1,4 @@
-"""외부 데이터(AI Hub) 일반화 랩 — 우리가 안 본 조건에서의 검증.
-
-축별 용도:
-- 전사 CER: 저음질 전화망(음질), 노인 자유대화(고령), 방언 2인(방언)
-- 보정 오교정 안전: 남의 대화 + 용어집을 끼웠을 때 원문 훼손 0건 확인
-  (교정 "성공률"은 그 가족 용어집이 있어야 해서 자체/베타 데이터 몫)
-
-AI Hub 전사 표기 규칙(이중 전사 (철자)/(발음), 잡음 태그 b/ o/ 등)을
-정규화한 뒤 채점한다. 골드가 이중 표기일 때는 두 해석 중 CER이 낮은
-쪽을 쓴다 (STT가 어느 쪽으로 써도 정답 취급).
-
-Usage:
-    python -m evaluation.transcription.external_cer phone-cer [--clips 30]
-    python -m evaluation.transcription.external_cer correction-safety --source phone [--utterances 80]
-"""
+"""외부 데이터(AI Hub) 일반화 검증, 전화망 전사 CER과 합성 용어집 오교정 안전"""
 
 import argparse
 import os
@@ -22,25 +8,23 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from evaluation.metrics import cer
 from evaluation.common import REPO_ROOT
+from evaluation.metrics import cer
 
-AIHUB_ROOT = Path(__file__).resolve().parents[1] / "data" / "external"
-PHONE_BASE = (
-    AIHUB_ROOT
-    / "571_전화망/007.저음질_전화망_음성인식_데이터/01.데이터/2.Validation"
-)
+# AI Hub 자료 위치 (환경 변수 AIHUB_ROOT 로 변경)
+AIHUB_ROOT = Path(os.environ.get("AIHUB_ROOT") or Path.home() / "aihub_data")
+PHONE_BASE = AIHUB_ROOT / "571_전화망/007.저음질_전화망_음성인식_데이터/01.데이터/2.Validation"
 
-# (철자)/(발음) 이중 전사
+# (철자)/(발음) 이중 전사, 골드가 이중 표기면 CER 낮은 쪽 채택
 _DUAL = re.compile(r"\(([^()]*)\)\s*/\s*\(([^()]*)\)")
-# 잡음·간투어 태그: b/ n/ o/ l/ u/ 등
+# 잡음, 간투어 태그 (b/ n/ o/ l/ u/ 등)
 _TAGS = re.compile(r"\b[bnolu]/")
 # 불명료 구간 ((...)), 중단 표시 +, 발음 오류 표시 *
 _UNCLEAR = re.compile(r"\(\([^)]*\)\)")
 
 
 def normalize_gold_variants(text: str) -> tuple[str, str]:
-    """AI Hub 표기 제거 → (철자 해석, 발음 해석) 두 가지 반환."""
+    """AI Hub 표기 제거 후 (철자 해석, 발음 해석)"""
 
     def strip_common(value: str) -> str:
         value = _UNCLEAR.sub(" ", value)
@@ -68,7 +52,7 @@ def phone_clip_pairs() -> list[tuple[Path, Path]]:
 
 
 def run_phone_cer(clips: int) -> None:
-    from app.providers.stt.elevenlabs_scribe import ElevenLabsScribeProvider
+    from app.external_api.stt.elevenlabs_scribe import ElevenLabsScribeProvider
 
     provider = ElevenLabsScribeProvider(api_key=os.environ["ELEVENLABS_API_KEY"])
     random.seed(42)
@@ -85,26 +69,42 @@ def run_phone_cer(clips: int) -> None:
         worst.append((value, gold_raw, hypothesis))
 
     scores.sort()
-    print(f"\n[전화망 8kHz] {clips}클립 CER 평균 {sum(scores)/len(scores):.4f} "
-          f"/ 중앙값 {scores[len(scores)//2]:.4f} / 최대 {scores[-1]:.4f}")
+    print(
+        f"\n[전화망 8kHz] {clips}클립 CER 평균 {sum(scores) / len(scores):.4f} "
+        f"/ 중앙값 {scores[len(scores) // 2]:.4f} / 최대 {scores[-1]:.4f}"
+    )
     print("최악 3건:")
     for value, gold_raw, hypothesis in sorted(worst, reverse=True)[:3]:
         print(f"  CER {value:.3f} | 골드: {gold_raw[:60]}")
         print(f"            | 전사: {hypothesis[:60]}")
 
 
-# 오교정 안전 테스트용 합성 용어집 — 특정 가족과 무관한 일반 이름·지명
+# 오교정 안전 확인용 합성 용어집, 특정 가족과 무관한 일반 이름과 지명
 SYNTHETIC_GLOSSARY = [
-    "김하늘", "하늘", "하늘아", "박민준", "민준", "민준아",
-    "이서연", "서연", "서연아", "최준호", "준호", "준호야",
-    "정읍", "속초", "구미", "매실청", "장아찌",
+    "김하늘",
+    "하늘",
+    "하늘아",
+    "박민준",
+    "민준",
+    "민준아",
+    "이서연",
+    "서연",
+    "서연아",
+    "최준호",
+    "준호",
+    "준호야",
+    "정읍",
+    "속초",
+    "구미",
+    "매실청",
+    "장아찌",
 ]
 
 
 def run_correction_safety(source: str, utterances: int) -> None:
-    from app.core.config import load_settings
-    from app.schemas.transcript import TranscriptSegment
-    from app.pipeline.correction.service import correct_segments
+    from app.schema.transcript import TranscriptSegment
+    from app.setting import load_settings
+    from pipeline.s1_transcription.c_correction import correct_segments
 
     if source == "phone":
         labels = [label for _, label in phone_clip_pairs()]
@@ -119,8 +119,11 @@ def run_correction_safety(source: str, utterances: int) -> None:
         if orthographic:
             segments.append(
                 TranscriptSegment(
-                    segment_index=i, start_ms=i * 1000, end_ms=(i + 1) * 1000,
-                    speaker_label="SPK_0", transcript_text=orthographic,
+                    segment_index=i,
+                    start_ms=i * 1000,
+                    end_ms=(i + 1) * 1000,
+                    speaker_label="SPK_0",
+                    transcript_text=orthographic,
                 )
             )
 
@@ -129,7 +132,9 @@ def run_correction_safety(source: str, utterances: int) -> None:
 
     corrected = [s for s in segments if s.corrected_text]
     flagged = [s for s in segments if s.needs_review]
-    print(f"\n[보정 오교정 안전 — {source}] 발화 {len(segments)}건 + 합성 용어집 {len(SYNTHETIC_GLOSSARY)}개")
+    print(
+        f"\n[보정 오교정 안전 — {source}] 발화 {len(segments)}건 + 합성 용어집 {len(SYNTHETIC_GLOSSARY)}개"
+    )
     print(f"  교정 발생(=원문 훼손 후보): {len(corrected)}건 ← 0이어야 함")
     for s in corrected:
         print(f"    ⚠️ {s.transcript_text[:50]} → {s.corrected_text[:50]}")
@@ -143,10 +148,12 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
 
-    phone = sub.add_parser("phone-cer")
+    phone = sub.add_parser("phone-cer", help="전화망 8kHz 클립 전사 CER")
     phone.add_argument("--clips", type=int, default=30)
 
-    safety = sub.add_parser("correction-safety")
+    safety = sub.add_parser(
+        "correction-safety", help="남의 대화 + 합성 용어집 교정 시 원문 훼손 수"
+    )
     safety.add_argument("--source", type=str, default="phone")
     safety.add_argument("--utterances", type=int, default=80)
 

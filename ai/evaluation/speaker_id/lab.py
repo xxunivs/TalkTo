@@ -1,32 +1,20 @@
-"""화자 식별 캘리브레이션 — 골드 13건으로 ECAPA 유사도 임계값 실측.
-
-정답 매핑은 손으로 만들지 않는다: 골드 전사의 화자 라벨(할머니:/손녀: 등)과
-Scribe 화자 라벨(SPK_n)을 텍스트 유사도(CER)로 자동 정렬해 "이 파일에서
-할머니 = SPK_?"를 도출한다. reference 임베딩은 지정 파일의 대상자 발화로
-만들어 Intake 음성 샘플(voiceSampleRef) 등록을 시뮬레이션한다.
-
-Usage:
-    python -m evaluation.speaker_id.lab [--reference "할머니 목소리 1"]
-
-Requires: pip install speechbrain torchaudio torch (선택 의존성),
-evaluation/e2e/results/*.json (전사 결과), evaluation/bakeoff/gold/*.txt.
-"""
+"""화자 식별 캘리브레이션, 골드 전사 기준 ECAPA 유사도 임계값 실측"""
 
 import argparse
 import re
 
-from app.schemas.transcript import TranscriptSegment
-from app.pipeline.speaker_id.service import SpeakerEmbedder, cosine_similarity
+from app.schema.transcript import TranscriptSegment
+from evaluation.common import GOLD_DIR, audio_path, load_segments, result_stems
 from evaluation.metrics import cer
-from evaluation.common import AUDIO_DIR, GOLD_DIR, load_segments, result_stems
+from pipeline.s1_transcription.b_speaker_id import SpeakerEmbedder, cosine_similarity
 
 SUBJECT_GOLD_LABEL = "할머니"
-# reference 클립 길이(초) — Intake 음성 샘플 구간을 흉내 낸다
+# reference 클립 길이(초), Intake 음성 샘플 구간 모사
 REFERENCE_CLIP_SECONDS = 20.0
 
 
 def gold_speaker_texts(stem: str) -> dict[str, str]:
-    """골드 전사를 화자 라벨별 텍스트로 분리."""
+    """골드 전사의 화자 라벨별 텍스트"""
     texts: dict[str, list[str]] = {}
     raw = (GOLD_DIR / f"{stem}.txt").read_text(encoding="utf-8")
     for line in raw.splitlines():
@@ -39,11 +27,7 @@ def gold_speaker_texts(stem: str) -> dict[str, str]:
 def subject_label_by_text(
     segments: list[TranscriptSegment], gold_texts: dict[str, str]
 ) -> str | None:
-    """골드 문장별 최근접 세그먼트의 화자 라벨을 투표해 '할머니 = SPK_?' 도출.
-
-    화자 전체 텍스트끼리 CER을 비교하면 골드가 잘린 파일(10번)에서 길이
-    차이에 속는다 — 문장 단위 투표는 존재하는 문장만 세므로 강건하다.
-    """
+    """골드 문장별 최근접 세그먼트 화자 라벨 투표, 잘린 골드에도 강건한 대상자 라벨 도출"""
     subject_text = gold_texts.get(SUBJECT_GOLD_LABEL)
     if not subject_text:
         return None
@@ -68,13 +52,13 @@ def subject_label_by_text(
 def reference_embedding_from(
     embedder: SpeakerEmbedder, stem: str, subject_label: str
 ) -> list[float]:
-    """대상자 발화 앞부분 ~20초로 reference 임베딩 생성 (voiceSampleRef 시뮬레이션)."""
+    """대상자 발화 앞 약 20초 reference 임베딩 (voiceSampleRef 모사)"""
     import torch
 
-    from app.pipeline.speaker_id.service import SAMPLE_RATE, load_mono_16k, slice_ms
+    from pipeline.s1_transcription.b_speaker_id import SAMPLE_RATE, load_mono_16k, slice_ms
 
     segments = load_segments(stem)
-    waveform = load_mono_16k(AUDIO_DIR / f"{stem}.wav")
+    waveform = load_mono_16k(audio_path(stem))
     clips, total = [], 0.0
     for segment in segments:
         if segment.speaker_label != subject_label:
@@ -92,7 +76,8 @@ def main() -> int:
     parser.add_argument("--reference", type=str, default="할머니 목소리 1")
     args = parser.parse_args()
 
-    stems = result_stems()
+    # 골드 전사가 있는 결과만 (외부 데이터 결과 제외)
+    stems = [stem for stem in result_stems() if (GOLD_DIR / f"{stem}.txt").exists()]
     embedder = SpeakerEmbedder()
 
     # 1) 정답 매핑
@@ -107,12 +92,12 @@ def main() -> int:
     reference = reference_embedding_from(embedder, args.reference, truth[args.reference])
     print(f"reference: {args.reference} / {truth[args.reference]} (~{REFERENCE_CLIP_SECONDS:.0f}s)")
 
-    # 3) 파일별 화자 임베딩 → 유사도
+    # 3) 파일별 화자 임베딩 -> 유사도
     same_sims, diff_sims, rows = [], [], []
     for stem in stems:
-        embeddings = embedder.embed_speakers(
-            AUDIO_DIR / f"{stem}.wav", load_segments(stem)
-        )
+        if stem not in truth:
+            continue
+        embeddings = embedder.embed_speakers(audio_path(stem), load_segments(stem))
         sims = {
             label: cosine_similarity(embedding, reference)
             for label, embedding in embeddings.items()

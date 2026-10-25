@@ -1,31 +1,23 @@
-"""3-B 검색 랩 — 기억 전체 임베딩 → 질의별 top-5 → Recall@5.
-
-P0(코사인만) vs P1(재정렬: 유사도 + 중요도 + 태그겹침) 비교.
-importance·tags는 3-A가 아직 안 뽑으므로 P1은 옵션(있으면 사용).
-pgvector 실측은 별도(--pgvector, Docker 필요) — 기본은 in-memory 코사인.
-
-Usage:
-    python -m evaluation.embeddings.lab            # P0 Recall@5
-"""
+"""기억 검색 Recall@k, 기억 전체 임베딩 후 질의별 top-k 코사인 검색"""
 
 import argparse
 import json
 import math
 
-from app.core.config import load_settings
-from app.pipeline.embeddings.service import embed_texts
+from app.setting import load_settings
 from evaluation.common import REPO_ROOT, RESULTS_DIR, write_summary_md
 from evaluation.embeddings.queries import QUERIES
+from pipeline.s3_synthesis.d_build_memory_embedding import embed_texts
 
 MEMORY_DIR = RESULTS_DIR / "memory"
 
 
 def load_all_memories() -> list[dict]:
-    """정답 녹음들의 기억 전체를 (stem, index, text, meta)로 로드."""
+    """정답 녹음들의 기억 전체 (stem, text, importance, tags)"""
     items = []
     for stem in sorted({stem for _, stem in QUERIES}):
         body = json.loads((MEMORY_DIR / f"{stem}.memory.json").read_text(encoding="utf-8"))
-        for i, seg in enumerate(body["memorySegments"]):
+        for seg in body["memorySegments"]:
             items.append(
                 {
                     "stem": stem,
@@ -38,7 +30,7 @@ def load_all_memories() -> list[dict]:
 
 
 def cosine(a: list[float], b: list[float]) -> float:
-    dot = sum(x * y for x, y in zip(a, b))
+    dot = sum(x * y for x, y in zip(a, b, strict=True))
     na = math.sqrt(sum(x * x for x in a))
     nb = math.sqrt(sum(y * y for y in b))
     return dot / (na * nb) if na and nb else 0.0
@@ -58,8 +50,10 @@ def main() -> int:
     hits = 0
     rows = []
     print(f"\n[검색 Recall@{args.k}] (P0 코사인 — 재정렬은 실험 결과 검색 악화로 미채택)")
-    for (query, answer_stem), qvec in zip(QUERIES, query_vectors):
-        scored = [(cosine(qvec, mvec), mem) for mem, mvec in zip(memories, mem_vectors)]
+    for (query, answer_stem), qvec in zip(QUERIES, query_vectors, strict=True):
+        scored = [
+            (cosine(qvec, mvec), mem) for mem, mvec in zip(memories, mem_vectors, strict=True)
+        ]
         scored.sort(key=lambda x: x[0], reverse=True)
         topk = scored[: args.k]
         hit = any(mem["stem"] == answer_stem for _, mem in topk)
@@ -76,11 +70,15 @@ def main() -> int:
 
     lines = [
         f"**Recall@{args.k} = {hits}/{len(QUERIES)} = {recall:.1%}** "
-        f"(목표 ≥ 0.8 → {'합격' if recall >= 0.8 else '미달'})", "",
-        "| | 질의 | 정답 | top1 | 점수 |", "|---|---|---|---|---|",
+        f"(목표 ≥ 0.8 → {'합격' if recall >= 0.8 else '미달'})",
+        "",
+        "| | 질의 | 정답 | top1 | 점수 |",
+        "|---|---|---|---|---|",
         *[f"| {m} | {q} | {a} | {t} | {s:.2f} |" for m, q, a, t, s in rows],
     ]
-    out = write_summary_md(RESULTS_DIR / "embeddings_summary.md", f"3-B 임베딩 검색 Recall@{args.k}", lines)
+    out = write_summary_md(
+        RESULTS_DIR / "embeddings_summary.md", f"3-B 임베딩 검색 Recall@{args.k}", lines
+    )
     print(f"→ 저장: {out.relative_to(REPO_ROOT)}")
     return 0
 

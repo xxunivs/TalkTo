@@ -39,7 +39,7 @@ from dotenv import dotenv_values
 from evaluation.metrics import cer, full_text, speaker_stats
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_AUDIO_DIR = REPO_ROOT / "data" / "voice_raw"
+DEFAULT_AUDIO_DIR = REPO_ROOT / "input" / "신금자" / "음성"
 DEFAULT_GOLD_DIR = REPO_ROOT / "evaluation" / "transcription" / "gold"
 DEFAULT_OUT = REPO_ROOT / "evaluation" / "transcription" / "results"
 
@@ -61,10 +61,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def natural_key(path: Path) -> tuple:
-    return tuple(
-        int(part) if part.isdigit() else part
-        for part in re.split(r"(\d+)", path.stem)
-    )
+    return tuple(int(part) if part.isdigit() else part for part in re.split(r"(\d+)", path.stem))
 
 
 def load_gold(gold_dir: Path, stem: str) -> str | None:
@@ -73,9 +70,7 @@ def load_gold(gold_dir: Path, stem: str) -> str | None:
         return None
     text = candidate.read_text(encoding="utf-8")
     # gold lines carry speaker labels like "할머니: ..." — score text only
-    return "\n".join(
-        re.sub(r"^[^:\n]{1,10}:\s*", "", line) for line in text.splitlines()
-    )
+    return "\n".join(re.sub(r"^[^:\n]{1,10}:\s*", "", line) for line in text.splitlines())
 
 
 def start_file_server(directory: Path, port: int) -> ThreadingHTTPServer:
@@ -141,14 +136,9 @@ def main() -> int:
             health.raise_for_status()
 
             for index, audio_path in enumerate(audio_files, start=1):
-                url = (
-                    f"http://localhost:{args.file_port}/"
-                    f"{urllib.parse.quote(audio_path.name)}"
-                )
+                url = f"http://localhost:{args.file_port}/{urllib.parse.quote(audio_path.name)}"
                 print(f"[{audio_path.stem}] 전사 요청...", flush=True)
-                status, body, latency = transcribe(
-                    client, args.server, url, index, glossary
-                )
+                status, body, latency = transcribe(client, args.server, url, index, glossary)
                 if status != 200:
                     print(
                         f"[{audio_path.stem}] 실패 {status}: {json.dumps(body, ensure_ascii=False)[:200]}",
@@ -162,9 +152,7 @@ def main() -> int:
                 )
                 segments = body["segments"]
                 stats = speaker_stats(segments)
-                confidences = [
-                    s["confidence"] for s in segments if s.get("confidence") is not None
-                ]
+                confidences = [s["confidence"] for s in segments if s.get("confidence") is not None]
                 gold = load_gold(args.gold_dir, audio_path.stem)
                 row = {
                     "stem": audio_path.stem,
@@ -176,15 +164,9 @@ def main() -> int:
                     "speakers": len(stats),
                     "durationMs": max(s["endMs"] for s in segments),
                     "meanConfidence": (
-                        round(sum(confidences) / len(confidences), 3)
-                        if confidences
-                        else None
+                        round(sum(confidences) / len(confidences), 3) if confidences else None
                     ),
-                    "cer": (
-                        round(cer(gold, full_text(segments)), 4)
-                        if gold is not None
-                        else None
-                    ),
+                    "cer": (round(cer(gold, full_text(segments)), 4) if gold is not None else None),
                     "cerExcluded": audio_path.stem in CER_EXCLUDED_STEMS,
                 }
                 rows.append(row)
