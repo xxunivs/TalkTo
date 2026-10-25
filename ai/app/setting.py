@@ -89,7 +89,7 @@ class Settings(BaseModel):
     min_speech_ms: int = Field(default=3_000, gt=0)
 
     max_audio_bytes: int | None = Field(default=None, gt=0)
-    # 임시 파일 위치 (그 아래 talkto-ai 폴더, app/scratch.py, None 이면 시스템 임시 폴더)
+    # 임시 파일 위치 (그 아래 talkto-ai 폴더, app/temp_files.py, None 이면 시스템 임시 폴더)
     temp_dir: Path | None = None
 
     # /v1/persona/responses 중간계층(orchestrator/) 처리 여부 (꺼지면 기존 경로)

@@ -20,7 +20,7 @@
 ```powershell
 .venv\Scripts\python.exe experiments\prompt_compare\prepare.py        # 변형·문항·기억 선택 만들기(OpenAI 없음)
 .venv\Scripts\python.exe experiments\prompt_compare\batch.py cost     # 비용 추정
-.venv\Scripts\python.exe experiments\prompt_compare\batch.py all --batch <id>   # 생성 → 판정 → 요약(run_batch.bat <id>)
+.venv\Scripts\python.exe experiments\prompt_compare\batch.py all --batch <id>   # 생성 → 판정 → 요약
 ```
 
 `compare.py` 는 변형 몇 개를 한 번씩 돌리는 단순 비교(`all --limit 5` 로 시험), `batch.py` 는 조건×반복 묶음과 부트스트랩 차이·판정기 일치도까지 낸다. `--mock` 이면 OpenAI 없이 전 단계 경로만 확인한다.

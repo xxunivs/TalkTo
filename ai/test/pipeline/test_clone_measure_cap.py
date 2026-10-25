@@ -16,7 +16,7 @@ from unittest import mock
 import numpy as np
 
 from app.schema.voice import VoiceSampleSegment
-from app.scratch import scratch_root
+from app.temp_files import scratch_root
 from pipeline.s4_voice import a_voice
 from pipeline.s4_voice import c_sample_quality as quality
 

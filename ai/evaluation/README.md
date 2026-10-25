@@ -43,8 +43,8 @@ python -m evaluation.persona.chat --help
 |---|---|
 | 원본 녹음 | 저장소 루트의 `input/<대상자>/음성/` (`할머니 목소리 N` 결과는 `통화NN` 녹음) |
 | 전사 정답과 용어집 | `transcription/gold/` |
-| 전사, 화자 식별, 기억 결과 | `transcription/results/` |
-| STT 비교 결과 | `transcription/bakeoff/results/`, `results-kw/`, `results-spk2/` |
+| 전사, 화자 식별 결과 요약 | `transcription/results/summary.md`, `speaker_id_summary.md` |
+| STT 비교 결과 | `transcription/bakeoff/results/STT_비교_할머니목소리8.md` |
 | 외부 인물 설정 | `persona/fixtures/` |
 | 페르소나 평가 결과 | `persona/results/` |
 | 외부 흐름 검증 결과 | `e2e/results/` |

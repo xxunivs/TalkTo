@@ -6,8 +6,8 @@ from pathlib import Path
 
 from app.external_api.audio import download_audio
 from app.schema.transcript import TranscriptSegment
-from app.scratch import scratch_dir
 from app.setting import Settings
+from app.temp_files import scratch_dir
 
 logger = logging.getLogger(__name__)
 

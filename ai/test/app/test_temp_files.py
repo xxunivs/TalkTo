@@ -8,8 +8,8 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from app.scratch import SCRATCH_NAME, reset_scratch_dir, scratch_dir, scratch_root
 from app.setting import Settings
+from app.temp_files import SCRATCH_NAME, reset_scratch_dir, scratch_dir, scratch_root
 
 
 class ScratchDirTest(unittest.TestCase):

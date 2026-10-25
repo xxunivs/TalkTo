@@ -9,8 +9,8 @@ from app.schema.transcript import (
     TranscriptionResponse,
     TranscriptSegment,
 )
-from app.scratch import scratch_dir
 from app.setting import Settings
+from app.temp_files import scratch_dir
 from pipeline.s1_transcription.c_correction import build_glossary, correct_segments
 
 logger = logging.getLogger(__name__)

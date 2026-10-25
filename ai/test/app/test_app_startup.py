@@ -13,7 +13,7 @@ def _app(settings: Settings):
     from main import create_app
 
     # 배포 설정이면 시작할 때 임시 폴더를 비운다. 테스트가 이 PC 의 진짜 임시 폴더를 비우지 않게 막는다
-    # (그 동작은 test_scratch.py 가 따로 본다)
+    # (그 동작은 test_temp_files.py 가 따로 본다)
     with patch("main.get_settings", return_value=settings), patch("main.reset_scratch_dir"):
         app = create_app()
     app.dependency_overrides[get_settings] = lambda: settings

@@ -15,8 +15,8 @@ from app.external_api.stt.elevenlabs_scribe import (
     strip_non_speech_notes,
 )
 from app.schema.voice import AnswerTranscriptionResponse
-from app.scratch import scratch_dir
 from app.setting import Settings
+from app.temp_files import scratch_dir
 
 logger = logging.getLogger(__name__)
 
