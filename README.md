@@ -110,7 +110,7 @@ ai/                  AI 서버 (페르소나 제작 파이프라인, 대화, 평
 ├── evaluation/      화자 식별, 전사, 페르소나 품질 평가
 └── test/            자동 테스트 (API 키 없이 실행)
 
-server/              백엔드 (FastAPI, 팀)
-web/                 웹 앱 (Flutter, 팀)
+backend/             백엔드 (FastAPI, 팀)
+frontend/            웹 앱 (Flutter, 팀)
 .github/             CI 설정, README 그림
 ```
