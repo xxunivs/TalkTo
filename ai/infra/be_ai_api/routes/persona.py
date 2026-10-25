@@ -33,7 +33,7 @@ def create_persona_assembly(
     _authorized: InternalRequest,
     settings: SettingsDependency,
 ) -> PersonaAssemblyResponse:
-    # 기능 플래그: PERSONA_PROMPT_BUILDER=layered 면 4층 프롬프트, 아니면 기존 조립(요청·응답 계약 동일)
+    # 기능 플래그: PERSONA_PROMPT_BUILDER=layered 면 4층 프롬프트, 아니면 기존 조립 (요청, 응답 계약 동일)
     return assemble_persona_instructions(request, settings)
 
 
@@ -43,8 +43,8 @@ def create_persona_response(
     _authorized: InternalRequest,
     settings: SettingsDependency,
 ) -> PersonaResponseResult:
-    # 기능 플래그: PERSONA_ORCHESTRATOR=1 이면 중간계층, 아니면 기존 경로(요청·응답 계약 동일).
-    # 가져온 지침(fixedPrompt)은 늘 기존 경로다.
+    # 기능 플래그: PERSONA_ORCHESTRATOR=1 이면 중간계층, 아니면 기존 경로 (요청, 응답 계약 동일)
+    # 가져온 지침(fixedPrompt)은 항상 기존 경로
     if settings.persona_orchestrator and not request.persona.fixed_prompt:
         return orchestrate_persona_response(request, settings=settings)
     return generate_persona_response(request, settings=settings)
@@ -56,10 +56,7 @@ def create_gap_question(
     _authorized: InternalRequest,
     settings: SettingsDependency,
 ) -> GapQuestionResponse:
-    """대화가 끝난 뒤(BE 뒤 작업) 기억 빈틈 후보 하나 → 가족에게 물을 질문 / 열린 질문에 합치기 / 건너뛰기.
-
-    대답 경로 밖의 LLM 호출이다. 대화 중에는 부르지 않는다.
-    """
+    """기억 빈틈 후보 하나 -> 가족 질문, 열린 질문 병합, 건너뛰기 (대화 종료 후 BE 뒤 작업 전용)"""
     return make_gap_question(request, settings=settings)
 
 
@@ -78,5 +75,5 @@ def create_reflection(
     _authorized: InternalRequest,
     settings: SettingsDependency,
 ) -> ReflectionResponse:
-    """누적 기억에서 상위 통찰(성향·가치관·반복주제)을 도출 — 페르소나 프로필 재료."""
+    """누적 기억 -> 상위 통찰 (성향, 가치관, 반복 주제, 페르소나 프로필 재료)"""
     return run_reflection(request, settings=settings)

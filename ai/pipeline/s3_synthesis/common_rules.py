@@ -1,20 +1,4 @@
-"""공통 규칙(4층 프롬프트의 L1) — 원본은 `prompts/rules/` 모듈 파일들, 순서는 `prompts/rules/manifest.json`.
-
-모든 페르소나가 같은 파일에서 규칙을 받는다(손으로 쓴 프롬프트마다 안전 규칙이 달라지는 문제 방지).
-세트 두 개:
-    legacy   모듈로 나누기 전 공통 규칙과 같은 출력(골든 8개). 지금 조립기(assemble_persona_prompt)·중간계층이 쓴다.
-    layered  4층 프롬프트의 L1. legacy + 사용자 식별·나이 맞춤·전해 들은 소식·사후 응답·기억 활용·말하는 형식.
-             페르소나 이름이 없어 모든 페르소나가 같은 앞머리가 된다(프롬프트 캐시 공유).
-모듈 안의 변형 블록 문법:
-    ::: private family        ← 공백으로 나눈 조건이 전부 맞을 때만 안의 줄을 넣는다
-    - 규칙 줄
-    :::
-조건: public / private(=not public), deceased / alive, family / nofamily,
-      death_deny / death_brief / death_ask_only / death_open(사망·임종 정책, 기본 deny — 설문 M9-01 에서 고름),
-      minor(만 19세 미만 살아 계신 대화 상대일 때만 켜짐. 반대 조건은 없다 — 꺼져 있으면 예전 출력 그대로).
-`<!-- -->` 로 시작하는 줄은 주석(출력 안 함). 블록 밖 줄은 항상 넣는다. `{{이름}}` 은 vars 로 채운다.
-섹션 안 모듈이 전부 비면 그 섹션 제목도 뺀다.
-"""
+"""공통 규칙 L1 조립 (원본 prompts/rules/ 모듈, 순서 manifest.json, 세트 legacy/layered)"""
 
 from __future__ import annotations
 
@@ -30,7 +14,7 @@ TOKENS = {"public", "private", "deceased", "alive", "family", "nofamily", "minor
     f"death_{p}" for p in DEATH_POLICIES
 }
 VAR = re.compile(r"\{\{(\w+)\}\}")
-# 모든 세트에 들어가는 기본값. legacy 는 가족 목록이 규칙보다 위에 있다(예전 템플릿 순서).
+# 전 세트 기본값 (legacy 는 예전 템플릿 순서대로 가족 목록이 규칙 위)
 DEFAULT_VARS = {"family_list": "위 가족 목록"}
 
 
@@ -50,7 +34,7 @@ def _flags(
         "family" if has_family else "nofamily",
         f"death_{death_policy}",
     }
-    # 미성년 규칙은 살아 계신 분만(떠나신 자녀는 고인 규칙). 아니면 아무것도 더하지 않는다(골든 그대로)
+    # 미성년 규칙은 살아 계신 분만 (떠나신 자녀는 사망 규칙, 아니면 골든 그대로)
     if minor and not deceased:
         flags.add("minor")
     return flags
@@ -67,7 +51,7 @@ def _manifest(rules_dir: Path) -> dict:
 
 
 def render_block_file(path: Path, flags: set[str], vars: dict[str, str] | None = None) -> list[str]:
-    """모듈 파일 하나를 조건에 맞게 줄 목록으로."""
+    """모듈 파일 하나 -> 조건에 맞는 줄 목록"""
     out: list[str] = []
     cond: set[str] | None = None
     for no, line in enumerate(_load(path), 1):
@@ -129,27 +113,20 @@ def render_rules(
 def render_common_rules(
     *, public: bool, deceased: bool, has_family: bool, minor: bool = False
 ) -> str:
-    """예전 출력(legacy 세트) — 조립기·중간계층이 쓰는 공통 규칙. 골든 8개로 고정(minor 면 안전 절에 미성년 규칙)."""
+    """legacy 세트 공통 규칙 (조립기, 중간계층용, 골든 8개 고정, minor 면 미성년 규칙 추가)"""
     return render_rules(
         "legacy", public=public, deceased=deceased, has_family=has_family, minor=minor
     )
 
 
 def common_rule_lines(*, public: bool, deceased: bool, has_family: bool) -> set[str]:
-    """중복 제거용: 이 변형에서 나오는 규칙 줄(제목·빈 줄 제외)."""
+    """변형별 규칙 줄 집합 (중복 제거용, 제목과 빈 줄 제외)"""
     text = render_common_rules(public=public, deceased=deceased, has_family=has_family)
     return {ln.strip() for ln in text.splitlines() if ln.strip().startswith("- ")}
 
 
 def family_guide(rows: Iterable) -> str:
-    """가족 표 제목 바로 아래 안내 한 줄(조립기·4층 공통). 행은 FamilyNote 나 Relation.
-
-    웹앱이 더 보내는 칸(isListener·listenerCalls·deceased·isOwner·isMember)에 맞는 문장만 붙인다. 하나도
-    없으면 빈 문자열이라 예전 출력이 그대로다. 돌아가신 분은 자해 규칙에서도 연락할 사람으로 짚지 않게 한다.
-    isOwner 줄·isMember 칸은 가족 공유에서 함께 쓰는 가족의 조립본에만 온다(주인 조립본에는 없다).
-    isOwner 줄이 있으면 표·예시 속 애칭과 옛일이 만든 가족 것임을 알린다. 그 줄이 있거나 듣는 사람 줄이
-    isMember 이고(나 자신 대화 상대에는 주인 줄이 없다), 듣는 사람이 존댓말이면 어미를 높이게 한다.
-    """
+    """가족 표 아래 안내 한 줄 (웹앱 추가 칸 있을 때만, 없으면 빈 문자열, isOwner/isMember 는 공유 가족 조립본만)"""
     rows = list(rows)
     others = [r for r in rows if not getattr(r, "is_listener", None)]
     parts = []
@@ -167,7 +144,7 @@ def family_guide(rows: Iterable) -> str:
         )
     owner = next((r for r in others if getattr(r, "is_owner", None)), None)
     if owner is not None:
-        # render 가 이 모듈을 불러서 안에서 부른다
+        # 순환 import 회피 (render 가 이 모듈 import)
         from pipeline.persona_prompt.render import particle
 
         n = owner.name
@@ -178,7 +155,7 @@ def family_guide(rows: Iterable) -> str:
             f"{n}{particle(n, '과', '와')}의 옛일을 지금 대화하는 사람과 함께한 일처럼 말하지 않는다."
         )
     listener = next((r for r in rows if getattr(r, "is_listener", None)), None)
-    shared = owner is not None or getattr(listener, "is_member", None)  # 함께 쓰는 가족의 조립본
+    shared = owner is not None or getattr(listener, "is_member", None)  # 공유 가족 조립본
     if shared and (getattr(listener, "speech_level", None) or "").strip() == "존댓말":
         parts.append(
             "지금 대화하는 사람에게는 예시 문장이 반말로 적혀 있어도 어미를 존댓말로 바꿔 말한다."

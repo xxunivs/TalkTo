@@ -16,11 +16,10 @@ class TranscriptionRequest(ApiModel):
     language: str = Field(default="ko", min_length=2, max_length=20)
     speaker_diarization: bool = True
     glossary: list[str] = Field(default_factory=list, max_length=500)
-    # 보정·화자식별 용어는 이 컨텍스트에서 자동 파생 (glossary 필드와 합집합)
+    # 보정, 화자 식별 용어 자동 파생 (glossary 와 합집합)
     subject_context: SubjectContext | None = None
     intake_context: IntakeContext | None = None
-    # 고인 목소리 참조 샘플 클립(presigned URL). 있으면 ECAPA 성문 매칭으로
-    # 대상자 화자를 확정해 응답 subjectSpeakerLabel에 담는다(없으면 미확정).
+    # 대상자 목소리 참조 샘플 presigned URL (있으면 ECAPA 매칭으로 subjectSpeakerLabel 확정)
     reference_voice_sample_url: HttpUrl | None = None
 
 
@@ -32,7 +31,7 @@ class TranscriptSegment(ApiModel):
     speaker_label: str = Field(default="unknown", max_length=120)
     transcript_text: str = Field(min_length=1, max_length=20_000)
     confidence: float | None = Field(default=None, ge=0, le=1)
-    # 보정 패스 산출 — 원문(transcript_text)과 분리 유지, 교정된 경우에만 채움
+    # 보정 결과 (원문과 분리, 교정 시에만)
     corrected_text: str | None = Field(default=None, max_length=20_000)
     needs_review: bool = False
 
@@ -41,5 +40,5 @@ class TranscriptionResponse(ApiModel):
     segments: list[TranscriptSegment]
     provider: str
     model: str
-    # ECAPA 성문 매칭으로 확정한 대상자 화자 라벨. 참조 샘플 미제공·임계값 미달이면 null.
+    # ECAPA 확정 대상자 화자 라벨 (참조 없음, 임계값 미달이면 null)
     subject_speaker_label: str | None = None

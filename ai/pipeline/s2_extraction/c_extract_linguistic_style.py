@@ -1,9 +1,4 @@
-"""2단계 언어 스타일 — LLM 제안 + 코드 검증(근거 실존).
-
-인물 분석과 같은 정책: 안전 항목이 아니므로 구조 위반 항목은 예외 대신 조용히
-버린다(재현율보다 신뢰 가능한 것만 남기기). sentencePatterns는 관찰 일반화라
-근거를 요구하지 않는다.
-"""
+"""2단계 언어 스타일: LLM 제안 + 근거 실존 검증 (안전 항목이 아니라 위반 항목은 조용히 버림)"""
 
 import logging
 
@@ -51,7 +46,7 @@ def _clean_source_ids(raw: object, valid_ids: set[int]) -> list[int] | None:
 
 
 def validate_linguistic_style_payload(payload: dict, segments: list[TranscriptSegment]) -> dict:
-    """근거 실존을 강제하고, 근거 없는 인용 항목은 버린다. 파생 없음."""
+    """근거 실존 강제 (근거 없는 인용 항목 제거, sentencePatterns 는 관찰 일반화라 근거 불요)"""
     valid_ids = {segment.segment_index for segment in segments}
     style = payload.get("linguisticStyle")
     if not isinstance(style, dict):

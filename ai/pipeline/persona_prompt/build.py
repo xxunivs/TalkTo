@@ -1,9 +1,4 @@
-"""재료를 모아 명세를 만들고 프롬프트로 펴는 진입점.
-
-- for_assembly: BE /v1/persona/assembly 요청(subjectContext·intakeContext·speechExamples)만으로.
-  전사 주고받기는 요청에 없어서 빠지고, 말투 카드는 speechExamples(대상자 발화)로 잰다(30개 미만이면 생략).
-- for_local: 로컬 파이프라인 산출물(output/<대상자>/)로. 설문 → 전사 재료로 빈칸 → 말투 카드·주고받기 → (선택) 인터뷰 후보.
-"""
+"""재료 -> 명세 -> 프롬프트 진입점 (for_assembly: BE 요청만, for_local: 로컬 산출물)"""
 
 from __future__ import annotations
 
@@ -64,14 +59,14 @@ def for_local(
     death_talk: bool | None = None,
     subject_name: str | None = None,
 ) -> tuple[PersonaSpec, list[str]]:
-    """반환: (명세, 기록). 기록은 사람이 확인할 판단·출처 줄."""
+    """명세와 사람 확인용 판단, 출처 기록"""
     made = subject_dir / "s2_extraction" / "b_intake_prompt.json"
     src = intake_path or (made if made.exists() else input_dir / "persona_intake.json")
     payload = _read(src)
     if payload is None:
         if intake_path is not None:
             raise FileNotFoundError(src)
-        # 설문 없이 녹음만 있는 경우: 이름만으로 시작하고 녹음 재료로 채운다
+        # 설문 없이 녹음만 있는 경우: 이름으로 시작, 녹음 재료로 보충
         spec = spec_from_intake(
             SubjectContext(subject={"name": subject_name or subject_dir.name}), None
         )

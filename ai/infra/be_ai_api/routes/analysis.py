@@ -40,7 +40,7 @@ def create_recording_analysis(
     _authorized: InternalRequest,
     settings: SettingsDependency,
 ) -> RecordingAnalysisResponse:
-    """녹음 1건 통합 분석 — 3-A 기억 + 요약 + 태그 + 말투(④) + 안전플래그를 한 번에."""
+    """녹음 1건 통합 분석 (기억, 요약, 태그, 말투, 안전 플래그)"""
     return run_recording_analysis(request, settings=settings)
 
 
@@ -63,7 +63,7 @@ def create_voice_groups(
     _authorized: InternalRequest,
     settings: SettingsDependency,
 ) -> VoiceGroupResponse:
-    """녹음 여러 개에 걸쳐 같은 사람의 목소리를 묶는다(ECAPA 지문). 사람은 묶음 하나를 고른다."""
+    """녹음 여러 개에 걸친 같은 사람 목소리 묶음 (ECAPA 지문, 사용자가 묶음 하나 선택)"""
     clusters, method = group_voices(
         [
             (r.recording_id, str(r.audio_url), _segments(r.transcript_segments))
@@ -97,7 +97,7 @@ def suggest_subject_speaker(
     _authorized: InternalRequest,
     settings: SettingsDependency,
 ) -> SubjectSpeakerResponse:
-    """전사문 호칭·맥락으로 대상자 화자를 추천한다. 화자가 하나뿐이면 LLM 없이 그 화자."""
+    """전사문 호칭, 맥락 기반 대상자 화자 추천 (화자 하나면 LLM 없이 그 화자)"""
     segments = _segments(request.transcript_segments)
     labels = {s.speaker_label for s in segments}
     if len(labels) == 1:

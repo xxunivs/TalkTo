@@ -1,8 +1,4 @@
-"""MiniMax 목소리 provider(예전 목소리): 합성 + 지우기.
-
-새 목소리는 더 이상 MiniMax 에서 만들지 않는다(Fish Audio 에서 만든다). 예전에 만든 목소리
-(voice_id 가 "TalkTo" 로 시작)는 다시 만들기 전까지 여기서 합성하고, 다시 만든 뒤에 지운다.
-"""
+"""MiniMax 예전 목소리 합성, 삭제 (voice_id "TalkTo" 접두어, 새 목소리 생성 없음)"""
 
 import logging
 
@@ -15,12 +11,9 @@ logger = logging.getLogger(__name__)
 
 MINIMAX_BASE = "https://api.minimax.io"
 _DEFAULT_MODEL = "speech-2.8-turbo"
-# 우리가 만든 MiniMax voice_id 는 모두 이 글자로 시작한다. 합성할 때 이것으로 MiniMax 목소리인지
-# 알아본다(ElevenLabs voice_id 는 영숫자 20자, Fish 는 "fish_" 로 시작해 겹치지 않는다).
+# MiniMax voice_id 접두어 (ElevenLabs 는 영숫자 20자, Fish 는 fish_ 라 겹치지 않음)
 VOICE_ID_PREFIX = "TalkTo"
-# 우리 감정 이름 → MiniMax 감정. neutral 은 보내지 않는다(MiniMax 가 글을 보고 정한다).
-# MiniMax 에는 angry·fearful·disgusted 도 있지만 우리 쪽에서 고를 수 없다.
-# Fish 용 이름 warm·worried 는 MiniMax 에 맞는 감정이 없어 None(없음)으로 본다 → 서버 기본값 또는 MiniMax 가 정한다.
+# 감정 이름 -> MiniMax 감정 (neutral 미전송, warm, worried 는 대응 없음 -> 서버 기본값 또는 MiniMax 판단)
 _EMOTIONS = {"calm": "calm", "happy": "happy", "sad": "sad", "surprised": "surprised"}
 
 
@@ -29,7 +22,7 @@ def is_minimax_voice(voice_id: str) -> bool:
 
 
 def _check(response: httpx.Response, what: str) -> dict:
-    """HTTP 200 이어도 base_resp.status_code 가 0 이 아니면 실패다."""
+    """응답 검사 (HTTP 200 이어도 base_resp.status_code 가 0 이 아니면 실패)"""
     if response.status_code != 200:
         raise TTSProviderError(f"MiniMax {what} 오류 {response.status_code}: {response.text[:200]}")
     body = response.json()
@@ -51,7 +44,7 @@ class MiniMaxTTSProvider:
         *,
         emotion: str | None = None,
         intensity: int = 0,
-        # BE 가 45초에 끊는다. 그보다 길게 기다리면 합성 값만 나가고 소리는 버려진다(Fish 는 40초 마감)
+        # BE 45초 한도보다 짧게 (초과 시 합성 비용만 나가고 소리는 버려짐, Fish 는 40초)
         timeout_seconds: float = 35,
     ) -> None:
         self.api_key = api_key
@@ -75,9 +68,9 @@ class MiniMaxTTSProvider:
         style: float = 0.0,
         emotion: str | None = None,
     ) -> TTSResult:
-        # stability·similarity_boost·style 은 ElevenLabs 값이라 여기선 쓰지 않는다.
+        # stability, similarity_boost, style 은 ElevenLabs 전용이라 미사용
         voice_setting: dict = {"voice_id": voice_id, "speed": speed, "vol": 1, "pitch": 0}
-        # 대답마다 고른 감정이 먼저, 없으면 서버 기본(MINIMAX_EMOTION), 그것도 없으면 MiniMax 가 정한다
+        # 감정 우선순위: 대답별 감정 -> MINIMAX_EMOTION -> MiniMax 판단
         chosen = _EMOTIONS.get(emotion or "") or self.emotion
         if chosen:
             voice_setting["emotion"] = chosen
@@ -95,7 +88,7 @@ class MiniMaxTTSProvider:
             },
         }
         if self.intensity:
-            # +면 부드럽게, -면 힘 있게(-100~100)
+            # + 부드럽게, - 힘 있게 (-100~100)
             body["voice_modify"] = {"intensity": self.intensity}
         try:
             response = httpx.post(
@@ -117,7 +110,7 @@ class MiniMaxTTSProvider:
         )
 
     def delete_voice(self, voice_id: str) -> None:
-        """복제한 목소리를 MiniMax 에서 지운다(대화 상대를 지울 때·목소리를 다시 만들 때)."""
+        """MiniMax 복제 목소리 삭제"""
         try:
             response = httpx.post(
                 f"{MINIMAX_BASE}/v1/delete_voice",

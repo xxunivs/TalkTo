@@ -1,4 +1,4 @@
-"""ElevenLabs Scribe STT with built-in diarization."""
+"""ElevenLabs Scribe STT (화자 분리 포함)"""
 
 import math
 import re
@@ -21,7 +21,7 @@ class STTResult:
 
 
 class STTProvider(Protocol):
-    """Provider boundary for speech-to-text with speaker diarization."""
+    """화자 분리 STT 제공사 인터페이스"""
 
     def transcribe(
         self,
@@ -35,9 +35,7 @@ class STTProvider(Protocol):
 
 ELEVENLABS_BASE = "https://api.elevenlabs.io"
 
-# Scribe가 무음·소리를 텍스트로 서술하는 패턴 — tag_audio_events를 꺼도
-# 새어 나온다 (예: "(2초간 멈춤)", "(침묵)").
-# 발화가 아니므로 전사에서 제거한다
+# Scribe 의 무음, 소리 서술 패턴 제거 (tag_audio_events 를 꺼도 "(2초간 멈춤)", "(침묵)" 등 출력)
 _NON_SPEECH_NOTE = re.compile(
     r"\(\s*(?:\d+\s*초[^)]*|침묵|멈춤|웃음|한숨|박수|기침|음악|잡음)[^)]*\)"
 )
@@ -88,12 +86,12 @@ class ElevenLabsScribeProvider:
         if response.status_code != 200:
             raise STTProviderError(f"Scribe error {response.status_code}: {response.text[:500]}")
         body = response.json()
-        # ElevenLabs 계정에 남는 받아쓰기 기록(보낸 녹음·받아쓴 글)을 바로 지운다
+        # ElevenLabs 계정의 받아쓰기 기록(녹음, 전사 글) 즉시 삭제
         forget_transcript(self._api_key, body)
 
         segments = group_scribe_words(body.get("words") or [])
         if not segments and (body.get("text") or "").strip():
-            # 시간 정보 없는 글만 온 경우. 길면 나눈다(구간 하나 20,000자 한도, transcript.py)
+            # 시간 정보 없는 글만 온 경우 분할 (구간당 20,000자 한도, transcript.py)
             segments = [
                 TranscriptSegment(
                     segment_index=i,
@@ -109,15 +107,14 @@ class ElevenLabsScribeProvider:
         return STTResult(provider="elevenlabs", model=self.model_id, segments=segments)
 
 
-# 한 사람이 이어 말한 구간 하나의 상한. 화자가 바뀔 때만 나누면 혼자 한 시간 가까이 말한 녹음(이야기·음성 일기)이
-# 구간 하나가 되어 20,000자 한도(transcript.py)를 넘었고, 받아쓰기 값을 낸 뒤 500 으로 실패했다(다시 해도 같음).
-# 보통 통화의 한 번 말하기(몇십 초~1분)는 나뉘지 않을 만큼 넉넉하게 둔다. 나눌 때는 낱말 경계에서, 같은 화자로.
+# 한 화자 연속 구간 상한 (1인 장시간 녹음이 20,000자 한도 초과로 500 실패한 이력)
+# 보통 통화의 한 번 말하기는 안 나뉘는 크기, 분할은 낱말 경계에서 같은 화자로
 MAX_SEGMENT_CHARS = 5_000
 MAX_SEGMENT_MS = 300_000  # 5분
 
 
 def split_text(text: str, limit: int) -> list[str]:
-    """글을 limit 글자 이하 조각으로(띄어쓰기에서). 띄어쓰기 없이 긴 덩어리는 글자 수로 자른다."""
+    """글 -> limit 글자 이하 조각 (띄어쓰기 기준, 긴 덩어리는 글자 수로)"""
     pieces: list[str] = []
     current = ""
     for word in text.split():
@@ -140,11 +137,7 @@ def split_text(text: str, limit: int) -> list[str]:
 
 
 def group_scribe_words(words: list[dict]) -> list[TranscriptSegment]:
-    """Group Scribe word entries into one segment per speaker turn.
-
-    A very long turn is split at a word boundary (same speaker) once it passes
-    MAX_SEGMENT_CHARS or MAX_SEGMENT_MS.
-    """
+    """Scribe 낱말 -> 화자 턴별 구간 (MAX_SEGMENT_CHARS, MAX_SEGMENT_MS 초과 시 낱말 경계 분할)"""
     segments: list[TranscriptSegment] = []
     current: dict | None = None
 
@@ -174,8 +167,7 @@ def group_scribe_words(words: list[dict]) -> list[TranscriptSegment]:
         end_ms = int(float(word.get("end") or 0) * 1000)
         too_long = (
             current is not None
-            and word.get("type", "word")
-            == "word"  # 낱말 앞에서만 나눈다(띄어쓰기에서 시작하지 않게)
+            and word.get("type", "word") == "word"  # 낱말 앞에서만 분할 (띄어쓰기로 시작 방지)
             and (
                 len(current["text"]) >= MAX_SEGMENT_CHARS
                 or current["endMs"] - current["startMs"] >= MAX_SEGMENT_MS

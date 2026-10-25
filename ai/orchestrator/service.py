@@ -1,9 +1,4 @@
-"""BE 계약(/v1/persona/responses) ↔ 중간계층.
-
-- 요청·응답 모양은 기존과 같다. 기억 원본은 BE 가 보낸 top-5(RequestMemoryStore).
-- 세션 상태가 프로세스 메모리에 있으므로 오케스트레이터는 프로세스당 하나(get_orchestrator).
-- ORCHESTRATOR_TRACE_DIR 를 주면 턴마다 입력·단계 추적·결과를 jsonl 로 남긴다(대화 원문 포함 → git 제외 경로에).
-"""
+"""BE 계약(/v1/persona/responses) <-> 중간계층 (세션이 프로세스 메모리라 오케스트레이터는 프로세스당 하나)"""
 
 from __future__ import annotations
 
@@ -61,7 +56,7 @@ def memory_from_context(m: MemoryContext) -> MemoryItem:
 
 def turn_from_request(request: PersonaResponseRequest) -> TurnInput:
     minor = is_minor(request.persona.minor, request.persona.deceased)
-    # 미성년이면 입력 검사에 걸렸던 가족 말과 그 대답은 앞 대화에서 뺀다(기존 경로와 같다)
+    # 미성년이면 입력 검사에 걸린 가족 말과 그 대답을 앞 대화에서 제외 (기존 경로와 동일)
     history = safe_history(request.history) if minor else request.history
     return TurnInput(
         subject_id=request.persona.subject_id,
@@ -87,7 +82,7 @@ def build_registry(settings: Settings) -> PersonaRegistry:
 
 
 def build_voice(settings: Settings) -> VoiceMarks:
-    """FISH_EMOTION: off(기본) | cue | inline. Fish 목소리 대답에만 쓴다."""
+    """FISH_EMOTION: off(기본) | cue | inline (Fish 목소리 대답 전용)"""
     return VoiceMarks(getattr(settings, "fish_emotion", "off"))
 
 
@@ -97,9 +92,8 @@ def build_assembler(
     kind = kind or settings.orchestrator_assembler
     late = settings.style_late_note == "on"
     voice = build_voice(settings)
-    low = (
-        settings.low_memory_max if settings.low_memory_note == "on" else None
-    )  # None = '기억이 적을 때' 절 끔
+    # None = 기억이 적을 때 절 끔
+    low = settings.low_memory_max if settings.low_memory_note == "on" else None
     if kind == "structured":
         return StructuredAssembler(
             registry or build_registry(settings),
@@ -116,8 +110,7 @@ def build_assembler(
 def build_guard(
     settings: Settings, kind: str | None = None, registry: PersonaRegistry | None = None
 ):
-    """v1: 헤더(structured 일 때)·누출·지어내기·애정·챙김 검사. legacy 조립이면 헤더 없이 넣은 기억 전부를 근거로 본다.
-    맨 바깥은 늘 미성년 가드(turn.minor 일 때만 대답을 본다 — 설정과 상관없이)."""
+    """v1, v11: 헤더, 누출, 지어내기, 애정, 챙김 검사 (맨 바깥은 설정 무관하게 미성년 가드)"""
     kind = kind or settings.orchestrator_guard
     registry = registry or build_registry(settings)
     if kind in ("v1", "v11"):
@@ -154,7 +147,7 @@ def build_selector(
     registry: PersonaRegistry | None = None,
     embedder=None,
 ):
-    """structured 경로면 제한 정보(restricted.json)의 기억을 뺀다. legacy 는 기존과 동일."""
+    """structured 경로는 제한 정보(restricted.json) 기억 제외, legacy 는 기존과 동일"""
     kind = kind or settings.orchestrator_assembler
     inner = build_inner_selector(settings, registry, embedder)
     if kind == "structured":
@@ -169,7 +162,7 @@ def build_precheck(
     if kind in ("coverage", "coverage_v11"):
         from orchestrator.text import morphs
 
-        morphs("준비")  # 형태소 분석기 로드(약 1.6초)를 첫 사용자 응답이 아니라 여기서 치른다
+        morphs("준비")  # 형태소 분석기 로드(약 1.6초)를 첫 사용자 응답 대신 여기서
         cls = CoveragePrecheckV11 if kind == "coverage_v11" else CoveragePrecheck
         return cls(
             registry or build_registry(settings),
@@ -204,7 +197,7 @@ def get_orchestrator(settings: Settings) -> PersonaOrchestrator:
 
 
 def reset_orchestrator() -> None:
-    """테스트용."""
+    """테스트용 초기화"""
     global _instance
     with _lock:
         _instance = None
@@ -237,11 +230,12 @@ def orchestrate_persona_response(
     over = warn_if_over_full_max(len(request.memories), settings)
     turn = turn_from_request(request)
     if turn.minor and input_blocked(request.message):
-        # 미성년 대화 상대에 성적인 이야기·비밀 만남: 모델을 부르지 않는다(기존 경로와 같은 대체 글, 세션에 남기지 않음)
+        # 미성년 상대의 성적 이야기, 비밀 만남: 모델 미호출 (기존 경로와 같은 대체 글, 세션 미기록)
         log.info("minor guard skipped the model for subject %s", turn.subject_id)
         return blocked_result(turn.persona_instructions)
     orch = orchestrator or get_orchestrator(settings)
     run = orch.run(turn)
+    # 턴마다 입력, 추적, 결과 jsonl 기록 (대화 원문 포함이라 git 제외 경로)
     if settings.orchestrator_trace_dir:
         flags = (
             {"memory_over_full_max": {"n": len(request.memories), "max": settings.memory_full_max}}
@@ -250,12 +244,12 @@ def orchestrate_persona_response(
         )
         try:
             write_trace(settings.orchestrator_trace_dir, run, orch.describe(), flags)
-        except OSError:  # 추적 로그 실패가 응답을 막으면 안 된다
+        except OSError:  # 추적 로그 실패로 응답 차단 방지
             log.exception("orchestrator trace write failed")
     res = run.result
     gap = MemoryGap(topic=res.memory_gap) if res.memory_gap is not None else None
     if any(r.startswith("minor:") for r in run.guard.reasons):
-        gap = None  # 미성년 가드가 대답을 바꿨으면 그 화제로 가족에게 묻지 않는다(기존 경로와 같다)
+        gap = None  # 미성년 가드가 대답을 바꿨으면 그 화제로 가족에게 묻지 않음 (기존 경로와 동일)
     return PersonaResponseResult(
         content=res.content,
         retrieved_memory_ids=res.retrieved_memory_ids,

@@ -1,11 +1,4 @@
-"""작성본 답을 persona_intake.json(A) 과 기억 조각(B) 으로 나눈다.
-
-어느 문항이 어디로 가는지는 docs/Persona_Intake_문항분류.md 를 따른다.
-A 는 프롬프트 슬롯으로, B 는 기억DB 로 간다. C 는 앱 운영이라 둘 다 아니다.
-2026-10-21 개정(docs/Persona_Intake.md PART 0)에서 새로 생긴 M6-08(그분 하면 떠오르는 것 + 까닭)은
-B 다(문항분류.md 는 그 전 것이라 이 문항이 없다). 웹앱(BE intake.build_intake_memories)과 같은 문장
-으로 기억 하나를 만든다. '기억이 안 나요'·'따로 없었어요'는 모름과 같아 어느 칸에도 가지 않는다.
-"""
+"""작성본 답 -> persona_intake.json(A, 프롬프트 슬롯) + 기억 조각(B) (분류: docs/Persona_Intake_문항분류.md)"""
 
 from __future__ import annotations
 
@@ -15,10 +8,10 @@ from pathlib import Path
 
 from pipeline.s0_intake.a_read_intake import UNKNOWN_CELL_MARK, Answer, parse
 
-# ── B 문항: 기억 한 줄로 바꿀 때 앞에 붙일 말 ──────────────────
-# 선지는 이미 프롬프트(A)로 갔고, 기억에는 서술로 적은 답만 넣을 문항
+# 선지는 프롬프트(A)로 가고 서술 답만 기억에 넣는 문항
 VALUES_ONLY = {"M4-01", "M1-09", "M6-03", "M1-06"}
 
+# B 문항: 기억 한 줄 앞에 붙일 말
 MEMORY_LEAD = {
     "P1-06": "이 시점을 남기려는 이유",
     "C-08": "애정을 표현했던 장면",
@@ -52,7 +45,7 @@ MEMORY_LEAD = {
     "T4-02": "지금의 그분을 대표하는 것",
     "T4-03": "몇 년 뒤의 가족에게 하고 싶은 말",
 }
-# 표로 답한 B 문항: 한 행이 기억 하나
+# 표로 답한 B 문항 (한 행이 기억 하나)
 MEMORY_TABLES = {
     "M1-05": "살아온 곳",
     "M2-03": "가족과의 기억",
@@ -63,8 +56,8 @@ MEMORY_TABLES = {
     "M7-01": "기억 카드",
     "T1-03": "마지막 시기에 곁에 있던 가족",
 }
-# M6-08 → 기억 하나: "<앞말>: <떠오르는 것> — <까닭>". 기억은 그분이 1인칭으로 읽어 '그분'이라 쓰지
-# 않는다(BE app/services/intake.py M6_08_LEAD·M6_08_TAG 와 같다).
+# M6-08 (2026-10-21 개정 신설, 문항분류.md 에 없음): "<앞말>: <떠오르는 것> - <까닭>" 기억 하나
+# 기억은 1인칭으로 읽혀 '그분' 표현 없음 (BE app/services/intake.py M6_08_LEAD, M6_08_TAG 와 동일)
 M6_08_LEAD = "가족이 나를 떠올리면 생각나는 것"
 M6_08_TAG = "떠오르는 것"
 SCOPES = ("자유", "물으면만", "회상 참고만")
@@ -79,12 +72,12 @@ def _scope(a: Answer) -> str:
 
 
 def _choices(answers: dict[str, Answer], qid: str) -> list[str]:
-    """고른 선지만. 하위질문에 서술로 적은 것은 기억으로 간다."""
+    """고른 선지만 (하위질문 서술 답은 기억 쪽)"""
     a = answers.get(qid)
     if not a or a.skipped:
         return []
     out = list(a.checked)
-    # "직접 입력 → 값" 은 선지 자리라 값도 특성으로 본다
+    # "직접 입력 -> 값" 은 선지 자리라 값도 특성으로 취급
     for i, c in enumerate(out):
         m = re.match(r"직접 입력\s*→\s*(.+)$", c)
         if m:
@@ -92,8 +85,7 @@ def _choices(answers: dict[str, Answer], qid: str) -> list[str]:
     return [c for c in out if c and not c.startswith("직접 입력")]
 
 
-#  M5 문항은 답 아래에 "시기: ___  감정: ___" 줄이 붙는다. 기억 본문이 아니라
-#  그 기억의 속성이라 period·emotion 으로 보낸다.
+# M5 문항 답 아래 "시기, 감정" 줄: 기억 본문이 아닌 속성이라 period, emotion 으로
 META_HINT = re.compile(r"^(19|20)\d\d|^(모름|평생|말년|고교|미래|—)$|^\d{4}[~년]")
 EMOTIONS = {"기쁨", "그리움", "자부심", "웃김", "슬픔", "평온", "사랑", "걱정", "의지", "모름"}
 
@@ -111,7 +103,7 @@ def _split_meta(texts: list[str]) -> tuple[list[str], str | None, str | None]:
 
 
 def _texts(a: Answer) -> list[str]:
-    """선지·값 중 답으로 볼 것만. 사용 범위와 추정 표시는 뺀다."""
+    """답으로 볼 선지, 값 (사용 범위, 추정 표시 제외)"""
     out = [v for v in a.values if v != "__추정__"]
     out += [c for c in a.checked if not any(c.startswith(s) for s in SCOPES)]
     return [t for t in out if t]
@@ -156,7 +148,7 @@ def to_memories(answers: dict[str, Answer]) -> list[dict]:
             if re.match(r"^(19|20)\d\d", c):
                 period = c
         texts = [v for v in a.values if v != "__추정__"] if qid in VALUES_ONLY else _texts(a)
-        if qid in VALUES_ONLY:  # 선지는 프롬프트로 갔으니 서술만 남긴다
+        if qid in VALUES_ONLY:  # 선지는 프롬프트 쪽이라 서술만
             chosen = set(_choices(answers, qid))
             texts = [t for t in texts if t not in chosen]
         texts, found_period, emotion = _split_meta(texts)
@@ -192,7 +184,7 @@ def to_memories(answers: dict[str, Answer]) -> list[dict]:
         pairs = [
             (_plain(c[0]) if c else None, _plain(c[1]) if len(c) > 1 else None) for c in thing.rows
         ]
-        if not thing.rows:  # 표가 아니라 빈칸에 적었으면 첫 값이 떠오르는 것, 둘째가 까닭
+        if not thing.rows:  # 빈칸 답이면 첫 값이 떠오르는 것, 둘째가 까닭
             values = [v for v in thing.values if v != "__추정__"]
             pairs = [(values[0] if values else None, values[1] if len(values) > 1 else None)]
         for what, why in pairs:
@@ -209,9 +201,7 @@ def to_memories(answers: dict[str, Answer]) -> list[dict]:
         if qid == "M7-01" or not a or a.skipped or not a.rows:
             continue
         for cells in a.rows:
-            cells = [
-                UNKNOWN_CELL_MARK.sub("", c).strip() for c in cells
-            ]  # '■ 모름' 같은 표시는 기억이 아니다
+            cells = [UNKNOWN_CELL_MARK.sub("", c).strip() for c in cells]  # 모름 표시 제거
             parts = [c for c in cells if c and c not in ("□", "■") and not c.startswith("_")]
             if not parts:
                 continue
@@ -408,9 +398,9 @@ def to_intake(answers: dict[str, Answer], *, name: str | None = None) -> dict:
 
 
 def _plain(cell: str) -> str | None:
-    # □/■ 모름 · 기억이 안 나요 · 따로 없었어요 — 답이 아니다(체크했으면 모른다는 뜻이라 빈칸과 같다)
+    # 모름 계열 표시 제거 (체크했으면 모른다는 뜻이라 빈칸과 같음)
     cell = UNKNOWN_CELL_MARK.sub("", cell).strip()
-    # 표에 직접 채우는 행이라는 표시. 답이 아니라 양식 메모라 프롬프트로 새면 안 된다.
+    # 직접 입력 행 표시 제거 (양식 메모라 프롬프트 유입 방지)
     cell = re.sub(r"^\(?직접\s*(입력|적기)\)?\s*(\(0~\d행\))?\s*", "", cell)
     cell = cell.strip("_ ").strip()
     return cell or None

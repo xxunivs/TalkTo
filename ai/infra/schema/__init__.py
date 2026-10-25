@@ -1,1 +1,1 @@
-"""Validated API contract schemas."""
+"""API 계약 스키마"""

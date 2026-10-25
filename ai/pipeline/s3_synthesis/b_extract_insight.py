@@ -1,9 +1,4 @@
-"""reflection — 누적 기억에서 상위 통찰 도출 (LLM 제안 + 근거 검증).
-
-Generative Agents 방식: 개별 관찰(기억)을 가로질러 대상자를 설명하는 통찰을 만들고,
-각 통찰에 근거 기억을 연결한다. 근거 없는 통찰은 버린다. 기억을 M1·M2…
-번호로 제시해 LLM이 번호로 인용하게 하고(긴 id 인용 오류 방지), 검증에서 실제 id로 되돌린다.
-"""
+"""누적 기억 -> 상위 통찰 (Generative Agents 방식, M번호 인용으로 id 오류 방지, 근거 없는 통찰 폐기)"""
 
 import logging
 
@@ -82,7 +77,7 @@ def run_reflection(request: ReflectionRequest, *, settings: Settings) -> Reflect
             for n in (item.get("evidence") or [])
             if isinstance(n, int) and n in id_by_number
         ]
-        # 근거 2개 미만·통제 어휘 밖 카테고리·빈 통찰은 신뢰 불가로 버린다
+        # 근거 2개 미만, 통제 어휘 밖 카테고리, 빈 통찰은 폐기
         if not insight or category not in _CATEGORIES or len(set(evidence_ids)) < 2:
             dropped += 1
             continue

@@ -1,4 +1,4 @@
-"""생성기들이 같이 쓰는 글 다듬기: 따옴표 정리, 같은 주제·같은 내용 알아보기, 호칭 후보 거르기."""
+"""생성기 공용 글 다듬기 (따옴표 정리, 같은 주제와 같은 내용 판별, 호칭 후보 거르기)"""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ QUOTES = "\"'“”‘’「」『』"
 _QUOTED_ITEM = re.compile(r"[\"“”'‘’]([^\"“”'‘’]+)[\"“”'‘’]")
 _SPLIT = re.compile(r"[\s·,/()\[\]~]+")
 _PARTICLE = re.compile(r"(에\s?대한|에게|으로|로|의|과|와|을|를|은|는|이|가|도|에)$")
-# 주제·성향을 비교할 때 뜻이 없는 말
+# 주제, 성향 비교 시 뜻 없는 말
 STOP = {
     "이야기",
     "얘기",
@@ -35,7 +35,7 @@ STOP = {
     "가족",
     "사람",
 }
-# 주제 앞에 붙는 '그분' 쪽 말(같은 주제인지 볼 때 뺀다)
+# 주제 앞에 붙는 그분 쪽 말 (같은 주제 판별 시 제외)
 SUBJECT_REFS = {"그분", "본인", "할머니", "할아버지", "엄마", "아빠", "어머니", "아버지", "대상자"}
 
 
@@ -44,8 +44,7 @@ def unquote(text: str) -> str:
 
 
 def split_quoted(value: str) -> list[str]:
-    """'“아유”' → ['아유'], '“밥 먹었냐?”, “잘될 거야”' → ['밥 먹었냐?', '잘될 거야'].
-    따옴표 친 말만으로 된 값이 아니면(설명이 섞이면) 따옴표만 곧은 것으로 바꿔 한 덩어리로 둔다."""
+    """따옴표 친 말 목록으로 분리 (설명이 섞이면 따옴표만 곧게 바꿔 한 덩어리)"""
     value = value.strip()
     items = _QUOTED_ITEM.findall(value)
     rest = _QUOTED_ITEM.sub("", value).strip(" ,·")
@@ -70,13 +69,13 @@ def _stem_hit(t: str, pool: set[str]) -> bool:
 
 
 def same_topic(a: str, b: str, extra_refs: set[str] = frozenset()) -> bool:
-    """'할머니의 건강 문제' 와 '그분의 건강·병력' 처럼 핵심어가 하나라도 겹치면 같은 주제로 본다."""
+    """핵심어가 하나라도 겹치면 같은 주제"""
     ta, tb = tokens(a, extra_refs), tokens(b, extra_refs)
     return bool(ta and tb and (ta & tb or any(_stem_hit(t, tb) for t in ta)))
 
 
 def mostly_covered(candidate: str, existing: list[str], ratio: float = 0.5) -> bool:
-    """후보의 핵심어 절반 이상이 이미 있는 값들에 있으면 같은 내용으로 본다."""
+    """후보 핵심어가 ratio 이상 기존 값에 있으면 같은 내용"""
     tc = tokens(candidate)
     pool = set().union(*(tokens(e) for e in existing)) if existing else set()
     if not tc or not pool:
@@ -84,7 +83,7 @@ def mostly_covered(candidate: str, existing: list[str], ratio: float = 0.5) -> b
     return sum(_stem_hit(t, pool) for t in tc) / len(tc) >= ratio
 
 
-# 호칭 칸에 들어온 서술(예: "이름으로 불렀던 것으로 정리됨")을 알아본다
+# 호칭 칸에 들어온 서술 판별 (예: "이름으로 불렀던 것으로 정리됨")
 _DESCRIPTIVE = re.compile(r"것으로|정리|불렀|부르던|부름|이름으로|라고|했다|했음|됨$|함$|음$")
 
 

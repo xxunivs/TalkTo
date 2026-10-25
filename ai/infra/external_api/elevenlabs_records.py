@@ -1,16 +1,4 @@
-"""ElevenLabs 계정에 남는 기록 지우기(받아쓰기 기록·대답 읽기 기록).
-
-TalkTo 는 ElevenLabs 의 '기록 남기지 않기(무보관)'를 쓸 수 없다(기업 요금제만). 그래서 쓸 때마다 남는
-기록을 다 쓴 뒤 바로 지운다.
-- 받아쓰기: 응답의 transcription_id → DELETE /v1/speech-to-text/transcripts/{id}
-  (보낸 녹음과 받아쓴 글이 함께 지워진다)
-- 대답 읽기(예전 ElevenLabs 목소리만): 응답 머리의 history-item-id → DELETE /v1/history/{id}.
-  머리에 없으면 request-id 로 최근 기록에서 찾는다.
-
-지우기는 대답을 늦추지 않게 따로 돈다(백그라운드 스레드). 실패하면 몇 번 다시 하고, 그래도 안 되면 id 만
-로그에 남긴다(글·녹음 내용은 남기지 않는다). 지우기가 실패해도 받아쓰기·대답은 그대로 돌려준다.
-예전에 쌓인 대답 읽기 기록은 tools/purge_elevenlabs_history.py 로 지운다.
-"""
+"""ElevenLabs 받아쓰기, 대답 읽기 기록 즉시 삭제 (무보관은 기업 요금제 전용, 백그라운드 재시도)"""
 
 import logging
 import threading
@@ -23,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 ELEVENLABS_BASE = "https://api.elevenlabs.io"
 TIMEOUT_SECONDS = 20.0
-# 다시 해 보기 전에 기다리는 초(첫 시도는 바로)
+# 재시도 전 대기 초 (첫 시도는 즉시)
 RETRY_DELAYS = (0.0, 1.0, 4.0)
 
 
@@ -32,7 +20,7 @@ def _headers(api_key: str) -> dict[str, str]:
 
 
 def _delete(api_key: str, path: str) -> bool:
-    """지웠거나 이미 없으면 True. 404 는 이미 지운 것으로 본다."""
+    """삭제 성공 여부 (404 는 이미 삭제로 간주)"""
     try:
         response = httpx.delete(
             f"{ELEVENLABS_BASE}{path}", headers=_headers(api_key), timeout=TIMEOUT_SECONDS
@@ -70,7 +58,7 @@ def delete_history_item(api_key: str, history_item_id: str) -> bool:
 
 
 def find_history_item(api_key: str, *, voice_id: str, request_id: str) -> str | None:
-    """대답 읽기 기록 id 를 request-id 로 찾는다(가장 최근 몇 개만 본다)."""
+    """request-id -> 대답 읽기 기록 id (최근 20개만 조회)"""
     try:
         response = httpx.get(
             f"{ELEVENLABS_BASE}/v1/history",
@@ -89,7 +77,7 @@ def find_history_item(api_key: str, *, voice_id: str, request_id: str) -> str | 
 
 
 def list_history(api_key: str, *, page_size: int = 1000) -> list[dict]:
-    """계정의 대답 읽기 기록 전부(최근 것부터). 지우기 도구가 쓴다."""
+    """계정의 대답 읽기 기록 전체 (최근순, 삭제 도구용)"""
     items: list[dict] = []
     after: str | None = None
     while True:
@@ -112,12 +100,12 @@ def list_history(api_key: str, *, page_size: int = 1000) -> list[dict]:
 
 
 def in_background(action: Callable[[], object]) -> None:
-    """대답을 늦추지 않게 따로 돌린다. 시험에서는 바로 부르도록 바꿔 끼운다."""
+    """백그라운드 스레드 실행 (테스트에서 즉시 실행으로 교체)"""
     threading.Thread(target=action, daemon=True, name="elevenlabs-cleanup").start()
 
 
 def forget_transcript(api_key: str, body: dict) -> None:
-    """받아쓰기 응답을 받은 뒤 부른다. id 가 없으면 지울 수 없어 로그만 남긴다."""
+    """받아쓰기 기록 삭제 예약 (transcription_id 없으면 경고 로그만)"""
     transcription_id = body.get("transcription_id")
     if not isinstance(transcription_id, str) or not transcription_id:
         logger.warning("scribe response had no transcription_id; transcript stays in the account")
@@ -126,7 +114,7 @@ def forget_transcript(api_key: str, body: dict) -> None:
 
 
 def forget_speech(api_key: str, *, voice_id: str, headers: object) -> None:
-    """예전 ElevenLabs 목소리로 대답을 읽은 뒤 부른다(응답 머리에서 기록 id 를 찾는다)."""
+    """예전 ElevenLabs 목소리 대답 읽기 기록 삭제 예약 (응답 헤더의 기록 id, 없으면 request-id 조회)"""
     get = getattr(headers, "get", None)
     history_id = get("history-item-id") if get else None
     request_id = get("request-id") if get else None

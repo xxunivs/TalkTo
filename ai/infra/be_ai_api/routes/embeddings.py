@@ -27,7 +27,7 @@ def create_embeddings(
     return generate_embeddings(request, settings=settings)
 
 
-# exclude_none: 질문을 다시 쓰지 않았으면 rewrittenQuery 칸 자체를 빼서 지금 응답과 같은 모양을 지킨다
+# exclude_none: 질문 재작성이 없으면 rewrittenQuery 칸 생략 (기존 응답 모양 유지)
 @router.post(
     "/embeddings/query", response_model=QueryEmbeddingResponse, response_model_exclude_none=True
 )
@@ -36,6 +36,5 @@ def create_query_embedding(
     _authorized: InternalRequest,
     settings: SettingsDependency,
 ) -> QueryEmbeddingResponse:
-    """대화 중 기억을 찾을 때 쓴다. /embeddings 는 job 과 segment id 를 요구해서
-    질문 하나를 벡터로 만드는 데는 쓸 수 없다."""
+    """대화 중 기억 검색용 질문 임베딩 (/embeddings 는 job, segment id 필수라 별도)"""
     return generate_query_embedding(request, settings=settings)

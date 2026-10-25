@@ -1,13 +1,13 @@
-"""fixture(jsonl)로 중간계층을 돌린다. 모듈 하나만 보고 싶으면 --until 로 그 단계에서 멈춘다.
+"""fixture(jsonl)로 중간계층 실행 (모듈 하나만 볼 때는 --until 로 그 단계에서 정지)
 
-fixture 한 줄: {"id": "...", "turn": {TurnInput}, "state": {SessionState}(선택)}  또는 TurnInput 자체.
-  state 가 없고 session_id 가 같으면 줄 순서대로 세션이 이어진다(여러 턴 대화 재현).
+fixture 한 줄: {"id": "...", "turn": {TurnInput}, "state": {SessionState}(선택)}  또는 TurnInput 자체
+  state 없고 session_id 가 같으면 줄 순서대로 세션 연결 (여러 턴 대화 재현)
 
 예)
   python -m orchestrator.cli test/orchestrator/fixtures/turns_sample.jsonl --until assemble
   python -m orchestrator.cli test/orchestrator/fixtures/turns_sample.jsonl --mock
   python -m orchestrator.cli <fixture> --memories <memories.json>
-  (--mock 없이 끝까지 돌리면 .env 의 OpenAI 를 실제로 부른다 — 비용 발생)
+  (--mock 없이 끝까지 돌리면 .env 의 OpenAI 실호출, 비용 발생)
 """
 
 from __future__ import annotations

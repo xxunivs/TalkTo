@@ -13,10 +13,7 @@ class VoiceTranscriptionResponse(ApiModel):
 
 
 class AnswerTranscriptionResponse(ApiModel):
-    """말로 답하기(/v1/voice/answer-transcriptions): 질문 답 칸에 넣을 받아쓴 글 한 덩어리.
-
-    화자 나누기 없이 한국어로 받아쓴 글이다. 녹음과 ElevenLabs 의 받아쓰기 기록은 남기지 않는다.
-    """
+    """말로 답하기 받아쓴 글 (화자 분리 없음, 녹음과 ElevenLabs 기록 미보관)"""
 
     text: str
     provider: str
@@ -24,12 +21,7 @@ class AnswerTranscriptionResponse(ApiModel):
 
 
 class VoiceSampleSegment(ApiModel):
-    """대상자 화자 구간 하나. 녹음 오디오 URL + 구간 [startMs, endMs).
-
-    구간은 필수다. samples[]는 "대상자가 말한 구간들"을 담는 용도라, 구간 없이 녹음을
-    통째로 넣으면 상대 화자 목소리가 섞여 엉뚱한 목소리로 학습된다. 이미 잘라놓은 클립
-    하나를 쓰려면 VoiceCloneRequest.sample_audio_url(단일 모드)로 보낸다.
-    """
+    """대상자 화자 구간 [startMs, endMs) (구간 필수: 통째 녹음은 상대 목소리 혼입)"""
 
     audio_url: HttpUrl
     start_ms: int = Field(ge=0)
@@ -43,14 +35,13 @@ class VoiceSampleSegment(ApiModel):
 
 
 class VoiceCloneRequest(ApiModel):
-    # 클론 음성 이름(대상자 식별용). 고인 목소리 잘 들리는 구간 샘플로 등록.
+    # 클론 음성 이름 (대상자 식별용)
     name: str = Field(min_length=1, max_length=200)
-    # (단일) BE가 TargetVoiceSample에서 잘라 만든 샘플 클립 하나의 presigned URL.
+    # 단일 모드: BE 가 잘라 둔 샘플 클립 presigned URL
     sample_audio_url: HttpUrl | None = None
-    # (다구간) 대상자 화자 구간들 — AI가 각 구간을 잘라 이어붙여 한 목소리로 학습.
-    # 화자 식별(subjectSpeakerLabel)로 전 통화에서 모은 대상자 구간을 넘기면 된다.
+    # 다구간 모드: 대상자 구간들 (AI 가 잘라 이어 붙여 한 목소리로 학습)
     samples: list[VoiceSampleSegment] | None = Field(default=None, max_length=100)
-    # 예전 BE 와 맞춘 칸(BE 는 "fish" 를 보낸다). 무엇을 보내도 새 목소리는 늘 Fish Audio 에서 만든다.
+    # 예전 BE 호환 칸 (값과 무관하게 새 목소리는 Fish Audio)
     provider: Literal["fish", "elevenlabs", "minimax"] | None = None
 
     @model_validator(mode="after")
@@ -63,40 +54,27 @@ class VoiceCloneRequest(ApiModel):
 
 
 class SubjectSampleCollectionRequest(ApiModel):
-    """한 통화에서 대상자 구간만 뽑아 반환(클론하지 않음).
+    """한 통화의 대상자 구간 추출 요청 (클론 없음, BE 가 대상자별 풀에 누적)"""
 
-    누적 풀: BE가 통화가 들어올 때마다 이 계약으로 대상자 구간을 받아 대상자별 풀에
-    저장·누적한다. 클론은 쌓인 풀을 /voice/clone(samples[])에 넘겨 별도로 수행한다.
-    """
-
-    # 대상자 구간을 잘라낼 원본 녹음(presigned URL). 반환 구간에 이 URL이 실린다.
+    # 원본 녹음 presigned URL (반환 구간에 포함)
     audio_url: HttpUrl
-    # 화자 라벨이 붙은 전사 구간들.
     transcript_segments: list[PersistedTranscriptSegment] = Field(min_length=1)
-    # 화자 식별로 확정된 대상자 라벨. 미확정(None)이면 이 통화는 풀에 기여분이 없다(빈 목록).
+    # 확정 대상자 라벨 (None 이면 빈 목록)
     subject_speaker_label: str | None = Field(default=None, max_length=120)
 
 
 class SubjectSampleCollectionResponse(ApiModel):
-    # 이 통화의 대상자 발화 구간(상한·선별 없이 전부). 상한·선별은 클론 시점에 적용.
+    # 대상자 발화 구간 전부 (상한, 선별은 클론 시점)
     samples: list[VoiceSampleSegment] = Field(default_factory=list)
 
 
 class VoiceCloneFromTranscriptRequest(ApiModel):
-    """전사 결과에서 대상자 구간을 자동 수집해 클론하는 요청.
+    """전사 결과 기반 대상자 구간 자동 수집 클론 요청 (녹음 1건 단위)"""
 
-    /voice/clone은 호출자가 samples[]를 직접 조립해야 하지만, 이 계약은 전사 산출물
-    (화자 라벨이 붙은 구간들) + 확정된 subjectSpeakerLabel을 넘기면 AI가 대상자 구간을
-    골라 모아 클론한다. 녹음 1건 단위다. 여러 통화 누적은 SubjectSampleCollectionRequest 로 모은다.
-    """
-
-    # 클론 음성 이름(대상자 식별용).
     name: str = Field(min_length=1, max_length=200)
-    # 대상자 구간을 잘라낼 원본 녹음(presigned URL).
     audio_url: HttpUrl
-    # 화자 라벨이 붙은 전사 구간들.
     transcript_segments: list[PersistedTranscriptSegment] = Field(min_length=1)
-    # 화자 식별로 확정된 대상자 라벨. 미확정(None)이면 클론을 진행하지 않는다.
+    # 확정 대상자 라벨 (None 이면 클론 안 함)
     subject_speaker_label: str | None = Field(default=None, max_length=120)
 
 
@@ -107,19 +85,16 @@ class VoiceCloneResponse(ApiModel):
 
 class SpeechSynthesisRequest(ApiModel):
     text: str = Field(min_length=1, max_length=20_000)
-    # 대상자 클론 음성 id. 앞글자로 만든 회사를 고른다(fish_… → Fish, TalkTo… → MiniMax, 그 밖 → ElevenLabs).
-    # 미지정 시 ELEVENLABS_DEFAULT_VOICE_ID로 폴백.
+    # 대상자 클론 음성 id (접두어로 제공사 판별, 없으면 ELEVENLABS_DEFAULT_VOICE_ID)
     voice_id: str | None = Field(default=None, max_length=200)
-    # 아래 속도·결은 예전 ElevenLabs·MiniMax 목소리에만 쓴다(Fish drama-3 는 쓰지 않는다).
-    # 말하는 속도(0.7~1.2, 1.0=기본). 미지정 시 서버 ELEVENLABS_SPEED로 폴백.
+    # 아래 속도, 결은 예전 ElevenLabs, MiniMax 목소리 전용 (Fish 미사용)
+    # 말하는 속도 (0.7~1.2, 없으면 ELEVENLABS_SPEED)
     speed: float | None = Field(default=None, ge=0.7, le=1.2)
-    # 목소리 결. 대상자마다 다르다. 미지정 시 서버 기본값으로 폴백.
+    # 대상자별 목소리 결 (없으면 서버 기본값)
     stability: float | None = Field(default=None, ge=0.0, le=1.0)
     similarity_boost: float | None = Field(default=None, ge=0.0, le=1.0)
     style: float | None = Field(default=None, ge=0.0, le=1.0)
-    # 대답 감정(우리 이름: neutral, calm, warm, happy, sad, surprised, worried). None 이면 회사가 글을 보고 정한다.
-    # MiniMax 는 자기 감정으로 바꿔 쓰고(warm·worried 는 없음), Fish 는 FISH_EMOTION=cue 일 때 연기 표시로 바꿔
-    # 글 맨 앞에 붙인다(fish.FISH_CUES). ElevenLabs 는 쓰지 않는다.
+    # 대답 감정 (None 이면 제공사 판단, MiniMax 는 자체 감정으로 변환, Fish 는 cue 일 때 연기 표시, ElevenLabs 미사용)
     emotion: Literal["neutral", "calm", "warm", "happy", "sad", "surprised", "worried"] | None = (
         None
     )
@@ -127,8 +102,7 @@ class SpeechSynthesisRequest(ApiModel):
 
 class VoiceDeleteRequest(ApiModel):
     voice_id: str = Field(min_length=1, max_length=255)
-    # 목소리를 만든 회사. voice_id 앞글자(fish_… · TalkTo…)가 먼저다. 앞글자로 모를 때만 이 값을 보고,
-    # 비우면 ElevenLabs(예전 IVC·PVC 모두).
+    # 목소리 제공사 (voice_id 접두어 우선, 접두어로 모를 때만 사용, 없으면 ElevenLabs)
     provider: Literal["fish", "elevenlabs", "minimax"] | None = None
 
 

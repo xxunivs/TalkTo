@@ -20,14 +20,14 @@ def create_app() -> FastAPI:
     settings = get_settings()
     configure_logging(settings.log_level)
     deployed = settings.deployed
-    # 배포 환경은 입장 토큰이 없으면 아예 뜨지 않는다(인증 없이 열리지 않게)
+    # 배포 환경은 입장 토큰 없으면 기동 거부 (인증 없는 노출 방지)
     if deployed and settings.ai_server_token is None:
         raise RuntimeError("AI_SERVER_TOKEN is required when APP_ENV is staging or production.")
     if deployed:
-        # 강제 종료(OOM)로 지난 프로세스가 못 지운 녹음·PCM·목소리 재료를 지운다(infra/scratch.py).
-        # 로컬은 지우지 않는다(같은 PC 에서 돌고 있는 개발 서버의 파일을 테스트가 지우지 않게).
+        # OOM 강제 종료로 지난 프로세스가 못 지운 녹음, PCM, 목소리 재료 삭제 (infra/scratch.py)
+        # 로컬 제외 (같은 PC 개발 서버 파일 보호)
         reset_scratch_dir(settings)
-    # 배포 환경에서는 API 문서(/docs·/redoc·/openapi.json)를 닫는다
+    # 배포 환경은 API 문서(/docs, /redoc, /openapi.json) 비공개
     docs = {"docs_url": None, "redoc_url": None, "openapi_url": None} if deployed else {}
 
     application = FastAPI(
@@ -38,20 +38,20 @@ def create_app() -> FastAPI:
     )
     application.add_exception_handler(AppError, app_error_handler)
     application.add_exception_handler(RequestValidationError, validation_error_handler)
-    # 처리 중에 만든 값이 스키마를 어기면 422 + 코드(받은 글을 로그에 남기지 않는다)
+    # 내부 생성 값의 스키마 위반 -> 422 + 코드 (받은 글 로그 미기록)
     application.add_exception_handler(ValidationError, internal_validation_error_handler)
-    # OpenAI 크레딧·키·요청 한도·시간 초과·연결 실패·5xx 는 503 + 코드로(백엔드가 관리자 화면에 알린다)
+    # OpenAI 크레딧, 키, 요청 한도, 시간 초과, 연결 실패, 5xx -> 503 + 코드 (BE 관리자 화면 알림)
     import openai
 
     for kind in (
         openai.RateLimitError,
         openai.AuthenticationError,
         openai.PermissionDeniedError,
-        openai.APIConnectionError,  # APITimeoutError 도 여기에 든다
+        openai.APIConnectionError,  # APITimeoutError 포함
         openai.InternalServerError,
     ):
         application.add_exception_handler(kind, provider_error_handler)
-    # OpenAI 가 요청을 받지 않음(400, 글이 너무 김 등). 다시 해도 같아서 422 + 코드
+    # OpenAI 요청 거부(400, 글 길이 초과 등) -> 재시도 무의미라 422 + 코드
     application.add_exception_handler(openai.BadRequestError, provider_bad_request_handler)
     application.include_router(health.router)
     application.include_router(persona.router, prefix="/v1/persona")
@@ -59,7 +59,7 @@ def create_app() -> FastAPI:
     application.include_router(embeddings.router, prefix="/v1")
     application.include_router(voice.router, prefix="/v1/voice")
     if settings.persona_orchestrator:
-        # 중간계층을 시작할 때 만든다(형태소 분석기 등 무거운 준비를 첫 요청 전에)
+        # 기동 시 중간계층 생성 (형태소 분석기 등 무거운 준비를 첫 요청 전에)
         from orchestrator.service import get_orchestrator
 
         get_orchestrator(settings)

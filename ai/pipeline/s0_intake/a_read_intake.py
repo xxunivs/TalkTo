@@ -1,18 +1,4 @@
-"""작성본(md) 을 문항별 답으로 읽는다.
-
-Persona Intake 작성본은 사람이 읽는 문서라 답이 여러 모양으로 들어 있다.
-
-    ■ 고른 선지          체크된 것
-    <u>값</u>            빈칸에 적은 값
-    | a | b |            표 한 행
-    ■ 모름               모른다고 답한 것 (■ 기억이 안 나요 · ■ 따로 없었어요 도 같다)
-    <!--dim-->           이 사람에게는 뜨지 않는 문항
-
-이 파서는 그것만 모아 돌려주고, 어느 칸으로 갈지는 b_split_intake 가 정한다.
-
-문항 머리는 "**ID · 질문**  `형식`" 이다. 2026-10-21 개정부터 필수 표시 〔…〕 가 형식 앞이나
-뒤에 붙는다(예: "**C-01 · …** 〔필수〕  `하나 선택`"). 표시는 답이 아니라 버린다.
-"""
+"""작성본 md -> 문항별 답 (고른 선지, 빈칸 값, 표 행, 모름, dim 문항)"""
 
 from __future__ import annotations
 
@@ -20,14 +6,14 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
+# 문항 머리: ID, 질문, 형식 (앞뒤 필수 표시 〔…〕 는 버림)
 QID = re.compile(
     r"^\*\*([A-Z0-9-]+) · (.*?)\*\*"
     r"(?:\s*〔[^〕]*〕)?(?:\s+`(.+?)`)?(?:\s*〔[^〕]*〕)?\s*$"
 )
-# '모름'처럼 답이 없다는 표시. 고른 선지로 넣으면 그 말이 프롬프트·기억으로 샌다
-# (돌아가신 분은 '기억이 안 난다'고 말하지 않는다).
+# 답 없음 표시: 선지로 넣으면 프롬프트, 기억으로 샘 (돌아가신 분은 '기억이 안 난다'고 말하지 않음)
 UNKNOWN_MARKS = ("모름", "기억이 안 나", "따로 없었")
-# 표 칸 속 표시(예: "______  ■ 따로 없었어요"). 체크했든 안 했든 답이 아니라 지운다(b_split_intake._plain).
+# 표 칸 속 모름 표시 (체크 여부와 무관하게 삭제, b_split_intake._plain)
 UNKNOWN_CELL_MARK = re.compile(r"[□■]\s*(?:모름|기억이\s*안\s*나요?|따로\s*없었어요?)")
 UNDERLINED = re.compile(r"<u>(.*?)</u>")
 CHECKED = re.compile(r"■\s*([^■□\n]+)")
@@ -82,7 +68,7 @@ def parse(path: Path | str) -> dict[str, Answer]:
         if line.strip() == "<!--dim-->":
             cur.skipped = True
             continue
-        if line.startswith(">"):  # 예시·가이드는 답이 아니다
+        if line.startswith(">"):  # 예시, 가이드 줄은 답 아님
             continue
         if line.startswith("|"):
             if TABLE_SEP.match(line.strip()):

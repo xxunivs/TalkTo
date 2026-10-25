@@ -1,8 +1,4 @@
-"""2단계 심층 분석 — 인물·관계 추출.
-
-LLM 산출은 그대로 믿지 않는다: 근거 세그먼트 실존, confidence enum,
-구조 검증을 코드로 강제하고, 위반 항목은 버리거나 unresolved로 강등한다.
-"""
+"""2단계 인물, 관계 추출 (LLM 산출은 코드로 검증, 위반 항목은 버리거나 unresolved 로 강등)"""
 
 import logging
 
@@ -55,7 +51,7 @@ def run_persons_analysis(
 
 
 _SELF_RELATIONS = {"본인", "self", "대상자", "자기 자신"}
-# 1·2인칭 대명사와 호응 — 지칭 근거가 될 수 없다 (3인칭 지칭 해소 "걔" 등은 허용)
+# 1, 2인칭 대명사와 호응: 지칭 근거 불가 (3인칭 "걔" 등은 허용)
 _PRONOUN_MENTIONS = {
     "나",
     "내",
@@ -82,7 +78,7 @@ _PRONOUN_MENTIONS = {
     "예",
     "그래",
 }
-# 특정 개인을 가리키지 않는 일반 표현 — unresolved 자격 없음
+# 특정인을 가리키지 않는 일반 표현 (unresolved 자격 없음)
 _GENERIC_MENTIONS = {"사람", "사람들", "애들", "친구", "친구들", "가족", "식구"}
 
 
@@ -93,7 +89,7 @@ def validate_persons_payload(
     subject_name: str | None = None,
     subject_address_term: str | None = None,
 ) -> dict:
-    """코드 검증: 근거 실존·mention 실존·본인 제외·enum·구조. 위반은 제거하고 기록한다."""
+    """LLM 산출 코드 검증: 근거 실존, mention 실존, 본인 제외, enum, 구조 (위반은 제거 후 기록)"""
     valid_ids = {segment.segment_index for segment in segments}
     transcript_text = " ".join(
         segment.transcript_text + " " + (segment.corrected_text or "") for segment in segments
@@ -111,7 +107,7 @@ def validate_persons_payload(
         if not isinstance(person, dict) or not str(person.get("name") or "").strip():
             dropped["persons"] += 1
             continue
-        # 대상자 본인·자리표시자 이름 제외 (프롬프트 지시가 뚫려도 코드로 강제)
+        # 대상자 본인, 자리표시자 이름 제외 (프롬프트 지시가 뚫려도 코드로 강제)
         name = str(person["name"]).strip()
         relation = str(person.get("relationToSubject") or "").strip().lower()
         placeholder_tokens = ("SPK", "화자", "상대", "청자", "speaker")
@@ -157,10 +153,8 @@ def validate_persons_payload(
                 continue
             facts.append({**fact, "sourceSegmentIds": fact_ids})
 
-        # mention 게이트: ① 전사문에 실존(힌트 베끼기 차단) ② 1·2인칭 대명사
-        # 금지("너"만으로 상대 단정 차단) ③ 지칭 형태여야 함(쉼표 포함·긴 발화
-        # 인용구 차단) ④ 대상자 호칭은 타인의 지칭이 될 수 없음.
-        # 유효 mention이 하나도 안 남는 인물은 통째로 신뢰하지 않는다
+        # mention 게이트: 전사문 실존(힌트 베끼기 차단), 1, 2인칭 금지, 지칭 형태(쉼표, 긴 인용 차단),
+        # 대상자 호칭 제외 (유효 mention 없는 인물은 통째로 제외)
         mentions = []
         for mention in person.get("mentions") or []:
             cleaned = str(mention).strip().rstrip("?.!~")
@@ -194,7 +188,7 @@ def validate_persons_payload(
             }
         )
 
-    # 같은 지칭이 여러 인물에 배정되면 근거 불충분 — 전원에게서 제거
+    # 여러 인물에 배정된 같은 지칭은 근거 불충분이라 전원에게서 제거
     mention_owners: dict[str, int] = {}
     for person in persons:
         for mention in person["mentions"]:

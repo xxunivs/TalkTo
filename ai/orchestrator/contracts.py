@@ -1,11 +1,4 @@
-"""중간계층 단계별 입출력 계약.
-
-규칙
-- 단계는 아래 Protocol 하나를 구현하고, 정해진 계약 모델만 주고받는다.
-- 단계는 서로를 직접 부르지 않는다. 순서와 연결은 pipeline.PersonaOrchestrator 만 안다.
-- 모든 구현은 `impl` 이름을 가진다(추적 로그·실험 조건 이름으로 씀).
-- 계약 필드를 바꾸면 CONTRACT.md 와 test/orchestrator 를 같이 고친다.
-"""
+"""중간계층 단계별 입출력 계약 (필드 변경 시 CONTRACT.md, test/orchestrator 함께 수정)"""
 
 from __future__ import annotations
 
@@ -26,7 +19,7 @@ class Contract(BaseModel):
 class Turn(Contract):
     role: Literal["user", "assistant"]
     content: str
-    # user 턴이면 누가 말했나(화자 프로필 이름·id). 모르면 None.
+    # user 턴 화자 (프로필 이름 또는 id, 모르면 None)
     speaker: str | None = None
 
 
@@ -38,10 +31,10 @@ class MemoryItem(Contract):
     text: str
     title: str = ""
     memory_type: MemoryType = "LONG_TERM"
-    # 운영 DB status(ACTIVE …) 또는 active/conflict/retracted
+    # 운영 DB status(ACTIVE 등) 또는 active, conflict, retracted
     status: str = "active"
     tags: list[str] = Field(default_factory=list)
-    # ADD-only 필드. DB 에 없으면 None.
+    # ADD-only 필드 (DB 에 없으면 None)
     source: str | None = None
     told_by: str | None = None
     relation: str | None = None
@@ -49,35 +42,35 @@ class MemoryItem(Contract):
 
 
 class StyleFix(Contract):
-    """가족이 고쳐 준 말투 한 쌍(BE styleExamples). 조립기가 '말투를 이렇게 고쳐 달라고 했어요' 절로 넣는다."""
+    """가족이 고쳐 준 말투 한 쌍 (BE styleExamples)"""
 
     original: str
     corrected: str
 
 
 class TurnInput(Contract):
-    """BE 요청을 중간계층 형식으로 옮긴 것. 한 턴의 입력 전부."""
+    """BE 요청 -> 중간계층 한 턴 입력"""
 
     subject_id: str
     message: str
     persona_instructions: str
     history: list[Turn] = Field(default_factory=list)
-    # BE 가 검색해 보낸 기억(지금은 top-5). 선택기가 쓸지 말지 정한다.
+    # BE 검색 기억 (현재 top-5, 사용 여부는 선택기 결정)
     be_memories: list[MemoryItem] = Field(default_factory=list)
-    # 이 페르소나의 총 기억 수(BE memoryTotal). None 이면 받은 기억 수로 짐작(low_memory.memory_count).
+    # 페르소나 총 기억 수 (BE memoryTotal, None 이면 받은 수로 추정, low_memory.memory_count)
     memory_total: int | None = None
     session_id: str | None = None
     speaker_hint: str | None = None
     voice_id: str | None = None
-    # 고인 페르소나인가(BE persona.deceased). 음성 감정 안전선(모르면(None) 고인으로 본다)과, 등록부가 없을 때
-    # 공통 규칙 변형(사후·사망 정책, PersonaRegistry.profile_for: 값이 있으면 지시문 추정보다 우선)에 쓴다.
+    # BE persona.deceased: 음성 감정 안전선(None 이면 사망으로 간주), 등록부 없을 때 공통 규칙 변형
+    # (PersonaRegistry.profile_for 에서 지시문 추정보다 우선)
     deceased: bool | None = None
-    # 기억 빈틈 표시를 받을까(BE flagGaps). 켜면 조립기가 빈틈 표시 지침을 넣고, 결과에 memory_gap 을 싣는다.
+    # BE flagGaps: 켜면 빈틈 표시 지침 추가, 결과에 memory_gap 포함
     flag_gaps: bool = False
-    # 가족이 고쳐 준 말투(BE styleExamples, 최근 10개)
+    # 가족이 고쳐 준 말투 (BE styleExamples, 최근 10개)
     style_examples: list[StyleFix] = Field(default_factory=list)
-    # 만 19세 미만 살아 계신 대화 상대(BE persona.minor, 고인이면 False). 조립기가 미성년 규칙을 넣고,
-    # 입력 검사(service)·대답 검사(MinorGuard)가 켜진다.
+    # 만 19세 미만 생존 대화 상대 (BE persona.minor, 사망 대상자면 False)
+    # 켜면 미성년 규칙 추가, 입력 검사(service), 대답 검사(MinorGuard) 작동
     minor: bool = False
 
 
@@ -88,13 +81,13 @@ class Replacement(Contract):
 
 
 class RestrictedFacts(Contract):
-    """제한 정보(사인·임종 경위 등). 설명: orchestrator/restricted.py"""
+    """제한 정보 (사인, 임종 경위 등, 설명: orchestrator/restricted.py)"""
 
-    # deny | brief | ask_only | open. intake(M9-01·T1-02)에 답이 있으면 그 값으로 덮인다(orchestrator/intake_policy.py).
+    # deny | brief | ask_only | open (intake M9-01, T1-02 답이 있으면 덮어씀, orchestrator/intake_policy.py)
     policy: Literal["deny", "brief", "ask_only", "open"] = "deny"
     brief_answer: str | None = None
     policy_source: str | None = None  # "restricted.json" | "M9-01" | "T1-02"
-    policy_note: str | None = None  # M9-01 단서(설문 작성자가 적은 말)
+    policy_note: str | None = None  # M9-01 단서 (설문 작성자 원문)
     facts: dict = Field(default_factory=dict)
     replace: list[Replacement] = Field(default_factory=list)
     memory_ids: list[str] = Field(default_factory=list)
@@ -103,33 +96,30 @@ class RestrictedFacts(Contract):
 
 
 class Shot(Contract):
-    """말투 few-shot 한 쌍(실제 통화). user = 가족 말, persona = 대상자 말."""
+    """말투 few-shot 한 쌍 (실제 통화, user = 가족 말, persona = 대상자 말)"""
 
     user: str
     persona: str
 
 
 class PersonaProfile(Contract):
-    """페르소나 메타. 공통 규칙 변형·말투 재료를 정한다(조립기가 씀).
-
-    source: registry(prompts/personas 에 등록) | inferred(지시문에서 추정) | default
-    """
+    """페르소나 메타: 공통 규칙 변형, 말투 재료 (source: registry | inferred | default)"""
 
     subject_name: str | None = None
     public: bool = False
     deceased: bool = False
     has_family: bool = True
     source: str = "default"
-    # few-shot 머리말에 쓸 대상자 호칭(기본 subject_name)
+    # few-shot 머리말 대상자 호칭 (기본 subject_name)
     self_label: str | None = None
     style_card: str | None = None
     shots: list[Shot] = Field(default_factory=list)
-    # 제한 정보(사인 등). 없으면 None.
+    # 제한 정보 (사인 등, 없으면 None)
     restricted: RestrictedFacts | None = None
-    # 발화 분해 사전(intake.json familyMembers 에서): 가족이 그분을 부르는 말 / 가족 이름
+    # 발화 분해 사전 (intake.json familyMembers): 가족이 그분을 부르는 말, 가족 이름
     address_terms: list[str] = Field(default_factory=list)
     family_names: list[str] = Field(default_factory=list)
-    # 등록부의 spec.json(페르소나 명세). 있으면 런타임 절(지금 상대·이미 한 말)을 가족 표 기준으로 만든다.
+    # 등록부 spec.json (있으면 런타임 절을 가족 표 기준으로 생성)
     persona_spec: PersonaSpec | None = None
 
 
@@ -142,9 +132,9 @@ class SessionState(Contract):
     turn_index: int = 0
     speaker: str | None = None
     recent_turns: list[Turn] = Field(default_factory=list)
-    # 챙김·애정 표현 등 세션 카운터(가드 R3·챙김 제한이 씀)
+    # 챙김, 애정 표현 등 세션 카운터 (가드 R3, 챙김 제한용)
     counters: dict[str, int] = Field(default_factory=dict)
-    # 이번 세션에서 가족이 알려 준 새 기억(델타 블록, ADD-only)
+    # 이번 세션에 가족이 알려 준 새 기억 (델타 블록, ADD-only)
     delta_memories: list[MemoryItem] = Field(default_factory=list)
 
 
@@ -155,7 +145,7 @@ class MemorySelection(Contract):
 
 
 class PrecheckResult(Contract):
-    # None = 판정하지 않음. False = DB 에 근거 없음 → directive 로 "모른다·되묻기" 지시
+    # None = 판정 안 함, False = DB 근거 없음 -> directive 로 모른다, 되묻기 지시
     known: bool | None = None
     coverage: float | None = None
     topic_terms: list[str] = Field(default_factory=list)
@@ -188,9 +178,9 @@ class GuardResult(Contract):
     text: str
     action: Literal["pass", "trim", "ask_back", "redact"] = "pass"
     reasons: list[str] = Field(default_factory=list)
-    # 근거 헤더로 확인한 인용 기억 id. None = 헤더 없음(인용 정보 모름)
+    # 근거 헤더로 확인한 인용 기억 id (None = 헤더 없음, 인용 정보 모름)
     cited_memory_ids: list[str] | None = None
-    # 세션 카운터 증가분(예: {"affection": 1})
+    # 세션 카운터 증가분 (예: {"affection": 1})
     counter_delta: dict[str, int] = Field(default_factory=dict)
 
 
@@ -206,11 +196,11 @@ class TurnResult(Contract):
     retrieved_memory_ids: list[str]
     provider: str
     model: str
-    # 대답 음성 표시(FISH_EMOTION, orchestrator/voice.py). off 면 둘 다 None.
+    # 대답 음성 표시 (FISH_EMOTION, orchestrator/voice.py, off 면 둘 다 None)
     emotion: str | None = None
     speech_text: str | None = None
-    # 기억 빈틈 주제(turn.flag_gaps 일 때만). 대답 끝 [기억없음:주제] 표시, 없으면 사전 판정의 '기억에 없다' 화제어.
-    # 주제를 모르면 빈 글, 빈틈이 없으면 None.
+    # 기억 빈틈 주제 (turn.flag_gaps 일 때만): 대답 끝 [기억없음:주제] 표시, 없으면 사전 판정 기억 없음 화제어
+    # (주제 모르면 빈 글, 빈틈 없으면 None)
     memory_gap: str | None = None
     trace: list[StageTrace] = Field(default_factory=list)
 
@@ -227,7 +217,7 @@ class SessionStore(Protocol):
 
 
 class MemoryStore(Protocol):
-    """대상자 기억 원본. BE 요청·파일·DB 어디서 읽든 같은 모양으로 준다."""
+    """대상자 기억 원본 (BE 요청, 파일, DB 공통 모양)"""
 
     impl: str
 
@@ -287,7 +277,7 @@ class Guard(Protocol):
 
 
 class PostTurn(Protocol):
-    """턴 뒤 처리. 응답 전에 도는 부분은 빨라야 한다(세션 갱신 정도). 무거운 추출은 비동기로."""
+    """턴 뒤 처리 (응답 전 부분은 세션 갱신 정도, 무거운 추출은 비동기)"""
 
     impl: str
 

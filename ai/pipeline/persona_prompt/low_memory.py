@@ -1,36 +1,16 @@
-"""기억이 아직 적은 페르소나 — 턴마다 붙이는 '기억이 적을 때' 지시(런타임 절). 4층 실험 레포 세션 19 이식.
-
-문제(10/18 실사용): 기억이 몇 개뿐인 페르소나는 거의 모든 질문이 "기억에 없는 것"이라 사전 판정·가드·
-공통 규칙 '모르는 일은 모른다'가 매 턴 "글쎄, 기억이 안 나네. 네가 얘기 좀 해 줄래?"만 내보내고 대화가 닫힌다.
-녹음이 목소리 복원 정도밖에 안 되는 사용자는 이 상태가 기본값이 된다.
-
-이 절은 기억이 적을 때만 들어가며(기억이 충분한 페르소나는 글자 하나 안 바뀜) 세 가지를 시킨다:
-  1. 모르는 것을 물으면 '모른다'로 끝내지 말고, 그 화제를 구체적으로 되물어 잇는다. 막연한 되묻기는 잇따라 쓰지 않는다.
-  2. 안부·인사·근황은 기억이 필요 없다. 평소 성격·말투대로 받고 상대 근황을 하나 묻는다.
-  3. 상대가 이번 대화에서 알려 준 것은 다음 말에 쓴다(앞 대화가 넘어올 때). 들은 것 외의 세부는 보태지 않는다.
-비공개 고인은 잊은 듯 말하지 않는다(잠금 2): 인정하는 말 없이, 그 이야기를 가족에게서 듣고 싶어 하며 되묻는다.
-존댓말로 대하는 상대(가족 표 듣는 사람 줄이 존댓말)는 예시도 존댓말이다. 공개 본인은 늘 존댓말.
-
-기억 수를 아는 법(memory_count):
-  - BE 가 memoryTotal 을 보내면 그 값.
-  - 안 보내면: BE 는 상위 top_k(기본 5)개만 검색해 보내므로, 받은 기억이 top_k 보다 적으면 그게 전부다
-    (= 총수). top_k 개 이상 받았으면 총수를 모르니 '적지 않다'로 본다(기억 많은 페르소나에 잘못 붙지 않게).
-
-기존 경로(generate_persona_response, 가져온 지침 제외)와 중간계층(legacy 조립기 절 · structured '지금 상황' 절 ·
-layers.json 런타임 모듈 low_memory) 모두 이 모듈을 쓴다.
-"""
+"""기억이 적은 페르소나용 런타임 절 (모른다 반복으로 대화가 닫히는 문제 대응, 기존 경로와 중간계층 공용)"""
 
 from __future__ import annotations
 
-LOW_MEMORY_MAX = 5  # 이 수 이하면 '기억이 적다'. 실측 전 임시값(4층 레포 10/18 fix_low_memory 3절).
-BE_MEMORY_TOP_K = 5  # BE 가 /responses 에 보내는 검색 기억 수(지금 top-5).
+LOW_MEMORY_MAX = 5  # 이하면 기억이 적다고 봄 (실측 전 임시값)
+BE_MEMORY_TOP_K = 5  # BE 가 /responses 에 보내는 검색 기억 수 (top-5)
 LOW_MEMORY_HEAD = "# 기억이 아직 적을 때"
 
 
 def memory_count(
     n_sent: int, memory_total: int | None = None, *, top_k: int = BE_MEMORY_TOP_K
 ) -> int | None:
-    """총 기억 수. 모르면 None(= 적다고 보지 않는다)."""
+    """총 기억 수 (memoryTotal 우선, 받은 수 < top_k 면 그 수, 아니면 None: 적다고 보지 않음)"""
     if memory_total is not None:
         return memory_total
     if n_sent < top_k:
@@ -58,7 +38,7 @@ _SHARED = (
 def low_memory_note(
     n: int, *, public: bool = False, deceased: bool = False, polite: bool = False
 ) -> str:
-    """'기억이 적을 때' 절. 공개 본인 / 비공개 고인(잊은 듯 말하지 않음) / 비공개 생존, 존댓말 상대면 예시도 존댓말."""
+    """기억이 적을 때 절 (공개 본인, 비공개 사망, 비공개 생존별 문구, 존댓말 상대면 예시도 존댓말)"""
     head = f"{LOW_MEMORY_HEAD} (지금 기억 {n}개)\n"
     if public:
         return (
@@ -71,7 +51,7 @@ def low_memory_note(
             "- '모른다'는 한 대화에서 한두 번이면 충분하다. 기억이 없다는 말을 거듭하지 않는다."
         )
     if deceased:
-        # 잠금 2: 잊은 듯·모르는 듯 말하는 예시를 주지 않는다(test_low_memory 가 forgot()·낱말로 확인)
+        # 잠금 2: 잊은 듯, 모르는 듯한 예시 금지 (test_low_memory 에서 확인)
         example, vague = (
             (
                 '"그 이야기 한번 들려주실래요? 언제 적 일이었는지 듣고 싶네요."',

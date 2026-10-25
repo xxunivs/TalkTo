@@ -1,10 +1,4 @@
-"""G3 통화 전사 → 말투 재료. 통계만 쓰고 LLM 은 부르지 않는다(형태소 분석 kiwipiepy, 없으면 카드 생략).
-
-- 말투 카드: 대상자 발화의 문장 길이·종결어미 분포·존댓말 비율·묻는 말 비율·감탄사·챙김/'사랑' 빈도.
-  실제 말투와의 어미 분포 거리를 줄이는 데 효과가 가장 컸던 재료다.
-- 실제 주고받기: 가족 말 → 바로 뒤 대상자 답 쌍. 통화별로 돌아가며 고르게, 시드 고정(다시 돌려도 같다).
-  건강·의료·돈·죽음 같은 말이 든 쌍은 뺀다(사실이 프롬프트에 상시로 새지 않게).
-"""
+"""G3 통화 전사 -> 말투 카드, 실제 주고받기 (통계만, LLM 없음, kiwipiepy 없으면 카드 생략)"""
 
 from __future__ import annotations
 
@@ -44,7 +38,7 @@ CARE = re.compile(
     r"밥\s*(은|잘|챙|먹|꼭|거르)|챙겨\s*먹|끼니|건강\s*(해|하|챙|조심)|몸\s*(조심|챙|상하|잘)|조심\s*해|감기\s*조심"
 )
 LOVE = re.compile(r"사랑")
-# 주고받기에서 뺄 말: 건강·의료·돈 같은 사실이 프롬프트에 새면 기억 정책(물을 때만)·사인 정책을 우회한다
+# 주고받기 제외어: 건강, 의료, 돈 같은 사실이 새면 기억 정책(물을 때만), 사인 정책 우회
 SENSITIVE = re.compile(
     r"주사|병원|약(을|은|이|국| 먹)|당뇨|혈당|수술|아파|아프|입원|응급|상속|재산|주소|장례|돌아가"
 )
@@ -128,7 +122,7 @@ def card(f: dict) -> str:
 
 
 def card_from_utterances(utts: list[str], min_utts: int = 30) -> str | None:
-    """대상자 발화로 카드. 발화가 너무 적거나 형태소 분석기가 없으면 None."""
+    """대상자 발화 -> 말투 카드 (어미 분포 거리 개선 효과 최대, 발화 부족이나 분석기 없으면 None)"""
     utts = [u for u in utts if len(u.strip()) >= 2]
     if len(utts) < min_utts:
         return None
@@ -161,8 +155,7 @@ def shots_from_segments(
     persona_len=(4, 50),
     exclude=None,
 ) -> list[Shot]:
-    """가족 말 → 바로 뒤 대상자 답. 대상자 화자 라벨이 없는 통화는 건너뛴다.
-    exclude(통화, 세그먼트 번호) -> bool: 평가 문항과 겹치는 구간을 빼는 데 쓴다(답 베끼기 방지)."""
+    """가족 말 -> 바로 뒤 대상자 답 쌍 (통화별 순환, 시드 고정, exclude 로 평가 문항 구간 제외)"""
     by_rec: dict[str, list[Shot]] = {}
     for rec, segs in sorted(segments_by_recording.items()):
         lab = labels.get(rec)

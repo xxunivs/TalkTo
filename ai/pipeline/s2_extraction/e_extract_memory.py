@@ -1,9 +1,4 @@
-"""기억 조각 추출 — LLM 제안 + 코드 검증/파생.
-
-LLM은 memoryText·근거·인물·확실성만 제안한다. 시간 구간(startMs/endMs)과
-화자 라벨은 근거 세그먼트에서 코드가 파생하고(LLM이 지어낼 수 없게),
-민감플래그는 민감정보 분석 결과와 근거 구간 교집합으로 코드가 조인한다.
-"""
+"""기억 조각 추출: LLM 은 문장, 근거, 인물, 확실성만 제안 (시간, 화자는 근거에서 파생, 민감플래그는 근거 구간 교집합으로 조인)"""
 
 import logging
 import unicodedata
@@ -19,33 +14,29 @@ _CONFIDENCE_VALUES = {"confirmed", "inferred"}
 
 
 def _allowed_letter(ch: str) -> bool:
-    """한글(완성형·자모·옛 자모, 'ㆍ' 포함)과 라틴 글자만 허용한다."""
+    """한글(완성형, 자모, 옛 자모, 'ㆍ' 포함), 라틴 글자 여부"""
     o = ord(ch)
     return (
         0xAC00 <= o <= 0xD7A3  # 한글 완성형
         or 0x1100 <= o <= 0x11FF  # 한글 자모
-        or 0x3130 <= o <= 0x318F  # 한글 호환 자모(ㄱ·ㅏ·ㆍ)
+        or 0x3130 <= o <= 0x318F  # 한글 호환 자모 (ㄱ, ㅏ, ㆍ)
         or ch.isascii()
-        or 0x00C0 <= o <= 0x024F  # 라틴 확장(café 등)
+        or 0x00C0 <= o <= 0x024F  # 라틴 확장 (café 등)
     )
 
 
 def has_foreign_script(text: str) -> bool:
-    """한글·라틴이 아닌 '글자'가 섞였나 — LLM 출력 오염(예: 벵골어·한자·가나 혼입)으로 보고 그 기억을 버린다.
-
-    문장부호·기호·숫자는 보지 않는다. 예전에는 허용 문자 목록 밖이면 다 버려서 “밥은 먹었냐”(둥근 따옴표),
-    3/1절, 김치&된장, 5°C, 서울ㆍ부산 같은 멀쩡한 기억(특히 입버릇 인용)이 조용히 사라졌다.
-    """
+    """한글, 라틴 외 글자 혼입 여부 (LLM 출력 오염 판정, 문장부호, 기호, 숫자는 제외해 둥근 따옴표, 5°C 등 보존)"""
     for ch in text:
         category = unicodedata.category(ch)
-        if category in ("Co", "Cn"):  # 사용자 정의·없는 글자 = 깨진 출력
+        if category in ("Co", "Cn"):  # 사용자 정의, 없는 글자는 깨진 출력
             return True
         if category.startswith("L") and not _allowed_letter(ch):
             return True
     return False
 
 
-# 태그 통제 어휘 — 이 밖의 값은 게이트에서 버린다
+# 태그 통제 어휘 (밖의 값은 게이트에서 제거)
 _ALLOWED_TAGS = {
     # 주제
     "음식요리",
@@ -126,7 +117,7 @@ def validate_memory_payload(
     *,
     subject_name: str | None = None,
 ) -> dict:
-    """근거 실존·enum·중복을 코드로 강제하고 시간·화자·민감플래그를 파생한다."""
+    """근거 실존, enum, 중복 코드 검증 + 시간, 화자, 민감플래그 파생"""
     by_index = {segment.segment_index: segment for segment in segments}
     dropped = {"memories": 0, "duplicates": 0}
     seen_texts: set[str] = set()
@@ -160,9 +151,8 @@ def validate_memory_payload(
         speaker_counts: dict[str, int] = {}
         for source in sources:
             speaker_counts[source.speaker_label] = speaker_counts.get(source.speaker_label, 0) + 1
-        # 민감플래그 조인은 정확히 인용된 세그먼트가 아니라 기억이 걸친 범위
-        # [최소~최대]로 한다 — 중간 세그먼트를 명시 인용하지 않아도 그 범위 안의
-        # 민감 내용을 놓치지 않기 위함 (근거 인용은 완전하지 않을 수 있음)
+        # 민감플래그 조인은 인용 세그먼트가 아닌 걸친 범위 [최소~최대] 기준
+        # (근거 인용이 불완전해도 범위 안 민감 내용 포함)
         span = range(source_ids[0], source_ids[-1] + 1)
         span_set = set(span)
         flags = sorted({flag_type for flag_ids, flag_type in flag_map if flag_ids & span_set})
@@ -171,12 +161,11 @@ def validate_memory_payload(
             for name in (memory.get("relatedPeople") or [])
             if str(name).strip() and str(name).strip() != subject_name
         ]
-        # importance: 1~10 정수로 클램프 (범위 밖·비정수는 중앙값 5)
+        # importance: 1~10 정수 클램프 (비정수는 중앙값 5)
         raw_importance = memory.get("importance")
         importance = (
             min(10, max(1, int(raw_importance))) if isinstance(raw_importance, (int, float)) else 5
         )
-        # tags: 통제 어휘 밖 값은 버린다
         tags = [tag for tag in (memory.get("tags") or []) if tag in _ALLOWED_TAGS]
         memories.append(
             {

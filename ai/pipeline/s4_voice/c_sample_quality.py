@@ -1,13 +1,4 @@
-"""목소리 복제 재료 고르기: 그분 구간마다 소리를 재서 깨끗한 것만 남긴다.
-
-IVC(즉시 복제)는 넣는 소리를 그대로 따라 하므로 재료 품질이 결과를 크게 좌우한다(실험:
-같은 목소리라도 정리한 재료와 날 재료의 닮음 차이가 컸다). 길이만 보고 고르면 잡음이 많거나
-소리가 찢어진 구간, 숨소리만 긴 구간도 들어간다. 그래서 구간마다
-  - 신호 대 잡음(SNR): 말하는 부분(상위 10% 프레임)과 쉬는 부분(하위 10% 프레임)의 크기 차
-  - 찢어짐(clipping): 최대치에 닿은 표본 비율
-  - 크기: 너무 작게 녹음된 구간
-을 재서 기준에 못 미치는 구간을 빼고, 점수 높은 순으로 녹음마다 번갈아 담는다.
-"""
+"""목소리 복제 재료 선별 (구간별 SNR, clipping, 음량 측정 후 깨끗한 것만, IVC 는 재료 품질 의존)"""
 
 import wave
 from dataclasses import dataclass
@@ -15,9 +6,9 @@ from pathlib import Path
 
 import numpy as np
 
-MIN_SNR_DB = 12.0  # 이보다 잡음이 크면 뺀다
-MAX_CLIP_RATIO = 0.002  # 표본 0.2% 넘게 찢어졌으면 뺀다
-MIN_LEVEL_DB = -45.0  # 이보다 작게 녹음된 구간은 뺀다
+MIN_SNR_DB = 12.0  # 최소 SNR
+MAX_CLIP_RATIO = 0.002  # 최대 clipping 표본 비율 (0.2%)
+MIN_LEVEL_DB = -45.0  # 최소 음량
 _FRAME_SECONDS = 0.02
 
 
@@ -38,12 +29,12 @@ class SegmentQuality:
 
     @property
     def score(self) -> float:
-        """깨끗할수록, 조금 길수록(문장이 온전할수록) 높다. 아주 긴 구간이 독식하지 않게 8초에서 멈춘다."""
+        """품질 점수 (깨끗하고 길수록 높음, 긴 구간 독식 방지로 길이는 8초 상한)"""
         return min(self.snr_db, 35.0) + 0.5 * min(self.seconds, 8.0) - 2000.0 * self.clip_ratio
 
 
 def measure(pcm: np.ndarray, sample_rate: int) -> SegmentQuality:
-    """-1~1 사이 mono 표본으로 품질을 잰다."""
+    """-1~1 mono 표본 품질 측정 (SNR: 상위 10% 대 하위 10% 프레임)"""
     seconds = len(pcm) / sample_rate if sample_rate else 0.0
     frame = max(1, int(sample_rate * _FRAME_SECONDS))
     count = len(pcm) // frame
@@ -63,11 +54,7 @@ def measure(pcm: np.ndarray, sample_rate: int) -> SegmentQuality:
 
 
 def measure_wav(path: Path, *, max_seconds: float | None = None) -> SegmentQuality:
-    """16비트 mono wav(_ffmpeg_normalize 결과)를 읽어 잰다.
-
-    max_seconds 를 주면 앞에서 그만큼만 읽는다. 다 읽으면 길이만큼 메모리를 쓴다(44.1kHz 에서
-    1분에 약 29MB, 표본·제곱·절댓값을 따로 들기 때문).
-    """
+    """16비트 mono wav 품질 측정 (max_seconds 만큼만 읽음, 전체는 44.1kHz 1분에 약 29MB)"""
     with wave.open(str(path), "rb") as w:
         rate = w.getframerate()
         frames = w.getnframes()
@@ -85,14 +72,7 @@ def pick(
     min_seconds: float,
     keep_order: bool = False,
 ) -> list[int]:
-    """(녹음 주소, 품질) 목록에서 담을 후보의 번호를 고른다.
-
-    원래 순서대로 돌려준다(keep_order 면 고른 순서대로).
-
-    기준을 넘는 구간만 쓰되, 그것만으로 min_seconds 가 안 되면 기준을 낮춰 점수 높은 것부터 쓴다
-    (통화 녹음처럼 전부 잡음이 있는 경우에도 복제는 되게). 녹음마다 번갈아 담아 한 통화가
-    다 차지하지 않게 한다.
-    """
+    """담을 후보 번호 (기준 통과분 부족 시 기준 완화, 녹음별 번갈아, keep_order 면 고른 순서)"""
     good = [i for i, (_, q) in enumerate(candidates) if q.ok]
     if sum(candidates[i][1].seconds for i in good) < min_seconds:
         good = list(range(len(candidates)))
@@ -117,13 +97,7 @@ def pick_seconds(
     min_seconds: float,
     min_part_seconds: float,
 ) -> dict[int, float]:
-    """pick 과 같이 고르되, 후보마다 몇 초를 쓸지까지 정한다(번호 → 초).
-
-    pick 은 담은 길이가 예산에 닿을 때까지 후보를 '통째로' 담아, 마지막 하나가 길면(혼자 몇 분씩
-    이어 말한 구간) 예산을 훌쩍 넘었다. 그 wav 가 Fish Audio 의 올리기 한도(30~40MB, 이 형식으로
-    약 6분)를 넘어 413 으로 목소리를 못 만들었다(2026-10-18). 넘치는 후보는 남은 예산만큼만 쓰고,
-    그 남은 몫이 min_part_seconds 보다 짧으면 뺀다. 그래서 쓰는 말소리는 늘 budget_seconds 이하다.
-    """
+    """후보별 사용 초 (번호 -> 초, 항상 budget_seconds 이하, Fish 업로드 한도 초과 413 사고 대응)"""
     out: dict[int, float] = {}
     left = budget_seconds
     for i in pick(

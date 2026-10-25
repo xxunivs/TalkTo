@@ -1,14 +1,4 @@
-"""② 기억 원본(MemoryStore) + 기억 선택(MemorySelector).
-
-원본
-- RequestMemoryStore: BE 가 보낸 기억(top-5) 그대로.
-- ExportFileMemoryStore: Neon 에서 내려받은 memories JSON(오프라인 재현·fixture 용).
-- DB 직접 읽기는 아직 없다.
-선택
-- PassThroughSelector: 원본을 순서 그대로 전부(기본).
-- TieredSelector(ORCHESTRATOR_SELECTOR=tiered): 장기 기억 전부 + 단기만 발화 분해 단서로 top-k.
-  BE 가 기억 유형(memoryType)을 안 보내면 전부 장기로 들어와 PassThrough 와 같은 결과가 된다.
-"""
+"""② 기억 원본(MemoryStore) + 기억 선택(MemorySelector)"""
 
 from __future__ import annotations
 
@@ -43,10 +33,7 @@ def _as_list(value) -> list[str]:
 
 
 def memory_from_export_row(row: dict) -> MemoryItem:
-    """Neon SQL 편집기 export 한 행 → MemoryItem.
-
-    행 모양: {"j": "<json 문자열>"} (id, mtype, status, title, body, tags …) 또는 그 json 자체.
-    """
+    """Neon SQL 편집기 export 한 행 -> MemoryItem (행: {"j": json 문자열} 또는 json 자체)"""
     r = json.loads(row["j"]) if "j" in row else row
     return MemoryItem(
         id=str(r["id"]),
@@ -59,7 +46,7 @@ def memory_from_export_row(row: dict) -> MemoryItem:
 
 
 class ExportFileMemoryStore:
-    """파일 하나 = 대상자 한 명. subject_id → 파일 경로. default 는 어느 subject 에나 쓴다."""
+    """Neon memories JSON 파일 원본 (파일 하나 = 대상자 한 명, default 는 모든 subject 공용)"""
 
     impl = "export_file"
 
@@ -104,7 +91,7 @@ class PassThroughSelector:
 
 
 class Embedder(Protocol):
-    """텍스트 → 벡터. 기억 벡터와 같은 모델이어야 서로 견줄 수 있다(운영: text-embedding-3-small)."""
+    """텍스트 -> 벡터 (기억 벡터와 같은 모델 필요, 운영: text-embedding-3-small)"""
 
     impl: str
 
@@ -112,7 +99,7 @@ class Embedder(Protocol):
 
 
 class OpenAIEmbedder:
-    """AI 서버의 기존 임베딩 함수(pipeline d_build_memory_embedding.embed_texts) 그대로."""
+    """AI 서버 기존 임베딩 함수 래퍼 (pipeline d_build_memory_embedding.embed_texts)"""
 
     impl = "openai"
 
@@ -126,7 +113,7 @@ class OpenAIEmbedder:
 
 
 class CachedEmbedder:
-    """같은 텍스트는 한 번만 임베딩한다(단기 후보 본문은 턴마다 거의 같다). 프로세스 메모리, 개수 상한."""
+    """같은 텍스트 1회 임베딩 캐시 (단기 후보 본문은 턴마다 거의 같음, 프로세스 메모리, 개수 상한)"""
 
     def __init__(self, inner: Embedder, max_items: int = 5000) -> None:
         self.inner = inner
@@ -145,7 +132,7 @@ class CachedEmbedder:
 
 
 class FileEmbedder:
-    """오프라인 재현용: {텍스트: 벡터} json 캐시. 없는 텍스트는 KeyError."""
+    """오프라인 재현용 {텍스트: 벡터} json 캐시 (없는 텍스트는 KeyError)"""
 
     impl = "file"
 
@@ -159,7 +146,7 @@ class FileEmbedder:
 
 
 class MemoryVectors(Protocol):
-    """기억 → 벡터. 못 구한 기억은 결과에서 빠진다(검색 대상에서 제외)."""
+    """기억 -> 벡터 (못 구한 기억은 검색 대상 제외)"""
 
     impl: str
 
@@ -167,7 +154,7 @@ class MemoryVectors(Protocol):
 
 
 class EmbedOnDemandVectors:
-    """BE 가 기억 본문만 보낼 때: 본문을 임베딩한다. 운영 memory_embeddings 와 같게 본문만(제목 없음)."""
+    """BE 가 본문만 보낼 때 본문 임베딩 (운영 memory_embeddings 와 같게 제목 제외)"""
 
     def __init__(self, embedder: Embedder) -> None:
         self.embedder = embedder
@@ -180,7 +167,7 @@ class EmbedOnDemandVectors:
 
 
 class ExportVectors:
-    """운영 memory_embeddings export(Neon SQL 편집기, 행 {"j": json}) → memoryId 별 벡터. 오프라인 재현용."""
+    """운영 memory_embeddings export -> memoryId 별 벡터 (오프라인 재현용)"""
 
     impl = "export"
 
@@ -203,14 +190,7 @@ def _cos(a: list[float], b: list[float]) -> float:
 
 
 class TieredSelector:
-    """장기 기억 전부(받은 순서 그대로 → 프롬프트 앞쪽 고정, 캐시) + 단기 기억은 분해 단서로 top-k(임계 이상).
-
-    - 분해: 페르소나 사전(PersonaProfile.address_terms·family_names)이 있으면 orchestrator.split, 없으면 원문 그대로.
-    - 분해 결과 기억 단서가 없으면(인사·호칭·군말뿐) 단기 검색을 건너뛴다 → 임베딩 호출도 없음.
-    - 임베딩이 실패하면 단기는 받은 순서(= BE 자체 유사도 순) 앞에서 k 개로 대신한다. 응답을 막지 않는다.
-    - 델타(이번 세션에 새로 들은 기억)는 PassThrough 와 같이 그대로 넘긴다.
-    strategy 예: "tiered:lt72+st5/237", "tiered:lt72+st0/237|nocue", "…|embed-fail"
-    """
+    """장기 기억 전부(받은 순서 고정, 캐시) + 단기는 분해 단서로 임계 이상 top-k (memoryType 없으면 PassThrough 와 동일)"""
 
     impl = "tiered_v1"
 
@@ -269,7 +249,7 @@ class TieredSelector:
         elif short:
             try:
                 picked = self.rank_short(cue, short)
-            except Exception:  # 임베딩 API·캐시 실패가 응답을 막으면 안 된다
+            except Exception:  # 임베딩 실패 시 받은 순서(BE 유사도 순)로 대체, 응답 차단 방지
                 log.exception(
                     "tiered selector: short-term ranking failed, falling back to given order"
                 )

@@ -1,5 +1,5 @@
 # BE 의 녹음 분석 요청을 받아 단계들을 돌리고 응답으로 조립
-# 같은 단계 순서가 pipeline/run_pipeline.py 에도 있다. 순서를 바꾸면 둘 다 확인할 것.
+# 단계 순서는 pipeline/run_pipeline.py 와 동일 (변경 시 양쪽 확인)
 
 from uuid import UUID
 
@@ -31,11 +31,7 @@ def _resolve_subject_speaker_label(
     *,
     settings: Settings,
 ) -> str | None:
-    """대상자 화자 라벨 확정: ECAPA 성문(provided) → LLM 의미 폴백 → 미확정(None).
-
-    발화량으로 추정하지 않는다(고인·상대 중 누가 더 말했는지는 신원 근거가 아니다). 참조가
-    없어 provided가 없으면 전사문 호칭·맥락으로 판정하고, 그래도 못 정하면 None으로 둔다.
-    """
+    """대상자 화자 라벨: ECAPA 성문(provided) -> LLM 호칭, 맥락 폴백 -> None (발화량은 신원 근거 아님)"""
     if provided:
         return provided
     return identify_subject_by_content(segments, subject_context, settings=settings)
@@ -98,7 +94,7 @@ def run_recording_analysis(
     memory_segments: list[MemorySegment] = []
     for memory in memory_result["memorySegments"]:
         source_ids = to_uuids(memory["sourceSegmentIds"])
-        if not source_ids:  # 근거가 요청 세그먼트에 없으면(방어) 그 기억은 버린다
+        if not source_ids:  # 근거 세그먼트가 요청에 없는 기억은 제외 (방어)
             continue
         memory_segments.append(
             MemorySegment(

@@ -1,7 +1,4 @@
-"""단계 연결. 순서를 아는 곳은 여기 하나뿐이다.
-
-run(turn, until=…) 으로 중간 단계에서 멈출 수 있다 → 모듈 하나만 따로 돌려 보기(CLI --until).
-"""
+"""단계 연결 (순서를 아는 유일한 곳, run(until=...) 으로 중간 단계 정지)"""
 
 from __future__ import annotations
 
@@ -36,18 +33,18 @@ STAGES = ("session", "select", "precheck", "assemble", "generate", "guard", "pos
 
 @dataclass
 class TurnRun:
-    """한 턴 동안 각 단계가 낸 값. until 로 멈추면 뒤 단계 값은 None."""
+    """한 턴 동안 각 단계 출력 (until 로 멈추면 뒤 단계는 None)"""
 
     turn: TurnInput
     state: SessionState | None = None
     selection: MemorySelection | None = None
     precheck: PrecheckResult | None = None
     bundle: PromptBundle | None = None
-    # 모델이 낸 글 그대로(음성 표시 포함). 가드에는 voice.guard_text 가 간다.
+    # 모델 원문 (음성 표시 포함, 가드에는 voice.guard_text 전달)
     generation: Generation | None = None
-    # 음성 표시를 떼어 낸 결과(FISH_EMOTION 이 켜진 Fish 목소리일 때만)
+    # 음성 표시 뗀 결과 (FISH_EMOTION 켜진 Fish 목소리일 때만)
     voice: VoiceRun | None = None
-    # 대답에서 뗀 기억 빈틈 표시의 주제(표시가 없으면 None, 주제 없이 붙었으면 빈 글)
+    # 대답에서 뗀 기억 빈틈 표시 주제 (표시 없으면 None, 주제 없이 붙었으면 빈 글)
     gap: str | None = None
     guard: GuardResult | None = None
     next_state: SessionState | None = None
@@ -65,7 +62,7 @@ class PersonaOrchestrator:
     llm: LLM
     guard: Guard
     post_turn: PostTurn
-    # 생성 뒤·가드 앞 음성 표시 떼기(FISH_EMOTION). 기본 off 면 아무것도 하지 않는다.
+    # 생성 뒤, 가드 앞 음성 표시 떼기 (FISH_EMOTION, 기본 off 면 무동작)
     voice: VoiceMarks = field(default_factory=VoiceMarks)
 
     def describe(self) -> dict[str, str]:
@@ -97,7 +94,7 @@ class PersonaOrchestrator:
     def run(
         self, turn: TurnInput, *, until: str | None = None, state: SessionState | None = None
     ) -> TurnRun:
-        """state 를 주면 저장소 대신 그것을 쓰고, 끝나도 저장하지 않는다(fixture 재현용)."""
+        """state 주면 저장소 대신 사용, 저장 안 함 (fixture 재현용)"""
         if until is not None and until not in STAGES:
             raise ValueError(f"until must be one of {STAGES}")
         r = TurnRun(turn=turn)
@@ -156,13 +153,13 @@ class PersonaOrchestrator:
         )
         if until == "generate":
             return r
-        # 기억 빈틈 표시([기억없음:주제])를 가장 먼저 뗀다(음성 표시는 [ ] 를 모두 지워 주제를 잃는다). 요청하지 않았는데
-        # 붙여도 지운다. 가드·세션·대화 기록에는 표시 없는 글만 간다.
+        # 기억 빈틈 표시([기억없음:주제]) 최우선 제거 (음성 표시 제거가 [ ] 를 모두 지워 주제 손실)
+        # 요청 없이 붙어도 제거, 가드, 세션, 대화 기록에는 표시 없는 글만
         r.gap, gap_text = split_gap(r.generation.text)
         generated = (
             r.generation if r.gap is None else r.generation.model_copy(update={"text": gap_text})
         )
-        # 감정 이름·연기 표시는 가드 앞에서 뗀다. 가드·언어 가드·턴 뒤 처리는 표시 없는 글만 본다.
+        # 감정 이름, 연기 표시는 가드 앞에서 제거 (가드, 언어 가드, 턴 뒤 처리는 표시 없는 글만)
         clean = generated
         if self.voice.mode(turn) != "off":
             r.voice = self._timed(
@@ -183,7 +180,7 @@ class PersonaOrchestrator:
         if until == "guard":
             return r
         if not r.guard.text.strip():
-            # 빈 대답은 돌려주지 않는다(BE 가 저장하면 그 대화의 다음 턴이 모두 422 로 막혔다). 세션에도 남기지 않는다.
+            # 빈 대답 반환 금지 (BE 저장 시 그 대화 다음 턴 전부 422), 세션에도 미기록
             raise EmptyReplyError()
         r.next_state = self._timed(
             r,
@@ -196,7 +193,7 @@ class PersonaOrchestrator:
             self.sessions.save(r.next_state)
 
         cited = r.guard.cited_memory_ids
-        # 헤더가 없으면(인용 정보 모름) 기존처럼 넣은 기억 전부를 '사용됨'으로 돌려준다.
+        # 헤더 없으면(인용 정보 모름) 기존처럼 넣은 기억 전부를 사용됨으로 반환
         ids = cited if cited is not None else [m.id for m in r.selection.memories]
         emotion, speech_text = self.voice.finish(r.voice, r.guard)
         r.result = TurnResult(
@@ -213,10 +210,7 @@ class PersonaOrchestrator:
 
 
 def memory_gap(turn: TurnInput, run: TurnRun) -> str | None:
-    """기억 빈틈 주제(turn.flag_gaps 일 때만). 모델 표시가 먼저, 없으면 사전 판정이 '기억에 없다'고 본 화제어.
-
-    죽음·장례·임종·위기·건강·종교 화제면 None(가족에게 묻지 않는다, e_memory_gap.turn_gap — 기존 경로와 같다).
-    """
+    """기억 빈틈 주제 (flag_gaps 일 때만, 모델 표시 우선, 없으면 사전 판정 화제어, 민감 화제면 None)"""
     if not turn.flag_gaps:
         return None
     if run.gap is not None:

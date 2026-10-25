@@ -1,10 +1,4 @@
-"""2단계 민감정보 플래그 — 안전 항목이라 실패 정책이 다르다.
-
-인물 분석과 달리 재현율이 최우선이므로 코드 게이트는 구조(enum·근거 실존)만
-검증하고 내용을 걸러내지 않는다. 구조 위반이 하나라도 있으면 조용히 버리는
-대신 SensitivityValidationError를 던진다 — 상위에서 재시도하고, 그래도
-실패하면 해당 녹음 전체를 중단한다 (부분 실패 정책).
-"""
+"""2단계 민감정보 플래그 (재현율 우선, 구조 위반은 버리지 않고 예외 -> 재시도, 재실패 시 녹음 중단)"""
 
 import logging
 
@@ -16,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 class SensitivityValidationError(RuntimeError):
-    """플래그 산출 구조가 신뢰 불가 — 이 녹음은 진행하면 안 된다."""
+    """플래그 산출 구조 신뢰 불가 (녹음 진행 중단)"""
 
 
 def run_sensitivity_analysis(
@@ -26,7 +20,7 @@ def run_sensitivity_analysis(
 ) -> dict:
 
     client = analysis_client(settings, "sensitivity analysis")
-    # 부분 실패 정책: 구조 위반이면 1회 재시도, 재실패 시 예외(녹음 중단)
+    # 부분 실패 정책: 구조 위반이면 1회 재시도, 재실패 시 예외 (녹음 중단)
     last_error: SensitivityValidationError | None = None
     result = None
     for attempt in range(2):
@@ -50,8 +44,7 @@ def run_sensitivity_analysis(
     if result is None:
         raise last_error
 
-    # 이중 체크: 2차 판정이 "유형 정의에 명백히 부합하지 않는" 플래그만
-    # 제거한다. 애매하면 유지 — 재현율은 1차, 정밀도는 2차가 담당
+    # 2차 판정은 유형 정의에 명백히 안 맞는 플래그만 제거 (애매하면 유지, 재현율은 1차, 정밀도는 2차)
     if result["sensitivityFlags"]:
         judge_response = analysis_completion(
             client,
@@ -72,7 +65,7 @@ def run_sensitivity_analysis(
 
 
 def apply_judge_decisions(result: dict, judge_payload: dict) -> dict:
-    """drop 판정된 플래그만 제거. 판정 누락·형식 오류는 keep으로 처리(보수적)."""
+    """drop 판정 플래그만 제거 (판정 누락, 형식 오류는 keep)"""
     drops: dict[int, str] = {}
     for decision in judge_payload.get("decisions") or []:
         if not isinstance(decision, dict):
@@ -88,7 +81,7 @@ def apply_judge_decisions(result: dict, judge_payload: dict) -> dict:
         else:
             kept.append(flag)
     if removed:
-        # 판정 이유는 원문을 담을 수 있어 로그에는 유형만 남긴다
+        # 판정 이유는 원문을 담을 수 있어 로그에는 유형만
         logger.info(
             "sensitivity judge dropped %d flags: %s",
             len(removed),
@@ -98,12 +91,7 @@ def apply_judge_decisions(result: dict, judge_payload: dict) -> dict:
 
 
 def validate_sensitivity_payload(payload: dict, segments: list[TranscriptSegment]) -> dict:
-    """구조 검증만 한다 — 내용 필터링은 안전 항목에선 금지.
-
-    enum 밖의 type이나 실존하지 않는 근거는 "덜 플래그된 것"이 아니라
-    "산출을 신뢰할 수 없는 것"이므로 예외로 올린다.
-    오류 문구는 로그로 가므로 원문(설명·받은 값)을 넣지 않는다. 몇 번째·자료형·개수만.
-    """
+    """구조만 검증, 위반은 예외 (내용 필터링 금지, 오류 문구에 원문 없이 순번, 자료형, 개수만)"""
     valid_ids = {segment.segment_index for segment in segments}
     flags = []
     for n, flag in enumerate(payload.get("sensitivityFlags") or []):

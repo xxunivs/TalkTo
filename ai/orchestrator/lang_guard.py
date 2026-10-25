@@ -1,15 +1,4 @@
-"""언어 누출 가드 — 답에 이번 턴 맥락에 없던 문자 체계나 추론 문장이 새어 나왔는지 본다. LLM 은 부르지 않는다.
-
-한글이 아닌 글자를 일괄로 막지 않는다. 영어가 섞이는 대화나 다른 언어로의 확장을 막으면 안 되기 때문이다.
-대신 '이번 턴 맥락'(가족 말, 지시문, 넣은 기억, 앞 대화)과 비교한다.
-    script:<이름>   맥락에 한 글자도 없던 문자 체계(한자·가나·키릴 등)가 답에 나옴
-    latin:<낱말>    맥락에 없던 영어 낱말이 답에 나옴(맥락에 있던 낱말·약어는 통과)
-    leak:<표지>     "Wait", "Okay,", "Let me", "The user" 같은 추론 문장이 답에 나옴
-가족이 영어로 말하고 있으면(가족 말·앞 대화에 영어 낱말 3개 이상) 영어 답은 문제 삼지 않는다.
-무슨 언어로 답할지는 프롬프트(L1 말하는 형식)가 정하고, 이 가드는 맥락에서 튀어나온 것만 본다.
-모드(ORCHESTRATOR_LANG_GUARD): off(기본) / flag(답은 그대로, 이유만 기록) / fix(걸린 문장을 지운다).
-fix 에서 문장이 다 지워지면 되묻는다. 가족 표의 '지금 대화하는 사람' 줄이 존댓말이면 높인 되묻기(family_polite).
-"""
+"""언어 누출 가드: 이번 턴 맥락에 없던 문자 체계, 영어 낱말, 추론 문장 검출 (LLM 미호출, off | flag | fix)"""
 
 from __future__ import annotations
 
@@ -23,8 +12,8 @@ LANG_GUARD_MODES = ("off", "flag", "fix")
 
 _LATIN_WORD = re.compile(r"[A-Za-z][A-Za-z'’-]+")
 _SENT = re.compile(r"(?<=[.?!。])\s+|\n+")
-# 추론·메타 문장의 표지(문장 첫머리). 대소문자 무시.
-# 강한 표지는 영어로 대화할 때도 누출이고, 약한 표지는 영어 대화에서는 평범한 말이라 한국어 대화에서만 본다.
+# 추론, 메타 문장 표지 (문장 첫머리, 대소문자 무시)
+# 강한 표지는 영어 대화에서도 누출, 약한 표지는 영어 대화에선 평범한 말이라 한국어 대화에서만
 LEAK_STRONG = re.compile(
     r"^\s*(?:<\/?think>|the user\b|user:|assistant:|final answer\b|reasoning:|note:)", re.IGNORECASE
 )
@@ -33,9 +22,9 @@ LEAK_WEAK = re.compile(
     r"|answer:|thinking\b|good\.)",
     re.IGNORECASE,
 )
-# 가족 말·앞 대화에 영어 낱말이 이만큼 있으면 영어로 대화하는 중으로 본다
+# 가족 말, 앞 대화에 영어 낱말이 이만큼 있으면 영어 대화로 간주
 ENGLISH_DIALOGUE_WORDS = 3
-# 맥락에 없어도 넘길 영어 약어(대화에서 흔한 것만)
+# 맥락에 없어도 통과시킬 흔한 영어 약어
 ALLOWED_LATIN = {"ok", "tv", "pc", "sns", "ktx", "kt", "lg", "sk"}
 ASK_BACK = {
     "family": "응? 다시 말해 줄래?",
@@ -45,7 +34,7 @@ ASK_BACK = {
 
 
 def script_of(ch: str) -> str | None:
-    """글자 하나의 문자 체계. 숫자·문장부호·공백은 None."""
+    """글자 하나의 문자 체계 (숫자, 문장부호, 공백은 None)"""
     if not unicodedata.category(ch).startswith("L"):
         return None
     o = ord(ch)
@@ -76,11 +65,7 @@ def leak_head(sent: str, english: bool) -> re.Match | None:
 
 
 def findings(answer: str, context: str, dialogue: str = "") -> list[str]:
-    """답에서 걸린 것들. 비어 있으면 통과.
-
-    context  이번 턴에 모델이 본 글 전부(가족 말·지시문·기억·앞 대화)
-    dialogue 그중 대화(가족 말·앞 대화). 여기서 영어로 말하고 있으면 영어 낱말은 문제 삼지 않는다.
-    """
+    """답에서 걸린 항목 (빈 목록이면 통과, 한글 외 일괄 차단 대신 context 대비, dialogue 가 영어 대화면 영어 허용)"""
     out: list[str] = []
     for s in sorted(scripts(answer) - scripts(context) - {"hangul", "latin"}):
         out.append(f"script:{s}")
@@ -118,7 +103,7 @@ def turn_context(turn: TurnInput, state: SessionState, selection: MemorySelectio
 
 
 class LanguageGuard:
-    """다른 가드 뒤에 붙는다. 안쪽 가드 결과 글을 한 번 더 본다."""
+    """다른 가드 뒤에서 안쪽 결과 글 재검사 (fix 에서 다 지워지면 되묻기)"""
 
     def __init__(self, inner, profiles, *, mode: str = "flag") -> None:
         if mode not in ("flag", "fix"):

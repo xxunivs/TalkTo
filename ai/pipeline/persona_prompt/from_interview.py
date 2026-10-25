@@ -1,10 +1,4 @@
-"""G2 가족 인터뷰 txt → 페르소나 명세 후보. LLM 이 뽑고 코드가 근거를 검증한다. 적용은 사람이 후보 파일을 확인한 뒤.
-
-- 입력은 줄 번호를 붙여 넘기고(L1, L2 …), 모든 후보에 근거 줄 번호(evidence)와 그 줄에 글자 그대로 있는
-  짧은 구절(quote)을 요구한다. 코드가 줄 번호가 있는지, quote 가 그 줄들에 정말 있는지 확인해 아니면 버린다.
-- 사실(생몰·직장·주소·병력 같은 기억)은 뽑지 않는다 — 그건 기억 DB 몫이고 프롬프트에 넣지 않는다.
-- 적용(apply_candidates)은 설문이 비운 칸만 채운다(사실·정책은 설문 > 인터뷰 > 전사). 목록 칸은 없는 값만 덧붙인다.
-"""
+"""G2 가족 인터뷰 txt -> 명세 후보 (LLM 추출, 근거 줄 검증, 사람 확인 뒤 적용)"""
 
 from __future__ import annotations
 
@@ -49,14 +43,14 @@ def numbered(text: str) -> tuple[str, list[str]]:
 
 
 def _as_list(v) -> list:
-    """LLM 이 목록 대신 값 하나를 주는 경우가 있다."""
+    """목록 대신 값 하나로 온 LLM 응답 대비"""
     if v is None or v == "":
         return []
     return v if isinstance(v, list) else [v]
 
 
 def _scalar(v) -> str:
-    """칸 하나에 목록이 오면 첫 값만 쓴다."""
+    """목록이 오면 첫 값만"""
     v = _as_list(v)
     return unquote(str(v[0])) if v else ""
 
@@ -66,6 +60,7 @@ def _norm(s: str) -> str:
 
 
 def verify(items: list[dict], lines: list[str]) -> tuple[list[dict], int]:
+    """근거 줄 번호가 있고 quote 가 그 줄에 실제로 있는 후보만"""
     kept, dropped = [], 0
     for it in items or []:
         if not isinstance(it, dict):
@@ -84,7 +79,7 @@ def verify(items: list[dict], lines: list[str]) -> tuple[list[dict], int]:
 
 
 def extract_candidates(text: str, *, client, model: str) -> dict:
-    """LLM 호출 한 번 → 검증된 후보. 반환: {"relations": [...], …, "dropped": n, "model": model}"""
+    """LLM 1회 호출 -> 검증된 후보 (dropped, model 포함)"""
     body, lines = numbered(text)
     r = client.chat.completions.create(
         model=model,
@@ -107,7 +102,7 @@ def _src(it: dict) -> str:
 
 
 def _add_items(target: list[str], value: str, known: list[str]) -> list[str]:
-    """목록 칸에 값 넣기. 따옴표 친 말 여러 개는 하나씩 나누고, 이미 있는 말(따옴표·띄어쓰기 무시)은 건너뛴다."""
+    """목록 칸에 새 값 추가 (따옴표 친 말은 하나씩, 따옴표와 띄어쓰기 무시 중복 제외)"""
     seen = {_norm(x) for x in known}
     added = []
     for item in split_quoted(value):
@@ -119,7 +114,7 @@ def _add_items(target: list[str], value: str, known: list[str]) -> list[str]:
 
 
 def apply_candidates(spec: PersonaSpec, cands: dict) -> list[str]:
-    """설문이 비운 칸만 채운다. 바꾼 내용과 건너뛴 이유를 한 줄씩 돌려준다(사람 확인용)."""
+    """설문 빈칸만 보충 (설문 > 인터뷰 > 전사), 변경과 건너뜀 사유 기록 반환"""
     log: list[str] = []
     for it in cands.get("relations") or []:
         name = str(it.get("name") or "").strip()
@@ -164,9 +159,7 @@ def apply_candidates(spec: PersonaSpec, cands: dict) -> list[str]:
         f, v = it.get("field"), str(it.get("value") or "").strip()
         if not v or (f == "sentence_endings" and "사랑" in v):
             continue
-        if (
-            f == "avoid_styles"
-        ):  # "장황한 조언, 과한 사투리" 처럼 여러 개가 한 줄로 오면 나눠서 겹치는 것을 뺀다
+        if f == "avoid_styles":  # 한 줄에 여러 개("장황한 조언, 과한 사투리")면 나눠 중복 제외
             have = spec.style.avoid_styles
             for item in (unquote(x) for x in v.split(",")):
                 if not item:

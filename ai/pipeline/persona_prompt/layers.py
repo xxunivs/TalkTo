@@ -1,15 +1,4 @@
-"""층 구성(`prompts/layers.json`)을 읽고, 지금 상황에 켜질 모듈을 고른다.
-
-정적 모듈(static)은 페르소나마다 정해지고 프롬프트 앞쪽에 놓여 캐시된다.
-런타임 모듈(runtime)은 턴마다 바뀌므로 기억 블록 뒤에 별도 system 절로 붙는다(runtime_section).
-
-조건 이름
-    페르소나 종류  public / private, deceased / alive, family / nofamily, minor(만 19세 미만 살아 계신 분만, 반대 조건 없음)
-    재료           has_intake / has_transcript / has_interview (spec.materials)
-    주고받기 위치  shots_in_system / shots_as_messages
-    런타임         speaker_known / speaker_unknown / long_conversation / low_memory(기억 수 ≤ LOW_MEMORY_MAX)
-when 의 조건이 전부 맞아야 모듈이 켜진다. 내용이 빈 모듈은 조건과 상관없이 빠진다.
-"""
+"""prompts/layers.json -> 지금 켜질 모듈 (런타임 모듈은 턴마다 바뀌어 기억 블록 뒤 별도 system 절)"""
 
 from __future__ import annotations
 
@@ -43,7 +32,7 @@ STATIC_CONDITIONS = {
 }
 RUNTIME_CONDITIONS = {"speaker_known", "speaker_unknown", "long_conversation", "low_memory"}
 
-# 이미 한 말을 알아보는 패턴(말투 카드와 같은 기준)
+# 이미 한 말 판별 패턴 (말투 카드와 같은 기준)
 CARE = re.compile(
     r"밥\s*(은|잘|챙|먹|꼭|거르)|챙겨\s*먹|끼니|건강\s*(해|하|챙|조심)|몸\s*(조심|챙|상하|잘)|조심\s*해|감기\s*조심"
 )
@@ -77,7 +66,7 @@ def static_flags(spec: PersonaSpec, *, shots_mode: ShotsMode = "system") -> set[
         "shots_in_system" if shots_mode == "system" else "shots_as_messages",
     }
     if spec.minor and not spec.deceased:
-        flags.add("minor")  # 아니면 더하지 않는다(예전 구성 그대로)
+        flags.add("minor")  # 반대 조건 없음 (예전 구성 유지)
     return flags | {f"has_{m}" for m in spec.materials}
 
 
@@ -95,15 +84,15 @@ def static_modules(
 
 @dataclass
 class RuntimeContext:
-    """한 턴의 상황. history 는 (role, content) 쌍, 페르소나 답은 role="assistant"."""
+    """한 턴의 상황 (history: (role, content) 쌍, 페르소나 답은 assistant)"""
 
     speaker: str | None = None
     history: list[tuple[str, str]] = field(default_factory=list)
     long_after: int = LONG_CONVERSATION_TURNS
-    # 이 페르소나의 기억 수. None 이면 모름(= 적다고 보지 않는다). pipeline/persona_prompt/low_memory.py
+    # 페르소나 기억 수 (None: 모름, 적다고 보지 않음)
     memory_count: int | None = None
     low_memory_max: int = LOW_MEMORY_MAX
-    # 고인 여부(None 이면 spec.deceased)·존댓말 상대 — '기억이 적을 때' 문구를 고른다(가드와 같은 판정을 조립기가 넣음)
+    # 사망 여부(None 이면 spec.deceased), 존댓말 상대: 기억 적을 때 문구 선택 (조립기가 가드와 같은 판정 전달)
     deceased: bool | None = None
     polite: bool = False
 
@@ -122,7 +111,7 @@ def current_speaker(spec: PersonaSpec, ctx: RuntimeContext) -> str:
     from pipeline.persona_prompt.render import relation_bits, relation_head
 
     r = spec.relation_for(ctx.speaker or "")
-    if r is None:  # 화자 힌트가 이름이 아니라 관계말("손녀")일 수 있다
+    if r is None:  # 화자 힌트가 관계말("손녀")일 수 있음
         same = [x for x in spec.relations if x.relation == ctx.speaker]
         if len(same) == 1:
             r = same[0]
@@ -137,9 +126,7 @@ def current_speaker(spec: PersonaSpec, ctx: RuntimeContext) -> str:
             f"# 지금 상대\n- 지금 말하는 사람: {ctx.speaker}. 가족 표에 없는 사람이니 아는 척하지 말고, "
             "어떤 사이인지 자연스럽게 확인한다."
         )
-    bits = relation_bits(
-        r, listener_view=False
-    )  # 말하는 사람이 정해졌으니 대화하는 사람 기준 칸은 뺀다
+    bits = relation_bits(r, listener_view=False)  # 말하는 사람이 정해져 대화하는 사람 기준 칸 제외
     return (
         f"# 지금 상대\n- 지금 말하는 사람: {relation_head(r)}"
         + (" — " + " / ".join(bits) if bits else "")
@@ -167,7 +154,7 @@ def already_said(spec: PersonaSpec, ctx: RuntimeContext) -> str:
 
 
 def low_memory(spec: PersonaSpec, ctx: RuntimeContext) -> str:
-    """기억이 적을 때. 비공개 고인은 잊은 듯 말하지 않는 문구(잠금 2)."""
+    """기억이 적을 때 절 (비공개 사망 페르소나는 잊은 듯 말하지 않음, 잠금 2)"""
     deceased = spec.deceased if ctx.deceased is None else ctx.deceased
     return low_memory_note(
         ctx.memory_count or 0, public=bool(spec.public), deceased=bool(deceased), polite=ctx.polite
@@ -183,7 +170,7 @@ RUNTIME_MODULES = {
 
 
 def runtime_section(spec: PersonaSpec, ctx: RuntimeContext, *, path: Path = LAYERS_FILE) -> str:
-    """이번 턴에 붙일 런타임 절. 켜진 모듈이 없거나 다 비면 빈 문자열."""
+    """이번 턴 런타임 절 (켜진 모듈이 없거나 모두 비면 빈 문자열)"""
     flags = runtime_flags(spec, ctx)
     parts = [
         RUNTIME_MODULES[row["module"]](spec, ctx)

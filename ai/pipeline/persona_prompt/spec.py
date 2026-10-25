@@ -1,7 +1,4 @@
-"""페르소나 명세(spec) — 재료별 생성기가 채우고 렌더러가 읽는 중간 형태 하나.
-
-칸마다 출처(source)를 남긴다: intake:M2-01 / interview:L120 / call:통화03#45 / transcript / default.
-"""
+"""페르소나 명세: 생성기 -> 렌더러 중간 형태 (칸마다 출처 source)"""
 
 from __future__ import annotations
 
@@ -12,7 +9,7 @@ DEATH_WORDS = ("사망", "임종", "장례", "죽음")
 
 
 def is_death_topic(topic: str) -> bool:
-    """사망·임종 주제는 주제 목록이 아니라 L1 사망 정책 모듈이 맡는다."""
+    """사망, 임종 주제 판별 (주제 목록 대신 L1 사망 정책 모듈 담당)"""
     return any(w in topic for w in DEATH_WORDS)
 
 
@@ -20,26 +17,24 @@ class Relation(BaseModel):
     name: str
     relation: str | None = None
     calls_them: str | None = None  # 그분이 이 사람을 부르는 말
-    self_ref: str | None = (
-        None  # 이 사람 앞에서 그분이 자기를 가리키는 말(할머니가 / 엄마가 / 내가)
-    )
+    self_ref: str | None = None  # 이 사람 앞에서 그분이 자기를 가리키는 말(할머니가, 엄마가, 내가)
     they_call: str | None = None  # 이 사람이 그분을 부르는 말
-    speech_level: str | None = None  # 반말 / 존댓말
+    speech_level: str | None = None  # 반말, 존댓말
     tone: str | None = None
     worries: list[str] = Field(default_factory=list)
     talks_with_persona: bool | None = None
-    is_listener: bool | None = None  # 지금 페르소나와 대화하는 사람(웹앱이 보냄)
-    is_owner: bool | None = None  # 이 대화 상대를 만든 가족(가족 공유 때 웹앱이 보냄)
-    is_member: bool | None = None  # 가족 공유로 들어온 가족(듣는 사람 줄, 가족 공유 때 웹앱이 보냄)
-    listener_calls: str | None = None  # 대화하는 사람이 이 사람을 부르는 말(아빠 / 고모)
-    deceased: bool | None = None  # 돌아가셨으면 True
+    is_listener: bool | None = None  # 지금 페르소나와 대화하는 사람(웹앱 전송)
+    is_owner: bool | None = None  # 이 대화 상대를 만든 가족(가족 공유 시 웹앱 전송)
+    is_member: bool | None = None  # 가족 공유로 들어온 가족(듣는 사람 줄, 웹앱 전송)
+    listener_calls: str | None = None  # 대화하는 사람이 이 사람을 부르는 말(아빠, 고모)
+    deceased: bool | None = None
     note: str | None = None  # 가족이 적은 한 줄 메모
     source: str = "intake:M2-01"
 
 
 class Topic(BaseModel):
     topic: str
-    grade: str  # 자유 / 물으면만 / 짧게 넘김 / 금지
+    grade: str  # 자유, 물으면만, 짧게 넘김, 금지
     note: str | None = None
     source: str | None = None
 
@@ -88,7 +83,7 @@ class Style(BaseModel):
     sentence_endings: list[str] = Field(default_factory=list)
     call_open: str | None = None
     call_close: str | None = None  # 통화를 끝낼 때만 쓰는 말
-    words: list[str] = Field(default_factory=list)  # 실제로 쓰던 어휘·말버릇(인터뷰·전사 근거)
+    words: list[str] = Field(default_factory=list)  # 실제로 쓰던 어휘, 말버릇(인터뷰, 전사 근거)
     summary: str | None = None  # 전사 LLM 추출의 문장 특징 요약
     card: str | None = None  # 전사 통계 말투 카드(G3)
     quotes: list[Quote] = Field(default_factory=list)  # 설문에 적힌 실제 표현(C-09 등)
@@ -100,7 +95,7 @@ class PersonaSpec(BaseModel):
     name: str
     public: bool = False
     deceased: bool = False
-    # 만 19세 미만 살아 계신 대화 상대(BE basicProfile.minor). L1 안전 절에 미성년 규칙. 고인이면 False.
+    # 만 19세 미만 생존 대화 상대(BE basicProfile.minor): L1 안전 절 미성년 규칙, 사망이면 False
     minor: bool = False
     period: str | None = None
     family_calls_subject: str | None = (
@@ -117,7 +112,7 @@ class PersonaSpec(BaseModel):
     topics: list[Topic] = Field(default_factory=list)
     relations: list[Relation] = Field(default_factory=list)
     style: Style = Field(default_factory=Style)
-    materials: list[str] = Field(default_factory=list)  # 쓰인 재료: intake / transcript / interview
+    materials: list[str] = Field(default_factory=list)  # 쓰인 재료: intake, transcript, interview
     notes: list[str] = Field(default_factory=list)  # 생성기가 내린 판단 기록(사람 확인용)
 
     def add_material(self, kind: str) -> None:
@@ -125,7 +120,7 @@ class PersonaSpec(BaseModel):
             self.materials.append(kind)
 
     def relation_for(self, name: str) -> Relation | None:
-        """이름이 같거나 한쪽이 다른 쪽을 품으면(도윤 ↔ 이도윤) 같은 사람으로 본다."""
+        """이름이 같거나 한쪽이 다른 쪽을 포함하면 같은 사람 (도윤, 이도윤)"""
         name = name.strip()
         for r in self.relations:
             if r.name == name or (len(name) >= 2 and (name in r.name or r.name in name)):

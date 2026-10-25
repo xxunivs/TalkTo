@@ -1,4 +1,4 @@
-"""⑤ 생성 모델 어댑터. 모델 교체·스트리밍은 이 뒤에서 한다(스트리밍은 BE SSE 경로와 같이)."""
+"""⑤ 생성 모델 어댑터 (모델 교체, 스트리밍 지점)"""
 
 from __future__ import annotations
 
@@ -20,10 +20,10 @@ class OpenAIChatLLM:
         self.model = model or settings.openai_chat_model
 
     def generate(self, messages: list[dict[str, str]]) -> Generation:
-        # BE 가 45초에 끊으므로 대화용 시간 한도(기본 20초 × 2번)로 부른다
+        # BE 45초 한도 안에서 끝나도록 대화용 시간 한도 (기본 20초 x 2번)
         client = chat_client(self.settings, "persona response")
         t0 = time.perf_counter()
-        # 추론 정도: 기본값이면 답 전에 오래 생각해 느리다(infra/setting.py openai_chat_reasoning_effort)
+        # 추론 정도: 기본값은 답 전 사고가 길어 느림 (infra/setting.py openai_chat_reasoning_effort)
         effort = getattr(self.settings, "openai_chat_reasoning_effort", None)
         extra = {"reasoning_effort": effort} if effort else {}
         response = client.chat.completions.create(model=self.model, messages=messages, **extra)
@@ -41,7 +41,7 @@ class OpenAIChatLLM:
 
 
 class FakeLLM:
-    """API 없이 정해진 답. 테스트·CLI --mock 용."""
+    """API 없는 고정 답 (테스트, CLI --mock 용)"""
 
     impl = "fake"
 

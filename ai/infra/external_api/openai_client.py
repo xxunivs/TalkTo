@@ -1,14 +1,4 @@
-"""OpenAI 클라이언트 팩토리.
-
-파이프라인 서비스들이 같은 설정(api_key·timeout·retries)으로 클라이언트를
-만들도록 한곳에 둔다. 테스트에서 목킹할 때는 이 모듈의 OpenAI를 patch한다
-(`patch("infra.external_api.openai_client.OpenAI")`).
-
-시간 한도는 쓰는 곳마다 다르다.
-- chat_client: 대화 대답. BE 가 45초에 끊으므로 그 안에 끝나거나 포기한다.
-- analysis_client: 녹음 분석·통찰. 긴 녹음은 답 하나에 60초가 넘는다(BE 는 30분까지 기다린다).
-- create_openai_client: 그 밖(기본 OPENAI_TIMEOUT_SECONDS·OPENAI_MAX_RETRIES).
-"""
+"""OpenAI 클라이언트 팩토리 (용도별 시간 한도, 테스트는 이 모듈의 OpenAI 를 patch)"""
 
 import json
 
@@ -18,9 +8,8 @@ from openai import OpenAI
 from infra.error import AnalysisBadOutputError, AnalysisTooLongError
 from infra.setting import Settings
 
-# 같은 설정이면 클라이언트(연결 묶음)를 다시 쓴다. 매번 새로 만들면 요청마다 OpenAI 와 새로
-# 연결(TLS)을 맺어 1턴이 0.3~2초 더 걸렸다(2026-10-13 측정). 키는 OpenAI 클래스까지 넣어,
-# 테스트가 이 모듈의 OpenAI 를 patch 하면 새 클라이언트를 만든다.
+# 같은 설정이면 클라이언트 재사용 (매번 새 TLS 연결 시 1턴 0.3~2초 증가, 2026-10-13 측정)
+# 키에 OpenAI 클래스 포함: 테스트 patch 시 새 클라이언트 생성
 _clients: dict[tuple, OpenAI] = {}
 
 
@@ -54,7 +43,7 @@ def create_openai_client(
 
 
 def chat_client(settings: Settings, purpose: str = "") -> OpenAI:
-    """대화 대답용. 시간 한도 × (다시 하기 + 1) 이 BE 의 45초보다 짧다(기본 20초 × 2번)."""
+    """대화 대답용 클라이언트 (시간 한도 x (재시도 + 1) < BE 45초, 기본 20초 x 2)"""
     return create_openai_client(
         settings,
         purpose,
@@ -64,7 +53,7 @@ def chat_client(settings: Settings, purpose: str = "") -> OpenAI:
 
 
 def analysis_client(settings: Settings, purpose: str = "") -> OpenAI:
-    """녹음 분석·통찰용. 긴 녹음의 답 하나가 기본 60초를 넘겨 매번 실패하던 것을 막는다(기본 300초)."""
+    """녹음 분석, 통찰용 클라이언트 (긴 녹음은 답 하나에 60초 초과, 기본 300초)"""
     return create_openai_client(
         settings,
         purpose,
@@ -74,10 +63,7 @@ def analysis_client(settings: Settings, purpose: str = "") -> OpenAI:
 
 
 def analysis_completion(client: OpenAI, stage: str, **kwargs):
-    """분석 호출 한 번. 시간 안에 못 끝나면 코드가 있는 오류(ANALYSIS_TOO_LONG, 422)로 바꾼다.
-
-    같은 녹음은 다시 해도 같은 결과라, 이름 없는 500 으로 BE 가 같은 일을 되풀이하지 않게 한다.
-    """
+    """분석 호출 1회 (시간 초과 -> ANALYSIS_TOO_LONG 422, BE 의 무의미한 재시도 방지)"""
     try:
         return client.chat.completions.create(**kwargs)
     except openai.APITimeoutError as error:
@@ -85,7 +71,7 @@ def analysis_completion(client: OpenAI, stage: str, **kwargs):
 
 
 def json_reply(response, stage: str) -> dict:
-    """분석 답(JSON 한 덩어리)을 읽는다. 길이 한도에서 잘렸거나 JSON 이 아니면 코드가 있는 오류로."""
+    """분석 답 JSON 파싱 (길이 잘림 -> TOO_LONG, 형식 위반 -> BAD_OUTPUT)"""
     choice = response.choices[0]
     if getattr(choice, "finish_reason", None) == "length":
         raise AnalysisTooLongError(stage)

@@ -1,8 +1,4 @@
-"""Download recording audio from a backend-issued presigned URL.
-
-Error messages must never include the URL itself — presigned query strings
-carry credentials and the same rule applies to logs.
-"""
+"""presigned URL -> 녹음 임시 파일 (오류 메시지, 로그에 URL 금지: 쿼리에 자격 증명 포함)"""
 
 import tempfile
 from pathlib import Path
@@ -65,9 +61,9 @@ def download_audio(
                 raise AudioDownloadFailedError("storage returned an empty body")
         except httpx.HTTPError as error:
             raise AudioDownloadFailedError(type(error).__name__) from error
-        target.close()  # 마지막 버퍼를 쓰다 디스크가 차도 아래에서 지운다
+        target.close()  # 마지막 버퍼 기록 중 디스크 부족도 아래에서 삭제
     except BaseException:
-        # 어떤 실패든(디스크·중단 포함) 받다 만 임시 파일을 남기지 않는다
+        # 모든 실패(디스크, 중단 포함)에서 받다 만 임시 파일 삭제
         target.close()
         path.unlink(missing_ok=True)
         raise

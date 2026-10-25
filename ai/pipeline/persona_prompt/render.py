@@ -1,12 +1,4 @@
-"""페르소나 명세 → 프롬프트. 템플릿만 쓰고 LLM 은 부르지 않는다.
-
-층과 모듈 순서는 `prompts/layers.json` 이 정한다(layers.py). 이 파일은 모듈 하나하나의 글을 만든다.
-    L1 공통 규칙       prompts/rules 의 layered 세트(사망 정책 변형 포함)
-    L2 개인 정보·정책  정체, 기본 정보, 성격·가치관, 상황별 반응, 주제 등급
-    L3 관계·호칭       비공개: 가족 표 / 공개: 방문자 안내
-    L4 개인 말투       말투 서술, 말투 카드, 실제로 하던 말, 실제 주고받기
-기억은 넣지 않는다. 기억 블록은 대화할 때 따로 붙는다.
-"""
+"""페르소나 명세 -> 정적 모듈별 프롬프트 글 (템플릿만, 순서는 prompts/layers.json, 기억 미포함)"""
 
 from __future__ import annotations
 
@@ -16,7 +8,7 @@ from pipeline.persona_prompt.layers import ShotsMode, static_modules
 from pipeline.persona_prompt.spec import PersonaSpec, Relation
 from pipeline.s3_synthesis.common_rules import family_guide, render_rules
 
-# 주제 등급 → 지시. 금지 문구는 상대에 따라 다르다(가족 / 공개 방문자).
+# 주제 등급 -> 지시 (금지 문구는 가족, 공개 방문자별)
 GRADE_TEXT = {
     "금지": (
         '**말하지 않는다.** 물어도 내용을 말하지 말고 "그런 얘기는 하지 말자" 하고 화제를 돌린다',
@@ -30,7 +22,7 @@ ORDER = ("금지", "짧게 넘김", "물으면만", "자유")
 
 
 def particle(name: str, with_batchim: str, without: str) -> str:
-    """이름 끝 글자의 받침에 맞는 조사(이/가 등)."""
+    """이름 끝 받침에 맞는 조사 (이/가 등)"""
     if not name or not ("가" <= name[-1] <= "힣"):
         return without
     return with_batchim if (ord(name[-1]) - 0xAC00) % 28 else without
@@ -50,16 +42,14 @@ def _block(*lines: str | None) -> str:
 
 
 def relation_head(r: Relation) -> str:
-    """가족 표 한 줄의 머리. 이름 칸에 관계말만 있으면(이름을 모르는 며느리 등) 관계말 하나만 쓴다."""
+    """가족 표 한 줄 머리 (이름 칸이 관계말뿐이면 하나만)"""
     if not r.relation or r.relation == r.name:
         return r.name
     return f"{r.name} ({r.relation})"
 
 
 def relation_bits(r: Relation, *, listener_view: bool = True) -> list[str]:
-    """가족 표 한 줄의 칸들. listener_view=False 면 대화하는 사람 기준 칸(지금 대화하는 사람·사용자는 …라고
-    부름)을 뺀다 — 런타임 '지금 상대' 줄처럼 말하는 사람이 따로 정해질 때.
-    is_owner(가족 공유: 함께 쓰는 가족의 조립본에만 오는 주인 줄)는 그 줄 첫 칸에 '이 대화 상대를 만든 가족'."""
+    """가족 표 한 줄 칸들 (listener_view=False: 대화하는 사람 기준 칸 제외, 런타임 지금 상대 줄용)"""
     bits = []
     if r.is_listener and listener_view:
         bits.append("지금 대화하는 사람")
@@ -129,7 +119,7 @@ def opening(spec: PersonaSpec) -> str:
 
 
 def _listener(spec: PersonaSpec) -> Relation | None:
-    """가족 표에서 지금 대화하는 사람(웹앱 isListener). 공개 페르소나에는 없다."""
+    """가족 표의 지금 대화하는 사람 (웹앱 isListener, 공개 페르소나는 None)"""
     if spec.public:
         return None
     return next((r for r in spec.relations if r.is_listener), None)
@@ -194,7 +184,7 @@ def topics(spec: PersonaSpec) -> str:
     for g in ORDER:
         if g in grouped:
             lines.append(f"- {GRADE_TEXT[g][idx]}: {', '.join(grouped.pop(g))}")
-    for g, items in grouped.items():  # 알 수 없는 등급도 버리지 않고 그대로 보인다
+    for g, items in grouped.items():  # 알 수 없는 등급도 그대로 표시
         lines.append(f"- [{g}]: {', '.join(items)}")
     return "\n".join(lines)
 
@@ -215,7 +205,7 @@ def family_table(spec: PersonaSpec) -> str:
     for r in spec.relations:
         bits = relation_bits(r)
         rows.append(f"- {relation_head(r)}" + (": " + " / ".join(bits) if bits else ""))
-    guide = family_guide(spec.relations)  # 대화하는 사람·돌아가신 분이 표에 있을 때만
+    guide = family_guide(spec.relations)  # 대화하는 사람, 돌아가신 분이 표에 있을 때만
     return FAMILY_HEAD + "\n" + (guide + "\n" if guide else "") + "\n".join(rows)
 
 
@@ -307,19 +297,14 @@ def render_layered_prompt(
     shots_mode: ShotsMode = "system",
     drop: Iterable[str] = (),
 ) -> str:
-    """정적 층(L1~L4)을 한 글로.
-
-    include_common=False  L1 을 뺀다(중간계층이 공통 규칙을 따로 붙일 때).
-    shots_mode="messages" 주고받기를 글에서 빼고, shot_messages() 로 대화 메시지가 되게 한다.
-    drop                  뺄 모듈 이름(비교 실험용).
-    """
+    """정적 층(L1~L4) 한 글로 (include_common=False: L1 제외, shots_mode="messages": 주고받기 제외)"""
     skip = set(drop) | (set() if include_common else {"common_rules"})
     parts = [MODULES[m](spec) for m in static_modules(spec, shots_mode=shots_mode) if m not in skip]
     return "\n\n".join(p for p in parts if p.strip())
 
 
 def shot_messages(spec: PersonaSpec) -> list[dict[str, str]]:
-    """실제 주고받기를 앞선 대화(user/assistant 메시지) 모양으로. shots_mode="messages" 와 같이 쓴다."""
+    """실제 주고받기 -> 앞선 user/assistant 메시지 (shots_mode="messages" 와 함께)"""
     out: list[dict[str, str]] = []
     for sh in spec.style.shots:
         out += [{"role": "user", "content": sh.user}, {"role": "assistant", "content": sh.persona}]

@@ -1,10 +1,4 @@
-"""Glossary-based transcript correction pass.
-
-Fixes proper nouns the STT misheard (e.g. "연아" → "윤아") using the family
-glossary. Corrections never touch meaning: only glossary terms are corrected,
-originals stay untouched, and uncertain cases are flagged needs_review instead
-of edited.
-"""
+"""용어집 기반 전사 교정 (고유명사만, 원문 보존, 애매하면 needs_review)"""
 
 import json
 import logging
@@ -20,7 +14,7 @@ from infra.setting import Settings
 logger = logging.getLogger(__name__)
 
 CHUNK_SIZE = 80
-# a name fix barely changes length; big deltas mean the model rewrote content
+# 이름 교정은 길이가 거의 그대로 (크게 달라지면 내용을 다시 쓴 것)
 _LENGTH_RATIO_BOUNDS = (0.5, 1.5)
 
 _CHOSEONG = "ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ"
@@ -51,7 +45,7 @@ def correct_segments(
     glossary: list[str],
     settings: Settings,
 ) -> list[TranscriptSegment]:
-    """Return segments with corrected_text/needs_review filled in place."""
+    """세그먼트 corrected_text, needs_review 채움 (제자리 수정)"""
     if not glossary or not segments:
         return segments
     if settings.openai_api_key is None:
@@ -64,7 +58,7 @@ def correct_segments(
         try:
             _correct_chunk(client, chunk, glossary=glossary, settings=settings)
         except Exception:
-            # 보정은 부가 패스 — 실패해도 전사 자체는 원문으로 진행한다
+            # 부가 패스라 실패해도 원문으로 진행
             logger.exception(
                 "correction pass failed for segments %s-%s; returning originals",
                 chunk[0].segment_index,
@@ -128,7 +122,7 @@ def apply_corrections(
 
 
 def _phonetically_plausible(original: str, corrected: str, max_jamo_ratio: float) -> bool:
-    """모든 교체 단어 쌍이 발음(자모) 수준에서 유사할 때만 True."""
+    """모든 교체 단어 쌍의 자모 유사 여부"""
     original_tokens = original.split()
     corrected_tokens = corrected.split()
     if len(original_tokens) != len(corrected_tokens):
@@ -169,14 +163,10 @@ def _edit_distance(left: str, right: str) -> int:
     return previous[-1]
 
 
-# ===== 용어집 파생 (교정·화자식별 재료) =====
-# 용어의 원천은 사용자가 앱에 입력한 데이터(프로필, 가족 구성원, 가족 용어집,
-# Intake 이름 리스트). 이 함수들은 그 구조화 데이터를 평평한 단어 목록으로
-# 조합만 한다. 특정 가족에 대한 하드코딩은 없다.
+# 용어집 파생: 앱 입력 데이터(프로필, 가족 구성원, 용어집, Intake 이름) -> 평평한 단어 목록 (가족별 하드코딩 없음)
 
 _TRIM = ".,?!~… "
-# 성+이름 형태의 한글 실명 (2~4자) — 성을 뗀 이름만으로 부르는 게 일반적이라
-# 호칭 보정에는 이름 변형도 필요하다 (이정우 → 정우, 남윤 → 윤)
+# 성+이름 한글 실명 2~4자 (성을 뗀 이름으로 부르는 경우가 많아 이름 변형도 추가, 이정우 -> 정우)
 _KOREAN_FULL_NAME = re.compile(r"^[가-힣]{2,4}$")
 
 
@@ -186,7 +176,7 @@ def _has_batchim(char: str) -> bool:
 
 
 def _vocative(name: str) -> str:
-    """이름을 부르는 형태 (한국어 호격: 받침 있으면 '아', 없으면 '야')."""
+    """호격형 이름 (받침 있으면 '아', 없으면 '야')"""
     return name + ("아" if _has_batchim(name[-1]) else "야")
 
 

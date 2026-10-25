@@ -1,16 +1,4 @@
-"""Fish Audio 목소리 provider: 녹음으로 목소리 만들기(즉시 복제) + 그 목소리로 합성 + 지우기.
-
-    만들기  POST   /model        multipart: type=tts, title, train_mode=fast, visibility=private, voices=<wav>
-    상태    GET    /model/{id}   state: created → trained (또는 failed)
-    합성    POST   /v1/tts       헤더 model: drama-3
-    지우기  DELETE /model/{id}
-
-우리 voice_id 는 "fish_" + Fish 모델 _id 다. 합성·지우기는 이 앞글자로 Fish 목소리인지 알아보고, Fish 에
-보낼 때는 앞글자를 뗀다(ElevenLabs voice_id 는 영숫자 20자, MiniMax 는 "TalkTo…" 라 겹치지 않는다).
-
-train_mode=fast 는 만들자마자 쓸 수 있어 201 응답이 대개 이미 trained 다. 아니면 잠깐 상태를 물어본다.
-(docs.fish.audio · 2026-10-17 확인)
-"""
+"""Fish Audio 목소리 제공사: 즉시 복제, drama-3 합성, 삭제 (voice_id = "fish_" + 모델 _id)"""
 
 import logging
 import mimetypes
@@ -35,23 +23,21 @@ from infra.external_api.tts.elevenlabs import TTSResult
 logger = logging.getLogger(__name__)
 
 FISH_BASE = "https://api.fish.audio"
-# 합성 모델. 헤더가 빠지거나 값이 틀리면 Fish 가 아무 말 없이 s2.1-pro 로 합성한다.
-# 그래서 환경 변수로 열지 않고 여기 하나만 둔다(테스트가 정확한 값을 확인한다).
+# 합성 모델 고정 (헤더 누락, 오타 시 경고 없이 s2.1-pro 로 합성, 테스트가 값 확인)
 MODEL = "drama-3"
 VOICE_ID_PREFIX = "fish_"
-# 합성 한 번(다시 하기 포함)의 전체 시간. BE 의 AI 서버 호출 제한(45초)보다 짧게. BE 가 먼저 끊으면
-# 합성 값만 나가고 소리는 버려진다. httpx 의 timeout 은 연결·읽기 같은 단계마다 따로 걸려(읽기는
-# 조각 사이마다) 전체를 묶지 못하므로, 합성은 소리를 조각으로 받으며 이 마감을 직접 본다(_speak).
+# 합성 1회 전체 마감 (재시도 포함, BE 45초 한도보다 짧게)
+# httpx timeout 은 단계별이라 전체를 묶지 못해 _speak 에서 조각마다 직접 확인
 _TIMEOUT_SECONDS = 40.0
 _CONNECT_SECONDS = 5.0
-_CLONE_TIMEOUT_SECONDS = 120.0  # 1분 안팎 wav(약 5MB)를 올린다
-# 합성만 한 번 더 해 본다. 목소리 만들기는 다시 보내면 목소리가 두 개 생긴다.
+_CLONE_TIMEOUT_SECONDS = 120.0  # 1분 안팎 wav (약 5MB) 업로드
+# 합성만 1회 재시도 (목소리 생성 재전송 시 목소리 중복 생성)
 _RETRY_STATUS = frozenset({429, 503})
 _RETRY_PAUSE_SECONDS = 1.0
-_RETRY_MIN_LEFT_SECONDS = 10.0  # 남은 시간이 이보다 적으면 다시 해 봐야 마감 안에 끝나기 어렵다
+_RETRY_MIN_LEFT_SECONDS = 10.0  # 남은 시간이 이보다 적으면 재시도 생략
 _POLL_TRIES = 15
 _POLL_SECONDS = 2.0
-_POLL_TIMEOUT_SECONDS = 10.0  # 상태 묻기 한 번. 막혀도 기다림 전체가 길어지지 않게
+_POLL_TIMEOUT_SECONDS = 10.0  # 상태 조회 1회 한도 (전체 대기 시간 보호)
 _CODES = {
     401: VOICE_PROVIDER_KEY,
     403: VOICE_PROVIDER_KEY,
@@ -60,16 +46,14 @@ _CODES = {
 }
 _MODEL_ID = re.compile(r"[A-Za-z0-9_-]{1,128}")
 
-# drama-3 는 [ ] 안 글을 연기 지시·효과음으로, <whisper> 같은 꺾쇠 표시를 말투 지시로, <|speaker:0|> 를
-# 화자 바꿈으로 읽는다. 대답에 섞여 나온 표시는 지운다. 남기는 것은 아래 두 목록의 한국어 연기 표시뿐이다
-# (FISH_EMOTION=cue·inline 일 때. off 면 지금처럼 다 지운다).
+# drama-3 가 지시로 읽는 [ ], < >, <|speaker|> 표시 제거
+# 예외: 아래 두 목록의 한국어 연기 표시 (FISH_EMOTION=cue, inline 일 때만)
 _SPEAKER_TAG = re.compile(r"<\|[^|<>\n]*\|>")
 _ANGLE_TAG = re.compile(r"<[^<>\n]{0,40}>")
 _SQUARE = re.compile(r"\[[^\[\]\n]*\]")
 
-# FISH_EMOTION=cue: 대답 LLM 이 고른 감정 이름 → 대답 맨 앞에 붙이는 연기 표시. 표시는 대본 언어(한국어)로 쓴다.
-# 고치기 쉽게 여기 한 곳에만 둔다. neutral 은 붙이지 않는다(글을 보고 drama-3 가 정한다).
-# 고인 페르소나는 sad 가 calm 으로 바뀌어 온다(pipeline/s4_voice/b_emotion.py). 우는 소리 표시는 두지 않는다.
+# FISH_EMOTION=cue: 감정 이름 -> 대답 맨 앞 한국어 연기 표시 (neutral 은 drama-3 자체 판단)
+# 대상자 페르소나는 sad 가 calm 으로 변환 (pipeline/s4_voice/b_emotion.py), 우는 소리 표시 없음
 FISH_CUES: dict[str, str | None] = {
     "neutral": None,
     "calm": "[차분하게]",
@@ -79,8 +63,7 @@ FISH_CUES: dict[str, str | None] = {
     "surprised": "[깜짝 놀라며]",
     "worried": "[걱정스럽게]",
 }
-# FISH_EMOTION=inline: 대답 LLM 이 대답 안에 쓸 수 있는 연기 표시. 여기 없는 표시는 떼어 버린다.
-# 울음·흐느낌 표시는 일부러 두지 않는다(고인 페르소나 안전선).
+# FISH_EMOTION=inline: 대답 안 허용 연기 표시 (그 외 제거, 울음, 흐느낌은 안전선으로 제외)
 FISH_INLINE_CUES: tuple[str, ...] = (
     "[웃으며]",
     "[작게 웃으며]",
@@ -93,12 +76,12 @@ FISH_INLINE_CUES: tuple[str, ...] = (
     "[작게]",
     "[잠깐 멈췄다가]",
 )
-# fish_plain_text 가 남기는 표시(두 방식의 표시 전부)
+# fish_plain_text 가 남기는 표시 (두 방식 합집합)
 _KEPT_CUES = frozenset(FISH_INLINE_CUES) | {cue for cue in FISH_CUES.values() if cue}
 
 
 def cue_key(raw: str) -> str:
-    """ "[ 작게  웃으며 ]" → "[작게 웃으며]". 대괄호 안 띄어쓰기만 고른다."""
+    """연기 표시 대괄호 안 띄어쓰기 정규화"""
     return "[" + " ".join(raw[1:-1].split()) + "]"
 
 
@@ -107,12 +90,12 @@ def is_fish_voice(voice_id: str) -> bool:
 
 
 def fish_model_id(voice_id: str) -> str:
-    """우리 voice_id → Fish 모델 _id(앞글자를 뗀다). 앞글자가 없으면 그대로."""
+    """voice_id -> Fish 모델 _id (접두어 제거)"""
     return voice_id.removeprefix(VOICE_ID_PREFIX)
 
 
 def strip_fish_cues(text: str) -> str:
-    """Fish 연기 표시만 지운다. Fish 가 아닌 목소리(MiniMax·ElevenLabs)는 이 표시를 소리 내어 읽을 수 있다."""
+    """Fish 연기 표시 제거 (MiniMax, ElevenLabs 는 표시를 소리 내어 읽음)"""
     found = False
 
     def square(m: re.Match) -> str:
@@ -123,15 +106,11 @@ def strip_fish_cues(text: str) -> str:
         return m.group(0)
 
     clean = _SQUARE.sub(square, text)
-    return _tidy(clean) if found else text  # 표시가 없으면 글을 건드리지 않는다
+    return _tidy(clean) if found else text  # 표시가 없으면 원문 그대로
 
 
 def fish_plain_text(text: str, *, keep_cues: bool = True) -> str:
-    """drama-3 에 보낼 글: 지시로 읽히는 [ ]·< >·<| |> 표시를 지운다. 다 지워지면 원래 글을 보낸다.
-
-    keep_cues 면 정해 둔 한국어 연기 표시(FISH_INLINE_CUES·FISH_CUES)는 남긴다(FISH_EMOTION=cue·inline).
-    감정 표시([감정:sad], (감정: 슬픔) 등)는 부르는 쪽(synthesize_speech)이 strip_emotion_tags 로 먼저 지운다.
-    """
+    """drama-3 전송용 글 (지시 표시 제거, keep_cues 면 정해 둔 연기 표시 유지, 전부 지워지면 원문)"""
 
     def square(m: re.Match) -> str:
         key = cue_key(m.group(0))
@@ -142,14 +121,14 @@ def fish_plain_text(text: str, *, keep_cues: bool = True) -> str:
 
 
 def _tidy(clean: str) -> str:
-    """표시를 지운 자리의 띄어쓰기를 고른다."""
+    """표시 제거 자리 띄어쓰기 정리"""
     clean = re.sub(r"[ \t]+([.,!?…])", r"\1", clean)
     clean = re.sub(r"[ \t]{2,}", " ", clean)
     return "\n".join(line.strip() for line in clean.splitlines()).strip()
 
 
 def _fail(response: httpx.Response, what: str) -> AppError:
-    """Fish 오류 응답 → 코드가 있는 503(키·잔액·한도·장애) 또는 그 밖의 502."""
+    """Fish 오류 응답 -> 코드 있는 503 (키, 잔액, 한도, 장애) 또는 502"""
     status = response.status_code
     code = _CODES.get(status) or (VOICE_PROVIDER_UNAVAILABLE if status >= 500 else None)
     if code:
@@ -161,15 +140,14 @@ def _fail(response: httpx.Response, what: str) -> AppError:
 
 
 def _unavailable(what: str, error: httpx.HTTPError) -> VoiceProviderError:
-    """시간 초과·연결 실패 → VOICE_PROVIDER_UNAVAILABLE."""
+    """시간 초과, 연결 실패 -> VOICE_PROVIDER_UNAVAILABLE"""
     return VoiceProviderError(
         VOICE_PROVIDER_UNAVAILABLE, f"Fish Audio {what} 요청 실패({type(error).__name__})"
     )
 
 
 def _path_id(voice_id: str) -> str:
-    """Fish 에 보낼 모델 id. Fish id 는 영숫자라 그 밖의 글자가 있거나 비었으면 보내지 않는다
-    (비운 reference_id 로 합성하면 엉뚱한 목소리가 나온다)."""
+    """Fish 전송용 모델 id 검증 (빈 reference_id 합성 시 엉뚱한 목소리)"""
     model_id = fish_model_id(voice_id)
     if not _MODEL_ID.fullmatch(model_id):
         raise TTSProviderError("Fish Audio 목소리 id 형식이 아니다.")
@@ -189,9 +167,9 @@ class FishAudioTTSProvider:
         clone_timeout_seconds: float = _CLONE_TIMEOUT_SECONDS,
     ) -> None:
         self.api_key = api_key
-        # FISH_EMOTION. off 면 지금처럼 표시를 다 지우고 감정을 쓰지 않는다(켰다 끄면 저장된 표시도 바로 안 읽는다).
+        # FISH_EMOTION (off 면 표시 전부 제거, 저장된 표시도 즉시 무시)
         self.emotion_mode = emotion_mode
-        # 기쁜 대답만 표현 흔들림을 낮춘다(FISH_HAPPY_TEMPERATURE). None·0 이하면 Fish 기본값 그대로
+        # 기쁜 대답 전용 temperature (FISH_HAPPY_TEMPERATURE, None 또는 0 이하면 Fish 기본값)
         self.happy_temperature = (
             happy_temperature if happy_temperature and happy_temperature > 0 else None
         )
@@ -216,16 +194,11 @@ class FishAudioTTSProvider:
                 timeout=timeout,
                 **kwargs,
             )
-        except httpx.HTTPError as error:  # 시간 초과·연결 실패
+        except httpx.HTTPError as error:  # 시간 초과, 연결 실패
             raise _unavailable(what, error) from error
 
     def _speak(self, body: dict, deadline: float) -> tuple[httpx.Response, bytes]:
-        """합성 요청 한 번. 소리를 조각으로 받다가 deadline(time.monotonic 기준)을 넘기면 끊는다.
-
-        천천히 이어지는 응답도 마감 안에서 끝난다. 다만 조각 사이에서 아예 멈추면 그 한 번은
-        읽기 제한(요청을 보낼 때 남은 시간)까지 기다린다. httpx 로는 읽는 중에 그 제한을
-        줄일 수 없다.
-        """
+        """합성 요청 1회 (조각 수신 중 deadline 초과 시 중단, 조각 사이 정지는 읽기 제한까지 대기)"""
         left = max(deadline - time.monotonic(), 0.1)
         try:
             with httpx.stream(
@@ -236,7 +209,7 @@ class FishAudioTTSProvider:
                 timeout=httpx.Timeout(left, connect=min(_CONNECT_SECONDS, left)),
             ) as response:
                 if response.status_code != 200:
-                    response.read()  # 짧은 오류 JSON(로그·코드용)
+                    response.read()  # 짧은 오류 JSON (로그, 코드용)
                     return response, b""
                 audio = bytearray()
                 for chunk in response.iter_bytes():
@@ -261,9 +234,8 @@ class FishAudioTTSProvider:
         style: float = 0.0,
         emotion: str | None = None,
     ) -> TTSResult:
-        # speed·stability·similarity_boost·style 은 ElevenLabs 값이라 쓰지 않는다.
-        # drama-3 에는 감정 값을 따로 보내지 않는다. FISH_EMOTION=cue 면 감정 이름을 한국어 연기 표시로 바꿔
-        # 글 맨 앞에 붙이고(FISH_CUES), cue·inline 이면 글 안의 정해진 연기 표시를 남긴다.
+        # speed, stability, similarity_boost, style 은 ElevenLabs 전용이라 미사용
+        # 감정은 연기 표시로만 전달 (cue: 맨 앞 FISH_CUES, cue 와 inline: 글 안 정해진 표시 유지)
         spoken = fish_plain_text(text, keep_cues=self.emotion_mode != "off")
         cue = FISH_CUES.get(emotion or "") if self.emotion_mode == "cue" else None
         if cue:
@@ -276,10 +248,10 @@ class FishAudioTTSProvider:
             "mp3_bitrate": 128,
             "latency": "normal",
         }
-        # [반갑게 웃으며]는 음이 너무 높게 연기될 때가 있어 기쁜 대답만 차분하게 읽힌다(표시는 그대로)
+        # [반갑게 웃으며] 의 높은 음 완화용 temperature (표시는 유지)
         if cue and emotion == "happy" and self.happy_temperature is not None:
             body["temperature"] = self.happy_temperature
-        deadline = time.monotonic() + self.timeout_seconds  # 다시 하기까지 이 안에서 끝낸다
+        deadline = time.monotonic() + self.timeout_seconds  # 재시도 포함 마감
         response, audio = self._speak(body, deadline)
         if response.status_code in _RETRY_STATUS:
             left = deadline - time.monotonic() - _RETRY_PAUSE_SECONDS
@@ -299,20 +271,16 @@ class FishAudioTTSProvider:
         )
 
     def clone_voice(self, name: str, audio_path: Path) -> str:
-        """녹음(1분 안팎 wav 하나)으로 목소리를 만들고 우리 voice_id("fish_" + _id)를 돌려준다.
-
-        다시 만들 때는 새 목소리를 먼저 만들고 옛 목소리를 지운다. 그 사이 제목이 겹치지 않게 짧은 꼬리를
-        붙인다. name 은 로그에 남기지 않는다. 실패해도 다시 보내지 않는다(목소리가 두 번 만들어진다).
-        """
+        """wav 녹음 -> 목소리 생성 -> voice_id (제목 중복 방지 꼬리, name 로그 금지, 중복 생성 방지로 재전송 없음)"""
         data = {
             "type": "tts",
             "title": f"{name}_{uuid.uuid4().hex[:6]}",
             "train_mode": "fast",
             "visibility": "private",
-            # 잡음 제거·크기 맞춤. 문서 기본값(true) 그대로지만, 기본값이 바뀌어도 흔들리지 않게 적어 둔다.
+            # 잡음 제거, 크기 맞춤 (문서 기본값 true 지만 기본값 변경 대비 명시)
             "enhance_audio_quality": "true",
         }
-        # texts 는 보내지 않는다(Fish 가 받아쓴다. 청취 비교도 그렇게 만들었다).
+        # texts 미전송 (Fish 자체 받아쓰기, 청취 비교와 동일 조건)
         content_type = mimetypes.guess_type(audio_path.name)[0] or "application/octet-stream"
         with audio_path.open("rb") as audio_file:
             response = self._send(
@@ -345,7 +313,7 @@ class FishAudioTTSProvider:
         return voice_id
 
     def _wait_trained(self, voice_id: str, state: object) -> object:
-        """trained·failed 가 될 때까지 잠깐(약 30초) 묻는다. 그래도 아니면 마지막 상태를 돌려준다."""
+        """trained, failed 까지 상태 조회 (약 30초, 이후 마지막 상태 반환)"""
         tries = 0
         while state not in ("trained", "failed") and tries < _POLL_TRIES:
             tries += 1
@@ -360,18 +328,18 @@ class FishAudioTTSProvider:
                 if response.status_code == 200:
                     state = (response.json() or {}).get("state")
             except (VoiceProviderError, ValueError, AttributeError):
-                continue  # 잠깐 막힌 것이면 다음에 다시 묻는다
+                continue  # 일시 장애면 다음 조회
         return state
 
     def _discard(self, voice_id: str) -> None:
-        """쓰지 못할 목소리를 지운다(녹음이 Fish 에 남지 않게). 실패해도 기록만 남긴다."""
+        """실패한 목소리 삭제 (녹음이 Fish 에 남지 않게, 실패 시 로그만)"""
         try:
             self.delete_voice(voice_id)
         except AppError as error:
             logger.warning("fish voice cleanup failed voice_id=%s code=%s", voice_id, error.code)
 
     def delete_voice(self, voice_id: str) -> None:
-        """Fish 에서 목소리를 지운다(대화 상대를 지울 때·목소리를 다시 만들 때). 이미 없으면 넘어간다."""
+        """Fish 목소리 삭제 (404 는 통과)"""
         response = self._send(
             "DELETE", f"/model/{_path_id(voice_id)}", "목소리 지우기", timeout=self.timeout_seconds
         )

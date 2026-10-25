@@ -2,8 +2,7 @@
 
 import logging
 
-# 바깥 라이브러리 로그는 경고부터만 남긴다. httpx 는 INFO 에 요청 주소 전체(서명된 S3 주소)를,
-# openai 는 DEBUG 에 요청 본문(대화·기억 원문)을 남긴다.
+# 외부 라이브러리 로그는 WARNING 이상만 (httpx INFO 에 서명된 S3 주소, openai DEBUG 에 대화, 기억 원문)
 _QUIET_LOGGERS = ("httpx", "httpx2", "httpcore", "openai")
 
 

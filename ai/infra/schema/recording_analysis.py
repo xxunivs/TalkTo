@@ -1,10 +1,4 @@
-"""녹음 분석 통합 엔드포인트 계약 — 한 번의 호출로 3-A 기억 + 요약 + 태그 +
-말투(④) + 안전플래그를 반환한다.
-
-인물·민감·3-A·요약·④를 각각 별도 호출하면 공통 분석(인물·민감·3-A)이 중복되므로,
-녹음 1건을 한 번에 분석하는 단일 계약으로 묶는다. reflection 산출(personaMaterials)은
-녹음 여러 건 누적이 필요해 이 응답에 포함하지 않는다.
-"""
+"""녹음 분석 통합 계약 (기억, 요약, 태그, 말투, 안전 플래그 한 번에, 공통 분석 중복 방지)"""
 
 from typing import Literal
 from uuid import UUID
@@ -21,10 +15,9 @@ class RecordingAnalysisRequest(ApiModel):
     recording_id: UUID
     transcript_segments: list[PersistedTranscriptSegment] = Field(min_length=1)
     subject_context: SubjectContext | None = None
-    # 대상자 화자 라벨(ECAPA 성문으로 확정된 값). 미지정 시 전사문 호칭·맥락 LLM 폴백으로
-    # 판정하고, 그래도 못 정하면 미확정(None)으로 진행한다.
+    # 대상자 화자 라벨 (ECAPA 확정값, 없으면 LLM 호칭, 맥락 폴백 -> None)
     subject_speaker_label: str | None = Field(default=None, max_length=120)
-    # 통화 상대 이름(업로드 시 선택). 있으면 대상자 아닌 화자를 이 이름으로 확정 귀속.
+    # 통화 상대 이름 (선택, 대상자 아닌 화자를 이 이름으로 귀속)
     conversation_partner_name: str | None = Field(default=None, max_length=120)
 
 
@@ -69,29 +62,26 @@ class RecordingAnalysisResponse(ApiModel):
 
 
 class SubjectSpeakerRequest(ApiModel):
-    """녹음 1건에서 누가 대상자인지 전사문 호칭·맥락으로 추천받는다.
-
-    참조 목소리(ECAPA)가 없을 때 화자 고르기 화면에 미리 골라 둘 값이다. 확정은 사람이 한다.
-    """
+    """전사문 호칭, 맥락 기반 대상자 화자 추천 요청 (ECAPA 참조 없을 때 화면 기본값, 확정은 사용자)"""
 
     transcript_segments: list[PersistedTranscriptSegment] = Field(min_length=1)
     subject_context: SubjectContext | None = None
 
 
 class SubjectSpeakerResponse(ApiModel):
-    # 등장한 화자 라벨 중 하나. 근거가 없으면 null.
+    # 등장 화자 라벨 중 하나 (근거 없으면 null)
     subject_speaker_label: str | None = None
 
 
 class VoiceGroupRecording(ApiModel):
     recording_id: str = Field(min_length=1, max_length=100)
-    # 녹음 오디오(presigned URL). 화자별 목소리 지문을 만들려고 내려받는다.
+    # 녹음 오디오 presigned URL (화자별 목소리 지문용)
     audio_url: HttpUrl
     transcript_segments: list[PersistedTranscriptSegment] = Field(min_length=1)
 
 
 class VoiceGroupRequest(ApiModel):
-    """녹음 여러 개에 걸쳐 같은 사람의 목소리를 하나로 묶어 달라는 요청."""
+    """녹음 여러 개의 같은 사람 목소리 묶음 요청"""
 
     recordings: list[VoiceGroupRecording] = Field(min_length=1, max_length=50)
 
@@ -109,7 +99,7 @@ class VoiceGroup(ApiModel):
 
 
 class VoiceGroupResponse(ApiModel):
-    # 말한 시간이 긴 순서
+    # 말한 시간 내림차순
     groups: list[VoiceGroup]
-    # ecapa = 목소리 지문으로 녹음 사이를 묶음 / per_recording = 지문을 못 써서 녹음별로만
+    # ecapa = 지문으로 녹음 간 묶음, per_recording = 지문 불가로 녹음별
     method: Literal["ecapa", "per_recording"]

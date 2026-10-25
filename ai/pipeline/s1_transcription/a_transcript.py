@@ -22,11 +22,7 @@ def _identify_subject_speaker(
     request: TranscriptionRequest,
     settings: Settings,
 ) -> str | None:
-    """참조 목소리 샘플과 녹음 화자를 ECAPA 성문 매칭해 대상자 화자 라벨을 확정.
-
-    참조 미제공·패키지 미설치·매칭 실패는 전사를 막지 않고 None으로 진행한다
-    (2단계 내용 기반 판단으로 폴백).
-    """
+    """참조 목소리 샘플 ECAPA 성문 매칭 -> 대상자 화자 라벨 (실패 시 None, 2단계 내용 기반 폴백)"""
     if request.reference_voice_sample_url is None:
         return None
     try:
@@ -46,7 +42,7 @@ def _identify_subject_speaker(
             max_bytes=settings.max_audio_bytes,
             temp_dir=scratch_dir(settings),
         )
-    except AppError as error:  # 참조 샘플을 못 받아도 전사는 그대로 진행한다(대상자 미확정)
+    except AppError as error:  # 참조 샘플 실패에도 전사 진행 (대상자 미확정)
         logger.warning("reference voice sample download failed: %s", error.code)
         return None
     try:
@@ -88,11 +84,10 @@ def transcribe_recording(
         if not segments:
             raise EmptyTranscriptError()
         last_end_ms = max(segment.end_ms for segment in segments)
-        # last_end_ms == 0 means the provider fell back to plain text without
-        # timestamps — duration is unknown there, so only positive values gate.
+        # 0 이면 타임스탬프 없는 일반 텍스트 폴백이라 길이 미상 (양수일 때만 검사)
         if 0 < last_end_ms < settings.min_speech_ms:
             raise AudioTooShortError(last_end_ms, settings.min_speech_ms)
-        # 화자 식별은 오디오가 아직 살아있을 때(unlink 전) 수행한다.
+        # 화자 식별은 오디오 삭제(unlink) 전에
         subject_speaker_label = _identify_subject_speaker(audio_path, segments, request, settings)
     finally:
         audio_path.unlink(missing_ok=True)

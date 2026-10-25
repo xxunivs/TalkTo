@@ -1,8 +1,4 @@
-"""녹음 단위 파생 산출물 — 전체 요약(LLM) + 태그 집계(코드).
-
-요약: 녹음 1건 → 2~3문장 (문장 수는 sentence_count 로 검증).
-태그: 기억 조각들의 태그를 녹음 단위로 집계 — 이미 통제 어휘라 재검증만.
-"""
+"""녹음 단위 파생: 요약 2~3문장(LLM, sentence_count 검증) + 기억 태그 집계(코드, 통제 어휘 재검증만)"""
 
 import logging
 import re
@@ -38,11 +34,7 @@ def sentence_count(summary: str) -> int:
 
 
 def aggregate_tags(memory_result: dict, *, max_tags: int = 7) -> list[str]:
-    """녹음의 주요 주제 태그 — 기억 전체 합집합이 아니라 빈도순 상위.
-
-    Memories 필터는 그 녹음의 '대표 주제'가 필요하지, 한 기억만 스친 태그까지
-    다 붙으면 필터가 무의미해진다. 빈도로 정렬해 상위 max_tags개만 남긴다.
-    """
+    """녹음 대표 주제 태그 빈도순 상위 max_tags개 (합집합이면 Memories 필터가 무의미)"""
     from collections import Counter
 
     counts: Counter[str] = Counter()
@@ -50,7 +42,7 @@ def aggregate_tags(memory_result: dict, *, max_tags: int = 7) -> list[str]:
         for tag in memory.get("tags") or []:
             if tag in _ALLOWED_TAGS:
                 counts[tag] += 1
-    # 빈도 내림차순, 동률은 어휘순 안정 정렬
+    # 빈도 내림차순, 동률은 어휘순
     ranked = sorted(counts, key=lambda t: (-counts[t], t))
     return ranked[:max_tags]
 

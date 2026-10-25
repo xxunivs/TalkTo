@@ -1,1 +1,1 @@
-"""HTTP route modules."""
+"""HTTP 라우트 모듈"""

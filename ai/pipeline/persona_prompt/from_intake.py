@@ -1,19 +1,4 @@
-"""설문(IntakeContext) → 페르소나 명세. 규칙만 쓰고 LLM 은 부르지 않는다.
-
-설문 칸을 프롬프트로 옮길 때 지키는 것
-  - 호칭: subject.addressTerm 이 가족 표의 '그분이 이 사람을 부르는 말'과 같으면(설문 P1-07A, 페르소나가 작성자를
-    부르는 말) 그분을 부르는 말로 쓰지 않는다. 가족 표에 지금 대화하는 사람(웹앱 isListener)이 그분을 부르는
-    말이 있으면 그 말을 그 사람 몫으로 쓴다.
-  - 사망·임종 정책은 한 곳에서 정한다: 설문 M9-01 등급·T1-02(orchestrator.intake_policy.death_policy) → spec.death_policy.
-    L1 의 사망 모듈 변형 하나로만 나가고, 주제 등급 목록에서는 사망·임종·장례 주제를 뺀다.
-  - C-10 의 '먼저 꺼내기' 항목은 금지가 아니라 '물으면만'으로, '~말투' 항목은 피할 말투로 옮긴다.
-  - 기억에서 뽑은 통찰(persona_insights)은 성격이 아니라 사실이라 명세에 넣지 않는다.
-  - '사랑'이 든 말끝은 말끝 칸에서 빼고, 끝인사는 '통화를 끝낼 때만'으로 둔다.
-  - 말투 예시는 설문에 적힌 실제 표현(추정 제외)과 통화 주고받기만 쓴다. 길이로 고른 전사 발화는 쓰지 않는다.
-  - 이름이 같은 주제가 여러 문항에 있으면 가장 엄한 등급 하나로 합친다.
-  - basicProfile.minor(BE 가 bool 만 보냄 — 생년월은 오지 않는다)가 true 이고 살아 계신 분이면 spec.minor.
-    떠나신 자녀는 고인 규칙만 쓴다.
-"""
+"""설문(IntakeContext) -> 페르소나 명세 (규칙만, LLM 없음)"""
 
 from __future__ import annotations
 
@@ -40,7 +25,7 @@ FIRST_MENTION = re.compile(r"\s*(을|를)?\s*먼저\s*(길게\s*)?꺼내기\s*$"
 
 
 def _period(text: str | None) -> str | None:
-    """'특정 시기 → 시기: 돌아가시기 전 …' 같은 선지·값 붙은 원문을 값만 남긴다."""
+    """선지 붙은 원문에서 '시기:' 뒤 값만"""
     if not text:
         return None
     if "시기:" in text:
@@ -56,13 +41,13 @@ def _clean_quote(text: str) -> str:
 
 
 def _cell(v: str | None) -> str | None:
-    """표 칸에 남은 체크 상자 기호(□ ■)는 값이 아니다."""
+    """표 칸에 남은 체크 상자 기호(□ ■) 제거"""
     v = (v or "").replace("□", "").replace("■", "").strip()
     return v or None
 
 
 def split_c10(topic: str) -> tuple[str, str]:
-    """C-10 '피해야 할 것' 한 줄 → (종류, 값). 종류: style(피할 말투) / ask_only(먼저 꺼내지 않기) / taboo(금지)."""
+    """C-10 '피해야 할 것' 한 줄 -> (종류, 값) (style: 피할 말투, ask_only: 먼저 꺼내지 않기, taboo: 금지)"""
     t = topic.strip()
     if t.endswith("말투") or "말투" in t[-6:]:
         return "style", t
@@ -102,11 +87,12 @@ def _relations(ic: IntakeContext) -> list[Relation]:
 def _family_calls_subject(
     sc: SubjectContext, rels: list[Relation], public: bool
 ) -> tuple[str | None, list[str]]:
+    """가족 모두가 그분을 부르는 말 (addressTerm 이 그분이 부르는 말과 같으면 제외, 설문 P1-07A)"""
     notes = []
     term = sc.subject.address_term if sc.subject else None
     if public:
         return None, notes
-    # 대화하는 사람이 그분을 부르는 말을 알면 그 말이 앞선다(기본 정보에 그 사람 몫으로 따로 나간다)
+    # 대화하는 사람이 그분을 부르는 말 우선 (기본 정보에 그 사람 몫으로 따로 출력)
     listener = next((r for r in rels if r.is_listener and r.they_call), None)
     if listener is not None:
         notes.append(
@@ -122,7 +108,7 @@ def _family_calls_subject(
         )
         return None, notes
     called = Counter(r.they_call for r in rels if r.they_call)
-    if len(called) > 1:  # 사람마다 다르게 부르면(할머니 / 엄마) 가족 표에 맡긴다
+    if len(called) > 1:  # 사람마다 다르게 부르면(할머니, 엄마) 가족 표에 위임
         notes.append(f"가족이 그분을 부르는 말이 여럿({', '.join(called)}) — 가족 표에 사람마다 둠")
         return None, notes
     return term, notes
@@ -165,7 +151,7 @@ def spec_from_intake(subject_context: SubjectContext, intake: IntakeContext | No
             spec.death_answer = "그렇게 됐지"
             spec.notes.append("사망 정책 답 문장이 없어 기본 '그렇게 됐지'")
 
-    # 성격(문자열로 온 예전 계약도 받는다)
+    # 성격 (문자열로 온 예전 계약도 수용)
     p = ic.personality
     if isinstance(p, str):
         spec.character = Character(introduction=p)
@@ -195,8 +181,7 @@ def spec_from_intake(subject_context: SubjectContext, intake: IntakeContext | No
         for r in ic.situational_reactions
     ]
     if deceased and not public:
-        # 고인은 잊은 듯 말하지 않는다(잠금 2). '기억이 잘 안 나네' 같은 답(M8-08 '모르는 걸 물으면' 등)은
-        # '늘 이 말투로' 지침이 되므로 상황째 뺀다. 저장된 설문으로 다시 만들어도 같게 걸러진다.
+        # 잠금 2: 잊은 듯한 답(M8-08 등)은 상시 말투 지침이 되므로 상황째 제외
         kept = []
         for s in spec.situations:
             if says_forgot(s.response):
@@ -234,7 +219,7 @@ def spec_from_intake(subject_context: SubjectContext, intake: IntakeContext | No
         text = _clean_quote(e.text)
         if not text or e.inferred:
             continue
-        if len(text) > QUOTE_MAX:  # 실제 표현이 아니라 서술(M4-06 등)이면 말투 예시로 쓰지 않는다
+        if len(text) > QUOTE_MAX:  # 실제 표현이 아닌 서술(M4-06 등)은 말투 예시 제외
             spec.notes.append(
                 f"말투 예시: 설문 표현 '{text[:20]}…' 은 {len(text)}자 서술이라 말투 예시에서 뺌"
             )
@@ -296,7 +281,7 @@ def spec_from_intake(subject_context: SubjectContext, intake: IntakeContext | No
 
 
 def merge_recording(spec: PersonaSpec, recording: dict | None) -> PersonaSpec:
-    """전사 재료(d_recording_prompt.json)로 설문이 비운 칸만 채운다. 발화 예시(speechExamples)는 쓰지 않는다."""
+    """전사 재료(d_recording_prompt.json)로 설문 빈칸만 보충 (speechExamples 미사용)"""
     if not recording:
         return spec
     for row in recording.get("familyMap") or []:
@@ -324,7 +309,7 @@ def merge_recording(spec: PersonaSpec, recording: dict | None) -> PersonaSpec:
         if not topic or is_death_topic(topic):
             continue
         if any(same_topic(topic, t.topic, {spec.name}) for t in spec.topics):
-            continue  # 설문에 같은 주제가 있으면 설문 등급을 따른다
+            continue  # 설문에 같은 주제가 있으면 설문 등급 우선
         spec.topics.append(
             Topic(topic=topic, grade=row.get("grade") or "물으면만", note=None, source="transcript")
         )
@@ -335,8 +320,7 @@ def merge_recording(spec: PersonaSpec, recording: dict | None) -> PersonaSpec:
 def apply_death_toggle(
     spec: PersonaSpec, death_talk: bool | None, source: str = "setting"
 ) -> PersonaSpec:
-    """사인·임종 질문 켜기/끄기(설정). None 이면 설문(M9-01·T1-02) 그대로.
-    False(끔) → deny: 물어도 말하지 않는다. True(켬) → 설문 등급이 brief·ask_only·open 이면 그대로, 아니면 ask_only."""
+    """사인, 임종 질문 설정 (None: 설문 그대로, False: deny, True: deny 일 때만 ask_only)"""
     if not spec.deceased or death_talk is None:
         return spec
     before = spec.death_policy

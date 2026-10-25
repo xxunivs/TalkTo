@@ -1,16 +1,4 @@
-"""③ 사전 판정.
-
-NoopPrecheck: 판정 안 함(기본).
-CoveragePrecheck(ORCHESTRATOR_PRECHECK=coverage): 질문이면 화제어(형태소)가 기억 문서 하나에 얼마나 모여 있는지
-  (최대 커버율)를 보고, 임계 미만이면 "모른다·되묻기" 지시를 넣는다. 임계 0.6 은 실측으로 정한 값.
-  - 문서 = 선택된 기억 + 델타 기억 + 페르소나 지시문의 '기본 정보' 절(m-profile)
-  - 동의어 사전(prompts/topic_synonyms.json): 화제어 대신 기억에 쓰인 말도 맞은 것으로 친다(고향↔태어났다)
-  - 질문이 아니면(근황 알림·잡담) 판정하지 않는다 — 가족이 새 소식을 말할 때 "모른다"가 붙으면 안 된다
-  - 화제어가 없으면(인사 등) 판정하지 않는다
-  - 기억이 하나도 없거나 min_memories(ORCHESTRATOR_PRECHECK_MIN_MEMORIES, 30)보다 적으면 판정하지 않는다
-    (기억 수는 BE memoryTotal, 없으면 받은 수로 짐작 — pipeline/persona_prompt/low_memory.memory_count)
-CoveragePrecheckV11(coverage_v11): v1 의 오판 원인을 고친 판정(아래 클래스 설명).
-"""
+"""③ 사전 판정 (질문 화제어의 기억 문서 최대 커버율이 임계 미만이면 모른다, 되묻기 지시)"""
 
 from __future__ import annotations
 
@@ -37,17 +25,14 @@ _QUESTION_WORDS = re.compile(
 _QUESTION_END = re.compile(
     r"(니|냐|나요|까|까요|죠|지요|어요|아요|예요|에요|래|대|지|나)\s*[?？]?\s*$"
 )
-# 앞머리 호칭("할머니,")과 자기소개("나 도윤이야.")는 화제가 아니다
+# 앞머리 호칭("할머니,"), 자기소개("나 도윤이야.")는 화제 아님
 _VOCATIVE = re.compile(
     r"^\s*(할머니|할머이|할매|할아버지|엄마|어머니|어머님|아빠|아버지|아버님|여보|당신)\s*[,.!~]*\s*"
 )
 _SELF_INTRO = re.compile(r"^\s*나\s*[,]?\s*[가-힣]{1,4}?(이야|야|이에요|예요|에요|이)\s*[.!,~]+\s*")
 _PROFILE_HEAD = re.compile(r"^#+[^\n]*기본\s*정보[^\n]*\n(.*?)(?=^#|\Z)", re.M | re.S)
-# 기억을 묻는 말이 아닌 관계 말: 그분 안부("편안하게 잘 계시죠", "거기는 어때"), 인사, 마음("보고 싶어요"),
-# 자기 근황("저 잘 지내요"). is_relational() 이 '이 말만 있는 질문'을 가려 사전 판정·가드 R1a·R1t 를 건너뛴다.
-# 화제가 남는 질문("잘 계시죠? 근데 제주도 갔던 거 기억나?")은 떼기 전 원래 화제어로 전과 똑같이 판정한다.
-# (2026-10-17 실사용: 고인 안부에 "글쎄, 그건 기억이 잘 안 나네"가 나가던 문제)
-# 반복은 {0,6}·{1,3} 으로 묶는다 — 무제한 \S*·+ 를 겹치면 "잘잘잘…?" 같은 입력에서 지수 시간이 걸린다.
+# 기억을 묻지 않는 관계 말: 안부, 인사, 마음, 자기 근황 (이 말만 있는 질문은 사전 판정, 가드 R1a, R1t 생략)
+# 반복은 {0,6}, {1,3} 으로 제한 (무제한 \S*, + 중첩 시 "잘잘잘…?" 입력에서 지수 시간)
 _RELATIONAL = re.compile(
     r"(?:(?:편안|편히|평안|건강|무탈|잘|괜찮)\S{0,6}?\s*){1,3}"
     r"(?:계시|계세|계셔|계십|지내|지냈|있|사시|사세|사셔|하시|하세|하셔)\S{0,6}(?:\s+(?:있|계시|계세|계셔)\S{0,6})?"
@@ -64,10 +49,8 @@ _RELATIONAL = re.compile(
 )
 
 
-# 위기(자해·자살 생각)와 그분의 죽음·임종을 묻는 말. 기억을 묻는 질문이 아니다.
-# '-어요'로 끝나 질문으로 잡히면 사전 판정이 "기억에 없다, 되물어라"를 넣고 가드가 위기 대답(109·119 안내 포함)을
-# "글쎄, 그건 기억이 잘 안 나네. 네가 얘기 좀 해 줄래?"로 갈아 끼웠다(고인에게 죽음 경위를 되묻는 셈).
-# 이런 말은 사전 판정·가드의 지어내기 검사(R1)를 건너뛰고 공통 규칙(위기 대응·사망 정책)을 따른다.
+# 위기(자해, 자살 생각), 그분의 죽음, 임종을 묻는 말: 사전 판정, 가드 R1 생략하고 공통 규칙 따름
+# (질문으로 잡혀 위기 대답이 기억 안 남 되묻기로 바뀌던 문제)
 SAFETY = re.compile(
     r"죽고\s?싶|죽을\s?것\s?같|죽어\s?버리|사라지고\s?싶|없어지고\s?싶|살기\s?싫|살고\s?싶지\s?않"
     r"|자살|자해|목숨|돌아가셨|돌아가신|임종|장례|세상을\s?떠|마지막\s?(?:순간|모습)"
@@ -79,23 +62,21 @@ def is_safety_turn(text: str) -> bool:
 
 
 def _keep_if_adnominal(m: re.Match) -> str:
-    """'잘 사시던 데', '잘하시던 거'처럼 '-던' 관형형은 화제를 꾸미는 말이라 떼지 않는다."""
+    """-던 관형형은 화제 수식이라 유지 (잘 사시던 데, 잘하시던 거)"""
     return m.group(0) if "던" in m.group(0) else " "
 
 
 def strip_relational(text: str) -> str:
-    """관계 말(안부·인사·마음·자기 근황)을 지운 나머지. 화제어 판단에만 쓴다(LLM 에 가는 원문은 그대로)."""
+    """관계 말(안부, 인사, 마음, 자기 근황) 제거 결과 (화제어 판단 전용, LLM 원문은 그대로)"""
     return re.sub(r"\s+", " ", _RELATIONAL.sub(_keep_if_adnominal, text)).strip()
 
 
 def is_relational(text: str, topic_terms) -> bool:
-    """안부·인사·마음 말'만' 있는 질문인가. topic_terms(text) -> list 는 호출 쪽 판정의 화제어 함수.
-    - 뗄 관계 말이 하나도 없던 질문("누구였어?")은 해당 없음(전과 같은 경로로 간다).
-    - 떼고 남은 말에 의문사(뭐·어디·누구·언제·몇·기억나…)가 있으면 기억을 묻는 질문으로 본다
-      ('데·거·분' 같은 의존명사는 화제어로 안 잡혀서 "고마운 분 누구였어?"가 비어 보이는 것을 막는다)."""
+    """안부, 인사, 마음 말만 있는 질문 여부 (topic_terms 는 호출 쪽 화제어 함수)"""
     rest = strip_relational(text)
     if rest == re.sub(r"\s+", " ", text).strip():
         return False
+    # 의존명사(데, 거, 분)는 화제어로 안 잡혀 "고마운 분 누구였어?" 가 비어 보이는 문제 방지
     if _QUESTION_WORDS.search(rest):
         return False
     return not topic_terms(rest)
@@ -138,11 +119,7 @@ def load_synonyms(path: Path = SYNONYMS_PATH) -> dict[str, tuple[str, ...]]:
 
 
 def _directive(terms: list[str], public: bool, polite: bool = False, deceased: bool = False) -> str:
-    """polite: 가족 표의 '지금 대화하는 사람' 줄이 존댓말(orchestrator.text.listener_speech_level).
-
-    deceased: 고인 페르소나는 '기억이 안 난다'·'모르겠다'고 말하지 않는다(잠금 2, 대표 지시 2026-10-21).
-    지어내지 않는 것은 같고, 잊은 듯 말하는 대신 가족에게서 그 이야기를 듣고 싶어 하며 되묻는다.
-    """
+    """모른다, 되묻기 지시 문구 (polite: 듣는 사람 줄 존댓말, deceased: 잊은 듯 말하지 않고 이야기를 청함, 잠금 2)"""
     topic = "·".join(terms[:4])
     if deceased and not public:
         ask = (
@@ -178,6 +155,8 @@ def _directive(terms: list[str], public: bool, polite: bool = False, deceased: b
 
 
 class CoveragePrecheck:
+    """화제어 최대 커버율 판정 (임계 0.6 실측, 문서 = 선택 기억 + 델타 + 지시문 기본 정보 절)"""
+
     impl = "coverage_v1"
 
     def __init__(
@@ -188,18 +167,18 @@ class CoveragePrecheck:
         synonyms: dict[str, tuple[str, ...]] | None = None,
         min_memories: int = 0,
     ) -> None:
-        from orchestrator.text import morph_set  # kiwipiepy 를 이 구현을 쓸 때만 요구
+        from orchestrator.text import morph_set  # kiwipiepy 는 이 구현 사용 시에만 필요
 
         self._morph_set = morph_set
         self.profiles = profiles
         self.threshold = threshold
-        # 기억이 이 수보다 적으면 판정하지 않는다(ORCHESTRATOR_PRECHECK_MIN_MEMORIES). 기억이 몇 개뿐이면 거의 모든
-        # 질문이 임계를 못 넘어 매 턴 '모른다' 지시가 붙고 대화가 닫힌다(10/18 실사용, 4층 레포 세션 19).
+        # 기억이 이 수 미만이면 판정 생략 (ORCHESTRATOR_PRECHECK_MIN_MEMORIES)
+        # (기억 몇 개뿐이면 매 턴 모른다 지시로 대화 단절, 10/18 실사용)
         self.min_memories = min_memories
         self.synonyms = load_synonyms() if synonyms is None else synonyms
 
     def low_memory(self, turn: TurnInput, selection: MemorySelection) -> bool:
-        """기억이 min_memories 보다 적어 판정을 건너뛸 턴인가. 기억이 하나도 없으면 문턱과 상관없이 건너뛴다."""
+        """기억 부족으로 판정을 건너뛸 턴 여부 (기억 0개면 문턱 무관하게 생략)"""
         from pipeline.persona_prompt.low_memory import memory_count
 
         n_sent = sent_memories(turn, selection)
@@ -236,9 +215,10 @@ class CoveragePrecheck:
     def check(
         self, turn: TurnInput, state: SessionState, selection: MemorySelection
     ) -> PrecheckResult:
-        if is_safety_turn(turn.message):  # 위기·죽음 말에는 "모른다·되묻기"를 넣지 않는다
+        if is_safety_turn(turn.message):  # 위기, 죽음 말에는 모른다, 되묻기 지시 생략
             return PrecheckResult()
         body = strip_preamble(turn.message)
+        # 질문 아닌 근황 알림, 잡담은 판정 생략 (새 소식에 모른다 방지)
         if not body or not is_question(body):
             return PrecheckResult()
         if self.low_memory(turn, selection):
@@ -253,9 +233,8 @@ class CoveragePrecheck:
             if n
         }
         terms = self.topic_terms(body, names)
-        if not terms or is_relational(
-            body, lambda t: self.topic_terms(t, names)
-        ):  # 화제어 없음·안부뿐 → 판정 안 함
+        # 화제어 없음, 안부뿐 -> 판정 안 함
+        if not terms or is_relational(body, lambda t: self.topic_terms(t, names)):
             return PrecheckResult(topic_terms=[])
         best, best_id = 0.0, None
         for doc_id, doc in self._docs(turn, selection):
@@ -277,20 +256,19 @@ class CoveragePrecheck:
 
 
 def _is_deceased(turn: TurnInput, profiles) -> bool:
-    """고인 페르소나인가. BE 가 보낸 persona.deceased 가 먼저이고, 없으면 프로필 추정."""
+    """사망 대상자 페르소나 여부 (BE persona.deceased 우선, 없으면 프로필 추정)"""
     if turn.deceased is not None:
         return bool(turn.deceased)
     return bool(profiles and profiles.profile_for(turn).deceased)
 
 
 def _polite(turn: TurnInput) -> bool:
-    """지금 대화하는 사람에게 존댓말을 쓰는가(가족 표 그 사람 줄). 반말·모름이면 예전 되묻기 그대로."""
+    """듣는 사람에게 존댓말 사용 여부 (가족 표 그 사람 줄, 반말이나 모름이면 예전 되묻기)"""
     return listener_speech_level(turn.persona_instructions) == "존댓말"
 
 
 def sent_memories(turn: TurnInput, selection: MemorySelection) -> int:
-    """이번 턴에 받은 기억 수(BE 가 보낸 것과 선택된 것 중 많은 쪽 + 델타). 제한 정보로 뺀 기억 때문에
-    top-5 를 다 받은 페르소나가 '기억이 적다'로 잘못 보이지 않게 BE 가 보낸 수도 본다."""
+    """이번 턴 받은 기억 수 (BE 전송과 선택 중 큰 쪽 + 델타, 제한 정보로 뺀 기억 때문에 기억 적음 오판 방지)"""
     return max(len(turn.be_memories), len(selection.memories)) + len(selection.delta)
 
 
@@ -326,7 +304,7 @@ LIGHT_V11 = frozenset(
 ADDRESS_V11 = frozenset(
     {"엄마", "어머니", "어머님", "아빠", "아버지", "아버님", "여보", "할매", "할머님"}
 )
-# 기억 원문에 대신 쓰이는 말(부분 문자열로 찾는다). topic_synonyms.json(v1 보정값)은 건드리지 않으려고 따로 둔다.
+# 기억 원문에 대신 쓰이는 말 (부분 문자열 탐색, v1 보정값 topic_synonyms.json 과 분리)
 SYN_V11 = {
     "나오": ("졸업", "나왔", "나온"),
     "대학": ("학과", "학부", "대학"),
@@ -341,15 +319,7 @@ _MERGE_TAGS = ("NNG", "NNP", "MAG", "XR")
 
 
 class CoveragePrecheckV11(CoveragePrecheck):
-    """v1 오판 원인을 고친 판정.
-    1) 이름이 한 글자 형태소로 쪼개짐(외자·두 글자 이름이 한 글자씩 갈라지는 경우) → 붙어 있던 한 글자 조각을 한 낱말로 다시 합친다.
-    2) 이름 표기 차이(정우 vs 이정우)·합성어(대학 ⊂ 한빛대학교) → 기억 원문 부분 문자열로도 맞은 것으로 친다(가드 v1 규칙과 같음).
-    3) 가벼운 말(하·있·알·맨날)·가족이 그분을 부르는 말(엄마·어머니)은 화제어에서 뺀다.
-    4) SYN_V11: 기억에 대신 쓰이는 말(나오↔졸업, 잔소리↔하던 말 …).
-    5) 등록부에 가족 사전(intake.json)이 있으면 원문 대신 발화 분해 단서(orchestrator/split.py)로 판정한다.
-       단서가 비면(인사·군말뿐) 판정하지 않는다("별일 없지?"에 '모름'이 붙지 않게).
-    주의: 이 고침은 특정 평가 세트의 오판을 보고 만들었다 → 새 질문으로 다시 확인해야 한다.
-    """
+    """v1 오판 보정 판정 (이름 조각 합치기, 부분 문자열, 호칭 제외, SYN_V11, 분해 단서, 새 질문으로 재확인 필요)"""
 
     impl = "coverage_v1.1"
 
@@ -371,7 +341,7 @@ class CoveragePrecheckV11(CoveragePrecheck):
         self._splitters: dict = {}
 
     def question_text(self, turn: TurnInput) -> tuple[str, frozenset[str]]:
-        """(판정할 질문 텍스트, 더 뺄 부르는 말). 가족 사전이 있으면 분해 단서, 없으면 앞머리 고정 제거."""
+        """(판정할 질문 텍스트, 추가 제외 호칭): 가족 사전 있으면 분해 단서, 없으면 앞머리 제거"""
         prof = self.profiles.profile_for(turn) if self.profiles is not None else None
         if prof is not None and (prof.address_terms or prof.family_names):
             key = (tuple(prof.address_terms), tuple(prof.family_names))
@@ -417,7 +387,7 @@ class CoveragePrecheckV11(CoveragePrecheck):
     def check(
         self, turn: TurnInput, state: SessionState, selection: MemorySelection
     ) -> PrecheckResult:
-        if is_safety_turn(turn.message):  # 위기·죽음 말에는 "모른다·되묻기"를 넣지 않는다
+        if is_safety_turn(turn.message):  # 위기, 죽음 말에는 모른다, 되묻기 지시 생략
             return PrecheckResult()
         body, addr = self.question_text(turn)
         if not body or not is_question(body):
@@ -434,9 +404,8 @@ class CoveragePrecheckV11(CoveragePrecheck):
             if n
         }
         terms = self.topic_terms(body, names | addr)
-        if not terms or is_relational(
-            body, lambda t: self.topic_terms(t, names | addr)
-        ):  # 화제어 없음·안부뿐 → 판정 안 함
+        # 화제어 없음, 안부뿐 -> 판정 안 함
+        if not terms or is_relational(body, lambda t: self.topic_terms(t, names | addr)):
             return PrecheckResult(topic_terms=[])
         raws = [_doc_text(m) for m in list(selection.memories) + list(selection.delta)]
         instructions = turn.persona_instructions

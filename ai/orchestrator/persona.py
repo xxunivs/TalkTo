@@ -1,15 +1,4 @@
-"""페르소나 메타(PersonaProfile) 찾기.
-
-1) 등록부: <persona_dir>/<이름>/profile.json (+ style_card.md, shots.jsonl, restricted.json, intake.json 선택)
-   intake.json: pipeline.s0_intake 가 만든 b_intake_prompt.json. 있으면 사망·임종 정책을 여기서 정한다
-   (M9-01 등급·T1-02 → restricted.policy, orchestrator/intake_policy.py).
-   profile.json: {"subject_ids": [...], "match_name": "박영자", "public": false, "deceased": true,
-                  "has_family": true, "self_label": "할머니"}
-   subject_id 가 맞거나, 없으면 지시문 첫 문장의 이름이 match_name 과 같을 때 쓴다.
-2) 추정: 지시문 문장으로 public·deceased·has_family 를 추정한다(등록이 없을 때만).
-3) 기본: 비공개·생존·가족 있음.
-등록부의 말투 카드·실제 발화는 개인 데이터일 수 있으니 git 제외 경로(ORCHESTRATOR_PERSONA_DIR)에 두는 것을 권장.
-"""
+"""페르소나 메타(PersonaProfile) 탐색 (등록부 -> 지시문 추정 -> 기본값)"""
 
 from __future__ import annotations
 
@@ -29,25 +18,25 @@ _NAME = re.compile(r"당신은\s*([^\s.,]+?)(?:\s*본인의|의\s*페르소나)"
 _PUBLIC_MARKS = ("본인의 말투로 말하는 페르소나", "# 방문자")
 _DECEASED_MARKS = ("사후 페르소나", "별세", "사망", "돌아가신", "사후 응답")
 _FAMILY_HEAD = re.compile(r"^#+\s*(가족|.*가족\s*\d+명)", re.M)
-# 4층 생성기 지시문의 표지. L1 의 사후 절은 고인일 때만 들어간다.
+# 4층 생성기 지시문 표지 (L1 사후 절은 사망 대상자일 때만)
 _LAYERED_MARKS = ("# 말하는 형식", "# 기억을 쓰는 법")
 _LAYERED_AFTERLIFE = "# 세상을 떠난 뒤의 대화"
 
 
 def subject_name_from(instructions: str) -> str | None:
-    """정체 문장의 이름. 4층 지시문은 공통 규칙(L1)이 앞에 있어 정체 문장이 뒤에 온다."""
+    """정체 문장의 이름 (4층 지시문은 L1 이 앞에 있어 정체 문장이 뒤쪽)"""
     m = _NAME.search(instructions[:300]) or _NAME.search(instructions)
     return m.group(1) if m else None
 
 
 def has_layered_rules(instructions: str) -> bool:
-    """4층 생성기가 L1(공통 규칙)까지 넣어 만든 지시문인가. 두 제목은 L1 에만 있다."""
+    """4층 생성기가 L1(공통 규칙)까지 넣은 지시문 여부 (두 제목은 L1 전용)"""
     return any(k in instructions for k in _LAYERED_MARKS)
 
 
 def infer_profile(instructions: str) -> PersonaProfile:
     public = any(k in instructions for k in _PUBLIC_MARKS)
-    if has_layered_rules(instructions):  # 4층 지시문: 공통 규칙의 사망 문구로 오판하지 않게
+    if has_layered_rules(instructions):  # 4층 지시문: 공통 규칙 사망 문구로 인한 오판 방지
         deceased = _LAYERED_AFTERLIFE in instructions
     elif public:
         deceased = "사후 페르소나" in instructions
@@ -83,7 +72,7 @@ def _load_package(folder: Path) -> tuple[dict, PersonaProfile]:
     ifile = folder / "intake.json"
     intake = json.loads(ifile.read_text(encoding="utf-8")) if ifile.exists() else None
     restricted = merge_death_policy(restricted, intake)
-    # profile.json "death_talk": false/true — 사인·임종 질문 설정이 설문보다 우선(끔 = deny, 켬 = deny 면 ask_only)
+    # profile.json death_talk 설정이 설문보다 우선 (false = deny, true = deny 면 ask_only)
     if meta.get("death_talk") is not None and meta.get("deceased"):
         base = restricted or RestrictedFacts()
         pol = (
@@ -105,7 +94,7 @@ def _load_package(folder: Path) -> tuple[dict, PersonaProfile]:
         if sfile.exists()
         else None
     )
-    if spec is not None:  # 말투 카드·주고받기 파일이 따로 없으면 명세의 것을 쓴다
+    if spec is not None:  # 말투 카드, 주고받기 파일 없으면 명세 값 사용
         shots = shots or [Shot(user=s.user, persona=s.persona) for s in spec.style.shots]
     style_card = (
         card.read_text(encoding="utf-8").strip()
@@ -119,7 +108,7 @@ def _load_package(folder: Path) -> tuple[dict, PersonaProfile]:
         and meta.get("death_talk") is None
         and (restricted is None or restricted.policy_source == "restricted.json")
     ):
-        # 설문이 없으면 명세에 정해 둔 사망 정책을 쓴다(restricted.json 의 정책보다 명세가 최신)
+        # 설문 없으면 명세의 사망 정책 사용 (restricted.json 보다 명세가 최신)
         base = restricted or RestrictedFacts()
         restricted = base.model_copy(
             update={
@@ -157,7 +146,7 @@ def _load_package(folder: Path) -> tuple[dict, PersonaProfile]:
 def merge_death_policy(
     restricted: RestrictedFacts | None, intake: dict | None
 ) -> RestrictedFacts | None:
-    """intake 의 사망·임종 정책을 restricted 에 얹는다. intake 가 우선, 없으면 restricted.json 값 그대로."""
+    """intake 사망, 임종 정책을 restricted 에 병합 (intake 우선, 없으면 restricted.json 값)"""
     dp = death_policy(intake)
     if dp is None:
         if restricted is not None and restricted.policy_source is None:
@@ -175,6 +164,8 @@ def merge_death_policy(
 
 
 class PersonaRegistry:
+    """<persona_dir>/<이름>/profile.json 등록부 (subject_id 또는 지시문 이름 match_name 일치, 개인 데이터라 git 제외 경로)"""
+
     impl = "registry_v1"
 
     def __init__(self, persona_dir: Path | None = None) -> None:
@@ -202,7 +193,6 @@ class PersonaRegistry:
             return self.by_name[name]
         profile = infer_profile(turn.persona_instructions)
         if turn.deceased is not None and profile.deceased != turn.deceased:
-            # BE 가 아는 고인 여부(persona.deceased)가 지시문 글자 추정보다 정확하다. 예전 지시문은 '돌아가신
-            # 할아버지'처럼 다른 사람 이야기만 있어도 고인으로, 그런 말이 없는 고인은 생존으로 추정됐다.
+            # BE persona.deceased 가 지시문 추정보다 정확 (다른 사람의 사망 언급만으로 오판하던 문제)
             profile = profile.model_copy(update={"deceased": turn.deceased})
         return profile

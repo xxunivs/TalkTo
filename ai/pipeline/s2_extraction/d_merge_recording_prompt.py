@@ -1,19 +1,12 @@
-"""전사에서 뽑은 것들을 프롬프트 재료 한 장으로 합친다.
-
-a(인물)·b(민감도)·c(말투) 는 통화별로 따로 나오고 모양도 제각각이다.
-그걸 설문(b_intake_prompt.json) 과 같은 칸 이름으로 옮겨 담아, s3 가 두 장만
-읽으면 되게 한다. 설문에 없는 칸을 전사가 채우는 식이다.
-
-칸 이름은 infra/schema/subject.py 의 IntakeContext 를 따른다.
-"""
+"""통화별 a(인물), b(민감도), c(말투) -> 설문(b_intake_prompt.json)과 같은 칸의 프롬프트 재료 한 장 (칸: infra/schema/subject.py IntakeContext)"""
 
 from collections import Counter
 
-# 감탄사로 볼 만한 짧은 말. 이보다 길면 문장에 가까워 말투 요약으로 보낸다.
+# 감탄사로 볼 최대 길이 (더 길면 말투 요약 쪽)
 INTERJECTION_MAX = 6
-# 몇 번 이상 나와야 습관으로 볼지
+# 습관으로 볼 최소 등장 횟수
 INTERJECTION_MIN_COUNT = 3
-# 민감도 종류를 금기 주제 이름으로
+# 민감도 종류 -> 금기 주제 이름
 TABOO_TOPIC = {
     "health": "건강·병",
     "asset": "재산·돈",
@@ -24,7 +17,7 @@ TABOO_TOPIC = {
 
 
 def _family_map(persons_by_recording: dict[str, dict], address_terms: list[dict]) -> list[dict]:
-    """인물 분석 + 말투의 호칭을 합쳐 가족 표를 만든다."""
+    """인물 분석 + 말투 호칭 -> 가족 표"""
     called: dict[str, str] = {}
     for row in address_terms:
         person, term = row.get("person"), row.get("term")
@@ -48,7 +41,7 @@ def _family_map(persons_by_recording: dict[str, dict], address_terms: list[dict]
 
 
 def _taboo_topics(sensitivity_by_recording: dict[str, dict]) -> list[dict]:
-    """민감도 플래그를 금기 후보로. 등급은 사람이 정하기 전까지 '물으면만'."""
+    """민감도 플래그 -> 금기 후보 (사람이 정하기 전 등급은 '물으면만')"""
     out: dict[str, dict] = {}
     for result in sensitivity_by_recording.values():
         for flag in result.get("sensitivityFlags", []):
@@ -67,7 +60,7 @@ def _taboo_topics(sensitivity_by_recording: dict[str, dict]) -> list[dict]:
 
 
 def _speech_style(style_by_recording: dict[str, dict]) -> dict:
-    """되풀이하는 말 중 짧은 것은 감탄사, 문장 특징은 요약 한 줄로."""
+    """반복어 중 짧은 것은 감탄사, 문장 특징은 요약 한 줄"""
     counts: Counter[str] = Counter()
     patterns: list[str] = []
     for style in style_by_recording.values():
@@ -104,7 +97,7 @@ def merge_recording_prompt(
     linguistic_style: dict[str, dict],
     speech_examples: list[str],
 ) -> dict:
-    """전사에서 나온 프롬프트 재료를 설문과 같은 칸 이름으로 담는다."""
+    """전사 프롬프트 재료 (설문과 같은 칸 이름)"""
     return {
         "familyMap": _family_map(persons, _address_terms(linguistic_style)),
         "speechStyle": _speech_style(linguistic_style),

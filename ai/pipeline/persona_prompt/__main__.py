@@ -1,16 +1,17 @@
-"""로컬 실행: 4층 프롬프트 만들기 (OpenAI 는 extract-interview 에서만).
+"""로컬 실행: 4층 프롬프트 생성(build), 인터뷰 후보 추출(extract-interview, OpenAI 사용)
 
-    python -m pipeline.persona_prompt build --subject 박영자 [--subject-out 박영자] [--intake …json]
-                                            [--labels …json] [--interview …candidates.json] [--out-dir …]
-    python -m pipeline.persona_prompt extract-interview --subject 박영자   # LLM 1회 → 후보 파일(사람이 확인)
+    python -m pipeline.persona_prompt build --subject 박영자 [--subject-out 박영자] [--intake ...json]
+                                            [--labels ...json] [--interview ...candidates.json] [--out-dir ...]
+    python -m pipeline.persona_prompt extract-interview --subject 박영자   # LLM 1회 -> 후보 파일(사람이 확인)
 
 build 산출물: <out-dir>/persona_spec.json, c_system_prompt_layered.txt, persona_spec_log.txt
-  (--shots-mode messages 면 주고받기를 지시문에서 빼고 shots_messages.json 으로 따로 쓴다)
-  persona_spec.json 은 중간계층 등록부(<ORCHESTRATOR_PERSONA_DIR>/<이름>/spec.json)로도 쓴다.
-  기본 out-dir = output/<subject-out>/s3_synthesis. 설문은 output/<subject-out>/s2_extraction/b_intake_prompt.json →
-  없으면 input/<subject>/persona_intake.json. --labels: {"통화01.wav": "SPK_0", …} 대상자 화자 라벨(없으면 b_speaker_id.json).
-extract-interview: input/<subject>/가족인터뷰_*.txt → output/<subject-out>/s3_synthesis/interview_candidates.json.
-  후보는 근거 줄 검증을 통과한 것만 남는다. 사람이 열어 보고 지울 것은 지운 뒤 build --interview 로 넣는다.
+  --shots-mode messages: 주고받기를 shots_messages.json 으로 분리
+  persona_spec.json: 중간계층 등록부(<ORCHESTRATOR_PERSONA_DIR>/<이름>/spec.json) 겸용
+  기본 out-dir: output/<subject-out>/s3_synthesis
+  설문: output/<subject-out>/s2_extraction/b_intake_prompt.json, 없으면 input/<subject>/persona_intake.json
+  --labels: {"통화01.wav": "SPK_0", ...} 대상자 화자 라벨 (없으면 b_speaker_id.json)
+extract-interview: input/<subject>/가족인터뷰_*.txt -> output/<subject-out>/s3_synthesis/interview_candidates.json
+  근거 줄 검증 통과 후보만 저장, 사람이 검토 후 build --interview 로 반영
 """
 
 from __future__ import annotations

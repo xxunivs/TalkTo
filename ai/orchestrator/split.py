@@ -1,21 +1,4 @@
-"""발화 분해 v1 — 보수적 분해 + 페르소나별 호칭 사전. 사전 판정 v1.1·가드 v1.1·TieredSelector 가 쓴다.
-
-들어온 가족 발화를 조각으로 나눈다. 원문은 그대로 LLM 에 가고, 검색 질의(cue)만 바뀐다.
-  address  부르는 말("할머니", "엄마")          → 답의 호칭
-  speaker  자기소개에서 나온 이름("나 도윤이야") → 화자 식별(세션 상태)
-  greeting 안부·인사 문장("잘 지냈어?")          → 답의 흐름. 검색에 안 넣음
-  filler   맞장구·군말 문장("어.", "응.")
-  cue      나머지 = 기억 검색 질의. 비면 검색 생략.
-
-원칙: 확실할 때만 뗀다. 틀렸을 때 비용이 비대칭이라(못 떼면 운영과 같음, 잘못 떼면 검색 손실).
-  - 문장 앞 호칭은 뒤에 문장부호가 오거나, 문장 나머지가 자기소개·인사뿐일 때만 뗀다.
-    "할머니 고향이 어디였지?"의 "할머니"는 화제일 수 있어 남긴다.
-  - 군말·접속어 뒤 호칭은 쉼표가 붙었을 때만 뗀다("근데 할머니, 그거 뭐지?" → "근데 그거 뭐지?").
-  - 문장 끝 호칭은 쉼표 뒤("…돼, 할머니?") 또는 공백 뒤 마지막 낱말일 때만 뗀다.
-  - 자기소개는 "나/저 + (사전에 있는 이름) + 야/예요…" 꼴만. 이름이 문장 화제로 쓰이면("도윤이 고등학교…") 안 뗀다.
-  - 인사는 문장 전체가 인사 사전 꼴일 때만.
-사전: intake M2-01 표(가족 이름·그분을 부르는 호칭) + P1-03 + 흔한 변이형. 일반 규칙이 아니라 페르소나별.
-"""
+"""발화 분해 v1: 가족 발화 -> 호칭, 화자, 인사, 군말, 검색 질의(cue) (잘못 떼면 검색 손실이라 확실할 때만)"""
 
 from __future__ import annotations
 
@@ -23,7 +6,7 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
-# 호칭 변이형(사투리·STT 흔들림). 사전에 있는 호칭에만 붙인다.
+# 호칭 변이형 (사투리, STT 흔들림, 사전에 있는 호칭에만 적용)
 ADDR_VARIANTS = {
     "할머니": ["할머니", "할머이", "할매", "할무니", "할머님"],
     "엄마": ["엄마", "엄마아", "어무이", "어매"],
@@ -56,8 +39,8 @@ GREETING = re.compile(
 
 @dataclass
 class Lexicon:
-    addresses: list[str]  # 가족이 그분을 부르는 말(변이형 포함)
-    names: list[str]  # 자기소개에 나올 수 있는 이름(성 뗀 것 + 원형)
+    addresses: list[str]  # 가족이 그분을 부르는 말 (변이형 포함)
+    names: list[str]  # 자기소개에 나올 수 있는 이름 (성 뗀 것 + 원형)
     source: str = ""
 
 
@@ -99,7 +82,7 @@ def _given(name: str) -> list[str]:
 
 
 def lexicon_from_intake(path: Path) -> Lexicon:
-    """intake 작성본 md 의 M2-01 표·P1-03 에서 호칭·이름 사전을 만든다."""
+    """intake 작성본 md 의 M2-01 표, P1-03 -> 호칭, 이름 사전"""
     md = path.read_text(encoding="utf-8")
     addr, names = set(), set()
     m = re.search(r"\*\*P1-03[^\n]*\n+\s*<u>([^<]+)</u>", md)
@@ -115,9 +98,8 @@ def lexicon_from_intake(path: Path) -> Lexicon:
         name = cells[0]
         if name and " " not in name and name not in RELATION_WORDS:
             names.update(_given(name))
-        call = re.search(
-            r"<u>([^<]+)</u>", cells[2]
-        )  # 그분이 이 사람을 부르는 호칭 ("도윤이", "정우야")
+        # 그분이 이 사람을 부르는 호칭 ("도윤이", "정우야")
+        call = re.search(r"<u>([^<]+)</u>", cells[2])
         if call:
             c = re.sub(r"(야|아)$", "", call.group(1).strip())
             if c and c not in {"여보"}:
@@ -137,7 +119,7 @@ def lexicon_from_intake(path: Path) -> Lexicon:
 
 
 def lexicon_from_intake_json(intake: dict | None) -> Lexicon | None:
-    """등록부 intake.json(pipeline.s0_intake 결과)의 familyMembers 에서 사전을 만든다. 가족이 없으면 None."""
+    """등록부 intake.json(pipeline.s0_intake 결과) familyMembers -> 사전 (가족 없으면 None)"""
     members = ((intake or {}).get("subjectContext") or {}).get("familyMembers") or []
     addr, names = set(), set()
     for m in members:
@@ -160,7 +142,7 @@ def lexicon_from_intake_json(intake: dict | None) -> Lexicon | None:
 
 
 def lexicon_from_terms(addresses: list[str], names: list[str]) -> Lexicon | None:
-    """PersonaProfile.address_terms / family_names 로 사전을 만든다."""
+    """PersonaProfile.address_terms, family_names -> 사전"""
     if not addresses and not names:
         return None
     full = set()
@@ -188,7 +170,7 @@ class Splitter:
         self._intro = re.compile(
             rf"(?:^|(?<=[\s,]))(?:나|저)\s*,?\s*({N})(?:이)?(?:야|예요|에요|이에요|이야|요|임)?(?=$|[\s,.!?~…])[\s,.!~…]*"
         )
-        # 군말·접속어 뒤 쉼표 부름: "근데 할머니, …" / "어, 할머니, …" → 호칭만 뗀다(쉼표가 있을 때만)
+        # 군말, 접속어 뒤 쉼표 부름: 호칭만 제거 ("근데 할머니, …", 쉼표 있을 때만)
         self._lead_marked = re.compile(
             rf"^\s*((?:어|아|응|음|근데|아니|그럼|그러니까|그래서|아무튼|암튼|맞아)[,\s]+)({A})\s*,\s*"
         )
@@ -239,11 +221,10 @@ class Splitter:
                 out.greeting.append(rest)
                 continue
             if addr and (punct or mi):
-                out.address.append(addr)  # 부름이 확실함 — 떼고 나머지만
+                out.address.append(addr)  # 확실한 부름: 호칭 제거
             elif addr:
-                rest = (
-                    s[m.start() : m.end()].strip() + " " + rest if not mi else rest
-                )  # 화제일 수 있어 남긴다
+                # 화제일 수 있어 유지 ("할머니 고향이 어디였지?")
+                rest = s[m.start() : m.end()].strip() + " " + rest if not mi else rest
             mt = self._trail.search(rest)
             if mt and mt.start() > 0:
                 out.address.append(mt.group(1))

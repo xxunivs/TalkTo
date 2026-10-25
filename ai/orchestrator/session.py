@@ -1,8 +1,4 @@
-"""① 세션 상태 저장소.
-
-프로세스 메모리. 주의 — uvicorn workers=2 면 워커마다 따로라서 같은 세션이 다른 워커로 가면
-상태가 끊긴다. 여러 워커에서 이으려면 DB 테이블이나 공유 캐시로 바꿔야 한다.
-"""
+"""① 세션 상태 저장소 (프로세스 메모리라 uvicorn 워커 간 미공유, 다중 워커는 DB, 공유 캐시 필요)"""
 
 from __future__ import annotations
 
@@ -29,7 +25,7 @@ class InMemorySessionStore:
         self.ttl_s = ttl_s
 
     def load(self, turn: TurnInput) -> SessionState:
-        if not turn.session_id:  # 세션 id 가 없으면(지금 BE) 매 턴 새 상태
+        if not turn.session_id:  # 세션 id 없음(현재 BE): 매 턴 새 상태
             return fresh_state(turn)
         now = time.monotonic()
         with self._lock:

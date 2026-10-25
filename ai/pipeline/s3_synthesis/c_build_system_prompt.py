@@ -1,9 +1,4 @@
-"""페르소나 응답 서빙 — 조립된 instructions + 런타임 기억 주입 → 응답.
-
-BE가 (a) 저장한 페르소나 조립본(persona.instructions), (b) 이번 질의로 벡터 검색한
-관련 기억 후보(memories), (c) 대화 이력(history), (d) 사용자 메시지(message)를 넘기면,
-AI가 기억을 프롬프트에 주입해 응답을 생성한다. AI는 stateless — 벡터 검색은 BE 담당.
-"""
+"""페르소나 조립본 + 런타임 기억 주입 -> 응답 (AI 는 stateless, 벡터 검색은 BE)"""
 
 import json
 import logging
@@ -61,7 +56,7 @@ JSON으로만: {"candidates": [{"summary": "...", "category": "...", "importance
 
 
 def _speech_segments(examples: list[str]) -> list[TranscriptSegment]:
-    """말투 few-shot용 예시 발화를 대상자(화자 S) 세그먼트로 감싼다."""
+    """말투 few-shot 예시 -> 대상자(화자 S) 세그먼트"""
     return [
         TranscriptSegment(
             segment_index=i,
@@ -79,12 +74,7 @@ def assemble_persona_instructions(
     request: PersonaAssemblyRequest,
     settings: Settings | None = None,
 ) -> PersonaAssemblyResponse:
-    """subjectContext + intakeContext + 발화 예시 → 페르소나 system 프롬프트.
-
-    LLM 미사용(순수 조립) — 비용·지연 없음. 산출물을 BE가 저장했다가 채팅 시
-    /responses의 persona.instructions로 넘긴다. 기억은 조립 시 넣지 않고 런타임 주입.
-    PERSONA_PROMPT_BUILDER=layered 면 4층 프롬프트(pipeline/persona_prompt). 기억 통찰(persona_insights)은 쓰지 않는다.
-    """
+    """subjectContext + intakeContext + 발화 예시 -> 페르소나 system 프롬프트 (LLM 미사용, 기억은 런타임 주입)"""
     if settings is not None and settings.persona_prompt_builder == "layered":
         from pipeline.persona_prompt import build
 
@@ -108,21 +98,16 @@ def assemble_persona_instructions(
 
 
 def chat_reasoning(settings) -> dict:
-    """대답 생성 호출에 붙일 추론 정도. 설정이 비면 아무것도 보내지 않는다(모델 기본값)."""
+    """대답 생성 추론 정도 (설정 없으면 모델 기본값)"""
     effort = getattr(settings, "openai_chat_reasoning_effort", None)
     return {"reasoning_effort": effort} if effort else {}
 
 
 def build_memory_block(memories) -> str:
-    """검색된 기억 후보를 프롬프트에 주입할 텍스트 블록으로. 없으면 빈 문자열.
-
-    순서는 기억 id 순으로 고정한다. BE 가 매 턴 다른 순서로 보내도 같은 기억이면 같은 글자가 되어
-    프롬프트 캐시가 유지된다. id 는 무작위 UUID 라 종류·시간과 상관없는 고정 순서가 되는데, 세션 14 E1
-    "기억 전부" c 조건(고정 무작위 순서)과 같은 성질이다(종류·시간순 d 조건은 성적이 낮았다).
-    """
+    """기억 후보 -> 주입용 블록 (id 순 고정으로 프롬프트 캐시 유지, 세션 14 E1 고정 무작위 순서 조건과 동일)"""
     if not memories:
         return ""
-    # ponytail: 새 기억이 들어오면 그 자리부터 뒤는 캐시가 깨진다. 기록 시각을 BE 가 보내면 "옛것 먼저"로 바꿀 수 있다.
+    # ponytail: 새 기억 위치부터 캐시 깨짐 (BE 기록 시각 제공 시 옛것 먼저 정렬 가능)
     memories = sorted(memories, key=lambda m: getattr(m, "id", "") or "")
     lines = []
     for memory in memories:
@@ -137,27 +122,22 @@ def build_memory_block(memories) -> str:
     )
 
 
-# 세션 18 실험(D1·E1) 문구에서 대상자 한 사람의 숫자("714마디", "열에 넷" 등)만 빼서 모든 페르소나에 맞게 했다.
+# 세션 18 실험(D1, E1) 문구에서 대상자 고유 숫자만 뺀 범용판
 STYLE_LATE_NOTE = """# 말투 덧붙임 (실제 통화 말버릇. 위 말투 규칙과 부딪히면 이것을 따른다)
 - 실제로는 문장 끝을 다 맺지 않는 말이 많다. "어.", "응."으로 받거나 "…하고.", "…해서.", "그거."처럼 흐려도 된다.
 - 한두 마디로 끝내도 된다. "어, 그래." "응."만 하고 말아도 된다. 매번 내용을 채워 답하지 않는다.
 - 잘 못 알아들었거나 놀라면 "어?", "뭐?" 하고 한마디로 되묻는다.
 - 가끔은 묻는 말도 한다. 위의 "매 턴 되묻지 않는다"는 매번 묻지 말라는 뜻이지 묻지 말라는 뜻이 아니다."""
-_CARD_HEAD = "# 말투 카드"  # pipeline/persona_prompt/from_transcript.py 가 붙이는 제목
+_CARD_HEAD = "# 말투 카드"  # pipeline/persona_prompt/from_transcript.py 제목
 _SHORT_RULE = (
-    "- 기본은 1~2문장으로 짧게."  # pipeline/persona_prompt/render.py style() 의 짧은 말투 규칙
+    "- 기본은 1~2문장으로 짧게."  # pipeline/persona_prompt/render.py style() 짧은 말투 규칙
 )
-_VISITORS_HEAD = "# 방문자"  # 공개 본인 페르소나(render.visitors): 처음 보는 방문자에게 존댓말
+_VISITORS_HEAD = "# 방문자"  # 공개 본인 페르소나 (render.visitors, 방문자에게 존댓말)
 
 
 def late_style_note(instructions: str) -> str:
-    """마지막 가족 말 바로 앞에 넣을 말투 덧붙임. 실험한 범위(4층 + 말투 카드 + 짧은 말투)일 때만, 아니면 빈 문자열.
-
-    덧붙임의 예시("어.", "응.", "뭐?")는 반말이고 "부딪히면 이것을 따른다"고 하므로, 지금 상대에게 존댓말을
-    쓰는 지시문에는 넣지 않는다: 가족 표의 '지금 대화하는 사람' 줄이 존댓말(가족 공유의 사위·며느리 등)이거나
-    공개 본인 페르소나(방문자에게 존댓말). 실험은 반말로 말하는 가족 페르소나에서 했다.
-    """
-    # ponytail: 지시문 글자로 범위를 가린다. 말이 긴 페르소나·카드 없는 페르소나는 재 보고 넓힌다.
+    """마지막 가족 말 앞 말투 덧붙임 (실험 범위: 4층 + 말투 카드 + 짧은 말투 + 반말 상대만)"""
+    # ponytail: 지시문 글자로 범위 판정 (긴 말투, 카드 없는 페르소나는 측정 후 확대)
     if _CARD_HEAD not in instructions or _SHORT_RULE not in instructions:
         return ""
     if listener_speech_level(instructions) == "존댓말" or _VISITORS_HEAD in instructions:
@@ -166,8 +146,7 @@ def late_style_note(instructions: str) -> str:
 
 
 def warn_if_over_full_max(n_memories: int, settings: Settings) -> bool:
-    """기억이 MEMORY_FULL_MAX 를 넘었나. 넘어도 자르지 않는다(AI 서버엔 벡터가 없어 스스로 고를 수 없다).
-    넘으면 검색으로 바꾸는 것은 BE 가 한다. 여기서는 경고만 남긴다."""
+    """MEMORY_FULL_MAX 초과 경고 (AI 서버는 벡터가 없어 자르지 않음, 검색 전환은 BE)"""
     if n_memories <= settings.memory_full_max:
         return False
     logger.warning(
@@ -179,11 +158,7 @@ def warn_if_over_full_max(n_memories: int, settings: Settings) -> bool:
 
 
 def low_memory_section(request: PersonaResponseRequest, settings: Settings) -> str:
-    """기억이 적을 때 붙이는 절(LOW_MEMORY_NOTE=on, 기억 수 <= LOW_MEMORY_MAX). 아니면 빈 문자열.
-
-    가져온 지침(fixedPrompt)에는 넣지 않는다(MVP 때와 같은 메시지). 고인 판정은 가드와 같다(BE persona.deceased 먼저,
-    없으면 지시문 추정) — 비공개 고인은 잊은 듯 말하지 않는 문구(잠금 2).
-    """
+    """기억 부족 절 (LOW_MEMORY_NOTE=on, 기억 수 <= LOW_MEMORY_MAX, fixedPrompt 제외)"""
     from pipeline.persona_prompt.low_memory import low_memory_note, memory_count
 
     if settings.low_memory_note != "on" or request.persona.fixed_prompt:
@@ -205,39 +180,39 @@ def generate_persona_response(
     request: PersonaResponseRequest, *, settings: Settings
 ) -> PersonaResponseResult:
     warn_if_over_full_max(len(request.memories), settings)
-    # 만 19세 미만 살아 계신 대화 상대(BE persona.minor, 고인이면 끔). 가져온 지침(fixedPrompt)도 같다.
+    # 만 19세 미만 생존 대화 상대 (BE persona.minor, 사망 시 끔, fixedPrompt 포함)
     minor = is_minor(request.persona.minor, request.persona.deceased)
     if minor and input_blocked(request.message):
-        # 성적인 이야기·비밀 만남이면 모델을 부르지 않고 대체 글(말 높이별)로 답한다. 내용은 남기지 않는다.
+        # 성적 이야기, 비밀 만남: 모델 호출 없이 말 높이별 대체 글 (내용 미기록)
         logger.info("minor guard skipped the model for subject %s", request.persona.subject_id)
         return blocked_result(request.persona.instructions)
-    # BE 가 45초에 끊으므로 대화용 시간 한도(기본 20초 × 2번)로 부른다
+    # BE 45초 한도 안에서 끝나도록 대화용 시간 한도 (기본 20초 x 2회)
     client = chat_client(settings, "persona response")
 
     messages = [{"role": "system", "content": request.persona.instructions}]
-    # 음성 감정 지침(MiniMax VOICE_EMOTION · Fish FISH_EMOTION). 같은 호출에 system 하나만 더한다(LLM 을 더 부르지 않는다).
-    # 정적인 글이라 지시문 바로 뒤에 둔다(프롬프트 캐시). 가져온 지침(fixedPrompt)도 같다.
+    # 음성 감정 지침 (MiniMax VOICE_EMOTION, Fish FISH_EMOTION, 추가 LLM 호출 없음)
+    # 정적 글이라 지시문 바로 뒤 (프롬프트 캐시, fixedPrompt 포함)
     mode = voice_mode(settings, request.persona.voice_id)
     instruction = voice_instruction(mode)
     if instruction:
         messages.append({"role": "system", "content": instruction})
-    # 기억 빈틈 표시(flagGaps)·가족이 고쳐 준 말투(styleExamples). 요청에 없으면 넣지 않는다(예전과 같은 메시지).
+    # 기억 빈틈 표시(flagGaps), 가족 교정 말투(styleExamples) (요청에 없으면 생략)
     for extra in extra_system(request.flag_gaps, request.style_examples):
         messages.append({"role": "system", "content": extra})
-    # 미성년 규칙 — 이미 조립된 지침(규칙이 L1 에 없던 때 만든 것)·가져온 지침에도 듣게 매 턴 넣는다
+    # 미성년 규칙 매 턴 주입 (L1 규칙 이전 조립본, fixedPrompt 대비)
     if minor:
         messages.append({"role": "system", "content": MINOR_NOTE})
     memory_block = build_memory_block(request.memories)
     if memory_block:
         messages.append({"role": "system", "content": memory_block})
-    # 미성년이면 입력 검사에 걸렸던 가족 말과 그 대답은 앞 대화에서 뺀다(BE 는 기록에 남겨 보낸다)
+    # 미성년: 입력 검사에 걸린 턴은 이력에서 제외 (BE 는 기록째 전송)
     for turn in safe_history(request.history) if minor else request.history:
         messages.append({"role": turn.role, "content": turn.content})
-    # 기억이 적은 페르소나: 모르는 건 구체적으로 되묻고 안부는 기억 없이 받는다(말투 덧붙임 바로 앞, 중간계층과 같은 자리)
+    # 기억 부족 절 위치: 말투 덧붙임 바로 앞 (중간계층과 동일)
     low = low_memory_section(request, settings)
     if low:
         messages.append({"role": "system", "content": low})
-    # 가져온 지침(fixedPrompt)은 MVP 때와 같은 메시지(지침 + 기억 + 대화)만 보낸다 — 덧붙임은 4층 지시문용
+    # fixedPrompt 는 MVP 메시지 그대로 (덧붙임은 4층 지시문용)
     late = settings.style_late_note == "on" and not request.persona.fixed_prompt
     note = late_style_note(request.persona.instructions) if late else ""
     if note:
@@ -250,24 +225,22 @@ def generate_persona_response(
         **chat_reasoning(settings),
     )
     content = (response.choices[0].message.content or "").strip()
-    # 기억 빈틈 표시([기억없음:주제])를 가장 먼저 뗀다. 음성 표시(cue·inline)는 [ ] 를 모두 지우므로 그 앞에서 떼야
-    # 주제를 잃지 않고, off 여도 표시가 화면·대화 기록·기억에 남지 않는다(요청하지 않았는데 붙여도 지운다).
+    # 기억 빈틈 표시([기억없음:주제]) 우선 분리 (음성 표시 처리가 [ ] 를 모두 지우므로, off 여도 제거)
     gap_topic, content = split_gap(content)
-    # 죽음·장례·임종·위기·건강·종교 화제면 빈틈 후보를 돌려주지 않는다(표시는 위에서 이미 뗐다). 중간계층과 같다.
+    # 죽음, 장례, 임종, 위기, 건강, 종교 화제는 빈틈 후보 미반환 (중간계층과 동일)
     gap_topic = turn_gap(request.message, gap_topic) if request.flag_gaps else None
-    # 감정·연기 표시를 떼어 낸다. content 는 표시 없는 글(화면·대화 기록·기억), speech_text 는 목소리용(inline)
+    # 감정, 연기 표시 분리 (content: 화면, 기록, 기억용 / speech_text: 목소리용)
     voice = split_voice(content, mode, deceased=request.persona.deceased)
     if not voice.text.strip():
-        # 빈 대답(내용 걸러짐·감정 표시만 옴)을 돌려주면 BE 가 저장하고, 그 대화의 다음 턴이 모두 422 로 막혔다
+        # 빈 대답을 BE 가 저장하면 이후 턴 전부 422 (사고 이력)
         logger.warning(
             "persona reply was empty (finish_reason=%s)",
             getattr(response.choices[0], "finish_reason", None),
         )
         raise EmptyReplyError()
     text, emotion, speech_text = voice.text, voice.emotion, voice.speech_text()
-    # 고인은 잊은 듯 말하지 않는다(잠금 2). 가드가 없는 이 경로(가져온 지침 fixedPrompt 등)도 같은 문장을 지운다.
-    # 표시를 뗀 글에서 지우고 연기 표시는 남은 글에 다시 꽂는다(화면·목소리 같은 글). 다 지워지면 고인 되묻기(감정·표시 버림).
-    # 공개 판정·위기 예외는 가드와 같다: 위기·죽음 턴은 되묻기로 바꾸지 않는다(남는 문장이 있을 때만 지운다).
+    # 잠금 2: 사망 대상자의 잊은 듯한 문장 제거 (가드 없는 경로 포함, 다 지워지면 되묻기)
+    # 공개 판정, 위기 예외는 가드와 동일 (위기, 죽음 턴은 되묻기 전환 없음)
     if request.persona.deceased and not infer_profile(request.persona.instructions).public:
         kept = drop_forgetting(voice.text, "")
         if kept != voice.text:
@@ -277,8 +250,8 @@ def generate_persona_response(
                 polite = listener_speech_level(request.persona.instructions) == "존댓말"
                 text = ASK_BACK["family_polite_deceased" if polite else "family_deceased"][0]
                 emotion, speech_text = None, None
-    # 미성년 대답 검사: 성적·비밀 만남·위험한 내용이면 대답 전체를 대체 글로(위기 대응 턴·상담 번호는 그대로).
-    # 바뀌면 감정·목소리 글과 기억 빈틈 후보도 버린다(그 화제로 가족에게 묻지 않게).
+    # 미성년 대답 검사: 성적, 비밀 만남, 위험 내용은 대체 글 (위기 턴, 상담 번호 유지)
+    # 교체 시 감정, 목소리 글, 빈틈 후보도 폐기 (그 화제로 가족에게 묻지 않도록)
     if minor:
         safe, replaced = filter_reply(
             text,
@@ -289,7 +262,7 @@ def generate_persona_response(
             text, emotion, speech_text, gap_topic = safe, None, None, None
             logger.warning("minor guard replaced reply for subject %s", request.persona.subject_id)
 
-    # 주입한 기억 전부를 '사용됨'으로 반환한다. 실제로 인용됐는지는 가리지 않는다.
+    # 주입한 기억 전부 사용됨으로 반환 (실제 인용 여부 무관)
     return PersonaResponseResult(
         content=text,
         retrieved_memory_ids=[memory.id for memory in request.memories],
@@ -301,17 +274,13 @@ def generate_persona_response(
     )
 
 
-_STORE_IMPORTANCE_THRESHOLD = 6  # importance >= 6이면 저장 추천
+_STORE_IMPORTANCE_THRESHOLD = 6  # 저장 추천 importance 하한
 
 
 def extract_memory_candidates(
     request: MemoryCandidateRequest, *, settings: Settings
 ) -> MemoryCandidateResponse:
-    """채팅 턴에서 앞으로 저장할 만한 새 기억 후보를 뽑는다.
-
-    저장 판단(shouldStore)은 AI가 importance 임계값으로 내린다.
-    BE는 shouldStore를 따르되, stateless인 AI가 못 하는 기존 기억과의 중복 제거만 한다.
-    """
+    """채팅 턴 -> 새 기억 후보 (shouldStore 는 importance 임계값, 기존 기억 중복 제거는 BE)"""
     client = create_openai_client(settings, "memory candidate extraction")
 
     convo = "\n".join(f"{m.role}: {m.content}" for m in request.history)
@@ -332,7 +301,7 @@ def extract_memory_candidates(
         summary = str(item.get("summary") or "").strip()
         if not summary:
             continue
-        # 코드가 범위를 강제(LLM이 벗어난 값을 줘도 스키마 검증에서 터지지 않게)
+        # LLM 범위 밖 값 보정 (스키마 검증 실패 방지)
         try:
             importance = int(item.get("importance", 5))
         except (TypeError, ValueError):
@@ -372,7 +341,7 @@ _SENSITIVITY_LABELS = {
 
 
 def merge_persons(persons_results: list[dict]) -> list[dict]:
-    """여러 녹음의 persons를 이름 기준 병합. confidence·언급 빈도로 관계 확정."""
+    """녹음별 persons 이름 기준 병합 (confidence, 언급 빈도로 관계 확정)"""
     by_name: dict[str, dict] = {}
     for result in persons_results:
         for person in result.get("persons", []):
@@ -407,19 +376,14 @@ def collect_speech_examples(
                 examples.append(text)
     if len(examples) <= limit:
         return examples
-    # 앞에서부터 자르면 녹음 첫머리 화제에만 쏠린다. 전체에서 고르게 집는다.
+    # 첫머리 화제 쏠림 방지: 전체에서 균등 추출
     step = len(examples) / limit
     return [examples[int(i * step)] for i in range(limit)]
 
 
-# ── Intake 값을 사람이 읽는 줄로 ──────────────────────────────
-# speech_style·personality·taboo_topics 는 하위 호환으로 문자열로도 들어온다.
-# 모델로 들어오면 필드 이름이 그대로 새어나가지 않게 여기서 줄로 편다.
+# Intake 값 -> 사람이 읽는 줄 (speech_style, personality, taboo_topics 는 하위 호환 문자열도 허용)
 
-# ── 대상·생존에 따라 갈리는 문장 ─────────────────────────────
-# 이 템플릿은 처음에 사후 가족 페르소나 하나만 보고 쓴 것이라, 반말·끼니 챙김·
-# 임종 회피가 본문에 박혀 있었다. 본인이 살아서 방문자를 맞는 공개 본인 페르소나
-# 에는 하나도 맞지 않는다. 갈리는 문장만 여기로 뺀다.
+# 공개 여부, 생존 여부에 따라 갈리는 문장 (사후 가족 전용이던 템플릿에서 분리)
 
 
 def _is_public(intake_context) -> bool:
@@ -433,20 +397,20 @@ def _is_deceased(intake_context) -> bool:
 
 
 def _is_minor(intake_context) -> bool:
-    """만 19세 미만(BE basicProfile.minor, bool 만 온다). 고인이면 공통 규칙이 미성년 규칙을 빼 준다."""
+    """만 19세 미만 여부 (BE basicProfile.minor, 사망 시 공통 규칙에서 제외)"""
     profile = getattr(intake_context, "basic_profile", None) or {}
     return profile.get("minor") is True
 
 
 def _wants_long_answers(intake_context) -> bool:
-    """C-01 말의 길이. '길게'를 고른 사람에게 1~2문장 규칙을 씌우면 서로 어긋난다."""
+    """C-01 말의 길이 길게 선택 여부 (1~2문장 규칙과 충돌 방지)"""
     style = getattr(intake_context, "speech_style", None)
     length = getattr(style, "length", None) if not isinstance(style, str) else style
     return bool(length and "길게" in length)
 
 
 def _subject_particle(name: str, with_batchim: str, without: str) -> str:
-    """받침에 따라 조사를 고른다. 이름마다 '이(가)'를 붙이면 읽기 사납다."""
+    """받침에 따른 조사 선택"""
     if not name:
         return without
     last = name[-1]
@@ -456,13 +420,13 @@ def _subject_particle(name: str, with_batchim: str, without: str) -> str:
 
 
 def _listener(intake_context) -> FamilyNote | None:
-    """가족 표에서 지금 대화하는 사람(isListener) 행. 웹앱이 보내지 않으면 없다."""
+    """가족 표의 현재 대화 상대(isListener) 행"""
     rows = getattr(intake_context, "family_map", None) or []
     return next((note for note in rows if note.is_listener), None)
 
 
 def family_line(name: str, note: FamilyNote | None, merged_relation: str | None = None) -> str:
-    """가족 목록 한 줄. 웹앱이 더 보내는 칸(isListener·isOwner·listenerCalls·deceased·note)이 비면 예전 줄 그대로다."""
+    """가족 목록 한 줄 (웹앱 추가 칸이 비면 예전 줄 그대로)"""
     rel = (note.relation if note else None) or merged_relation
     line = f"- {name}" + (f" ({rel})" if rel else "")
     if note is None:
@@ -471,14 +435,14 @@ def family_line(name: str, note: FamilyNote | None, merged_relation: str | None 
         line += " (지금 대화하는 사람)"
     elif note.deceased:
         line += " (돌아가심)"
-    elif note.is_owner:  # 가족 공유: 함께 쓰는 가족의 조립본에만 오는 주인 줄
+    elif note.is_owner:  # 가족 공유 조립본에만 오는 주인 줄
         line += " (이 대화 상대를 만든 가족)"
-    # 그분이 이 사람을 부르던 말(예: 우리 강아지). 가족이 직접 적은 것이라 그대로 부른다.
+    # 대상자가 이 사람을 부르던 말 (가족 직접 작성이라 그대로 사용)
     if note.address_term_to:
         line += f' — 이 사람을 "{note.address_term_to}"라고 부른다'
     if note.tone:
         line += f": {note.tone}"
-    # 대화하는 사람 쪽 호칭(아빠·고모). 사용자가 "아빠가…" 하면 누구인지 이걸로 찾는다.
+    # 대화 상대 쪽 호칭 (사용자가 말하는 가족 식별용)
     if note.listener_calls and not note.is_listener:
         said = _subject_particle(note.listener_calls, "이라고", "라고")
         line += f' · 사용자는 "{note.listener_calls}"{said} 부름'
@@ -488,11 +452,7 @@ def family_line(name: str, note: FamilyNote | None, merged_relation: str | None 
 
 
 def visitor_context_block(intake_context, *, public: bool) -> str:
-    """왜 이 페르소나가 여기 있고 누가 오는지 (P1-07D).
-
-    없으면 페르소나는 자기가 왜 대화하는지 모른 채 답한다. 공개 페르소나는
-    방문자가 무엇을 기대하고 오는지가 답의 방향을 크게 바꾼다.
-    """
+    """공개 페르소나의 존재 이유와 방문자 맥락 (P1-07D)"""
     text = getattr(intake_context, "visitor_context", None)
     if not public or not text:
         return ""
@@ -500,11 +460,7 @@ def visitor_context_block(intake_context, *, public: bool) -> str:
 
 
 def opening_line(subject_name: str, *, public: bool, deceased: bool) -> str:
-    """사후 가족 페르소나와 생존 본인 페르소나는 정체를 다루는 법이 정반대다.
-
-    돌아가신 분은 "내가 그 사람이다" 하면 안 된다. 살아 있는 본인의 공개
-    페르소나는 반대로 1인칭으로 말하는 것이 맞고, 본인이냐고 물을 때만 밝힌다.
-    """
+    """정체 소개 첫 문단 (사후 가족: 본인 아님 명시, 생존 공개 본인: 1인칭)"""
     if deceased or not public:
         return (
             f"당신은 {subject_name}의 페르소나를 가진 챗봇이다. "
@@ -573,11 +529,7 @@ def audience_heading(*, public: bool) -> str:
 
 
 def fixed_rules(*, public: bool, deceased: bool, has_family: bool, minor: bool = False) -> str:
-    """대화 흐름 원칙과 안전 가드레일. 대상에 따라 문장이 갈린다.
-
-    문장은 prompts/rules/ 모듈(legacy 세트, 변형 블록 포함)에 있다. 8개 변형의 출력은
-    test/pipeline/test_common_rules.py 골든 파일로 고정돼 있다(minor 면 안전 절에 미성년 규칙이 더해진다).
-    """
+    """대화 흐름 원칙과 안전 가드레일 (prompts/rules/ legacy 세트, 8개 변형 골든 고정)"""
     return render_common_rules(public=public, deceased=deceased, has_family=has_family, minor=minor)
 
 
@@ -630,7 +582,7 @@ def render_speech_style(style) -> str:
     return "\n".join(r for r in rows if r)
 
 
-# 등급 → 그 등급이면 어떻게 하라는 말인지. 등급 이름만 적어두면 지시가 안 된다.
+# 등급 -> 행동 지시 (등급 이름만으로는 지시가 안 됨)
 TABOO_GRADES = [
     (
         "금지",
@@ -644,7 +596,7 @@ TABOO_GRADES = [
 
 
 def _taboo_item(topic) -> tuple[str, str]:
-    """(등급, 주제와 단서) 로 나눈다. 문자열(하위 호환 형태)은 전부 금지로 본다."""
+    """(등급, 주제와 단서) 분리 (하위 호환 문자열은 금지 등급)"""
     if isinstance(topic, str):
         return "금지", topic
     text = topic.topic
@@ -655,12 +607,7 @@ def _taboo_item(topic) -> tuple[str, str]:
 
 
 def render_taboo_block(topics) -> str:
-    """등급끼리 묶어 지시문으로 편다.
-
-    문항이 여럿이라 같은 주제가 다른 등급으로 두 번 들어올 수 있다. C-10 의
-    "종교 이야기나 권유"(금지) 와 M9-01 의 "종교"(짧게 넘김) 가 그렇다. 프롬프트가
-    스스로 어긋나면 안 되니 겹치는 것은 엄한 쪽만 남긴다.
-    """
+    """금기 등급별 지시문 (C-10, M9-01 처럼 같은 주제가 겹치면 엄한 쪽만)"""
     strictness = {grade: i for i, (grade, _) in enumerate(TABOO_GRADES)}
     items = [_taboo_item(t) for t in topics]
     kept: list[tuple[str, str]] = []
@@ -687,7 +634,7 @@ def render_taboo_block(topics) -> str:
         items = grouped.pop(grade, [])
         if items:
             rows.append(f"- {instruction}: {', '.join(items)}")
-    for grade, items in grouped.items():  # 예상 밖 등급도 버리지 않는다
+    for grade, items in grouped.items():  # 예상 밖 등급도 유지
         rows.append(f"- [{grade}]: {', '.join(items)}")
     return "\n".join(rows) or "- (지정된 것 없음)"
 
@@ -718,12 +665,12 @@ def assemble_persona_prompt(
     listener = _listener(intake_context) if not public else None
     identity = f"{subject_name}"
     if listener is not None and listener.address_term_from:
-        # 웹앱이 대화하는 사람을 알려주면 가족 모두가 아니라 그 사람이 부르는 말을 쓴다
+        # 대화 상대가 지정되면 그 사람의 호칭 사용
         term = listener.address_term_from
         ra = _subject_particle(term, "이라고", "라고")
         identity += f". 지금 대화하는 사람({listener.name})은 '{term}'{ra} 부른다."
     elif address:
-        # 공개 페르소나에서 이 값은 P1-07B, 방문자를 부르는 말이다
+        # 공개 페르소나에서는 P1-07B 방문자 호칭
         ra = _subject_particle(address, "이라고", "라고")
         identity += (
             f". 방문자는 '{address}'{ra} 부른다."
@@ -736,16 +683,15 @@ def assemble_persona_prompt(
             identity += f" — {bp['oneLine']}"
         if bp.get("period"):
             identity += f"\n- 어느 때의 모습인가: {bp['period']}"
-        # familyStatusNow 는 상시 주입하면 과공유를 일으켜 넣지 않는다.
-        # 사인·경위(deathContext)도 넣지 않는다 — 배경으로만 넣어도 직접 물으면
-        # 단정적으로 새어나오고, 페르소나가 알 필요도 없다.
+        # familyStatusNow 제외 (상시 주입 시 과공유)
+        # deathContext 제외 (배경으로만 넣어도 직접 물으면 단정적으로 노출)
         if bp.get("status") == "사망":
             identity += (
                 "\n(사후 페르소나다. 사망·임종·사인·경위는 어떤 경우에도 입에 올리지 않는다."
                 " 직접 물어도 '그런 얘기는 자세히 말하지 말자, 마음만 아프다' 하고 안부·가족 챙김으로 넘긴다.)"
             )
 
-    # Intake 가족 표를 1차 소스로, 파이프라인 persons 병합을 보강으로 합침
+    # Intake 가족 표 우선, persons 병합은 보강
     note_by_name: dict[str, FamilyNote] = {}
     if intake_context is not None:
         for note in intake_context.family_map:
@@ -758,7 +704,7 @@ def assemble_persona_prompt(
     if family_lines:
         family = "\n".join(family_lines)
         guide = family_guide(note_by_name.values())
-        if guide:  # 목록은 사람 줄만 남게 안내는 제목 바로 아래 따로 둔다
+        if guide:  # 안내는 목록과 분리해 제목 바로 아래
             family = f"{guide}\n{family}"
     elif _is_public(intake_context):
         family = (
@@ -772,8 +718,7 @@ def assemble_persona_prompt(
 
     taboo_topics: list = list(aggregate_taboo(sensitivity_results))
 
-    # memoryCards 상시 주입은 과공유를 일으켜 제외 —
-    # 기억은 런타임 RAG로 질의 관련된 것만 주입한다
+    # memoryCards 상시 주입 제외 (과공유, 기억은 런타임 RAG 로 질의 관련분만)
     memories = (
         "\n".join(f"- {m}" for m in retrieved_memories)
         if retrieved_memories
@@ -790,7 +735,7 @@ def assemble_persona_prompt(
         if intake_context and intake_context.personality
         else ""
     )
-    # reflection 통찰을 성향·가치관에 합침 (누적 기억에서 파생된 프로필)
+    # reflection 통찰을 성격, 가치관에 병합
     if persona_insights:
         insight_block = "\n".join(f"- {s}" for s in persona_insights)
         personality = f"{personality}\n{insight_block}".strip() if personality else insight_block
@@ -800,7 +745,7 @@ def assemble_persona_prompt(
     if intake_context and intake_context.situational_reactions:
         sit_lines = []
         for r in intake_context.situational_reactions:
-            # 고인은 잊은 듯 말하지 않는다(잠금 2): '기억이 안 나네' 같은 답(M8-08 등)은 지침으로 넣지 않는다
+            # 잠금 2: 사망 대상자의 잊은 듯한 답(M8-08 등) 제외
             if deceased and not public and says_forgot(r.response):
                 continue
             line = f'- "{r.situation}" → {r.response}'
@@ -810,7 +755,7 @@ def assemble_persona_prompt(
         situational = "\n".join(sit_lines) or "(별도 지침 없음 — 위 원칙을 따른다)"
     else:
         situational = "(별도 지침 없음 — 위 원칙을 따른다)"
-    # Intake 금기를 앞에 두고 전사에서 잡힌 것을 뒤에 붙인다
+    # Intake 금기 먼저, 전사 금기 뒤
     if intake_context and intake_context.taboo_topics:
         taboo_topics = list(intake_context.taboo_topics) + taboo_topics
     taboo = render_taboo_block(taboo_topics)
@@ -842,7 +787,7 @@ def assemble_persona_prompt(
 
 
 # ===== 템플릿 =====
-# 대상자별 슬롯을 끼워 최종 프롬프트를 만드는 골격
+# 대상자별 슬롯 골격
 PERSONA_TEMPLATE = """{opening}
 
 # 기본 정보

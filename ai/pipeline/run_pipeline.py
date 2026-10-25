@@ -1,18 +1,7 @@
-# 로컬 실행 (input/<대상자> 를 읽어 output/<대상자>/sN 에 쓴다). 전체 또는 단계만 골라 돌린다.
-# 같은 단계 순서가 infra/be_ai_api/recording_analysis.py 에도 있다. 순서를 바꾸면 둘 다 확인할 것.
-#
-#     python -m pipeline.run_pipeline --subject <대상자폴더>                # 전체
-#     python -m pipeline.run_pipeline --subject <대상자폴더> --only s2      # s2 전체
-#     python -m pipeline.run_pipeline --subject <대상자폴더> --only s2_e    # 기억 추출만
-#     python -m pipeline.run_pipeline --subject <대상자폴더> --from s2 --to s3
-#
-# 각 단계는 앞 단계 결과를 output/<subject>/ 에서 읽는다. 전사는 a_transcript.json 에
-# 이미 있는 녹음을 건너뛰어, 다시 돌려도 유료 API 를 부르지 않는다.
-#
-# 사람이 넣는 자료는 input/<대상자>/ 에 둔다. 파이프라인이 자동으로 읽는 것은
-# persona_intake.json 과 음성/ 뿐이고, 나머지 자료(인터뷰 전사, 기억DB 등)는 사람이
-# 도구를 골라 넣는다. 매뉴얼 페르소나는 같은 입력을 쓰고 산출물만
-# output/<대상자>_manual/ 로 갈린다.
+# 로컬 실행 (input/<대상자> -> output/<대상자>/sN, 전체 또는 단계 선택)
+# 단계 순서는 infra/be_ai_api/recording_analysis.py 와 공유 (변경 시 양쪽 확인)
+#   python -m pipeline.run_pipeline --subject <대상자폴더> [--only s2 | --only s2_e | --from s2 --to s3]
+# 자동 입력은 persona_intake.json 과 음성/ 뿐 (나머지 자료는 수동 투입, 매뉴얼 산출물은 output/<대상자>_manual/)
 
 import argparse
 import json
@@ -82,7 +71,7 @@ STEP_LABEL = {
 
 
 class NeedPriorStep(Exception):
-    """앞 단계 결과 파일이 없어 진행할 수 없을 때."""
+    """앞 단계 결과 파일 누락"""
 
     def __init__(self, missing_file: Path, needed_by: str) -> None:
         super().__init__(str(missing_file))
@@ -116,7 +105,7 @@ def _mem_field(memory: dict, *keys, default=None):
 
 
 def expand_steps(token: str) -> list[str]:
-    """s2 -> s2_a..s2_f, s2_d -> [s2_d]. 모르는 값이면 빈 목록."""
+    """단계 토큰 펼치기 (s2 -> s2_a..s2_f, s2_d -> [s2_d], 모르는 값은 빈 목록)"""
     if token in STEP_ORDER:
         return [token]
     return [s for s in STEP_ORDER if s.startswith(token + "_")]
@@ -144,7 +133,7 @@ def select_steps(only: str | None, start: str | None, end: str | None) -> list[s
 
 
 class Ctx:
-    """단계들이 함께 쓰는 상태. 메모리에 없으면 output 파일에서 읽어온다."""
+    """단계 공용 상태 (메모리에 없으면 output 파일에서 로드)"""
 
     def __init__(
         self, subject_dir: Path, input_dir: Path, settings: Settings, limit: int | None
@@ -160,7 +149,7 @@ class Ctx:
         self._memories: list[dict] | None = None
         self._insights: list[str] | None = None
 
-        # 작성본에서 변환한 것(s2_extraction)을 먼저 보고, 없으면 앱이 넣어준 입력을 본다
+        # 작성본 변환본(s2_extraction) 우선, 없으면 앱 입력
         made = subject_dir / "s2_extraction" / "b_intake_prompt.json"
         source = made if made.exists() else input_dir / "persona_intake.json"
         payload = _read_json(source, "s0_intake")
@@ -207,17 +196,13 @@ class Ctx:
         return self._sensitivity
 
     def memories(self, needed_by: str) -> list[dict]:
-        """s3_a 가 모아 둔 한 장을 본다. 출처별 파일을 직접 세지 않는다."""
+        """s3_a 통합본 로드 (출처별 파일 직접 참조 없음)"""
         if self._memories is None:
             self._memories = _read_json(self.dir / "s3_synthesis" / "a_memory.json", needed_by)
         return self._memories
 
     def prompt_material(self) -> tuple[IntakeContext, dict]:
-        """설문과 전사, 두 장을 합쳐 프롬프트 재료 하나로 만든다.
-
-        같은 칸에 둘 다 값이 있으면 설문이 이긴다. 사용자가 직접 쓴 것이라서다.
-        전사는 설문이 비워둔 칸만 채운다.
-        """
+        """설문 + 전사 프롬프트 재료 병합 (충돌 시 사용자 작성 설문 우선, 전사는 빈칸만)"""
         intake = self.intake_context or IntakeContext()
         path = self.dir / "s2_extraction" / "d_recording_prompt.json"
         if not path.exists():
@@ -231,8 +216,7 @@ class Ctx:
 
         style = recording.get("speechStyle") or {}
         if isinstance(intake.speech_style, SpeechStyle):
-            # 감탄사는 여러 개를 모으는 칸이라 덮지 않고 합친다. 본인이 적은 것이
-            # 앞에 오고, 녹음에서 새로 나온 것이 뒤에 붙는다.
+            # 감탄사는 덮지 않고 합침 (설문 먼저, 녹음 신규 뒤)
             found = intake.speech_style.interjections
             intake.speech_style.interjections = found + [
                 w for w in style.get("interjections", []) if w not in found
@@ -256,7 +240,7 @@ class Ctx:
         return self._insights
 
     def speech_examples(self, needed_by: str) -> list[str]:
-        """대상자가 말한 짧고 담백한 발화 (말투 few-shot)."""
+        """대상자의 짧고 담백한 발화 (말투 few-shot)"""
         segments = self.segments(needed_by)
         labels = self.labels(needed_by)
         out: list[str] = []
@@ -282,11 +266,7 @@ class Ctx:
 
 
 def step_s1_a(ctx: Ctx) -> str:
-    """전사는 유료라, a_transcript.json 에 이미 있는 녹음은 다시 전사하지 않는다.
-
-    다시 전사하려면 그 녹음 항목을 a_transcript.json 에서 지우면 된다.
-    이미 있는 항목은 그대로 두므로 s1_c 가 채운 교정문도 보존된다.
-    """
+    """전사 (유료라 a_transcript.json 에 있는 녹음은 건너뜀, 재전사는 해당 항목 삭제)"""
     clips = ctx.clips()
     if not clips:
         raise NeedPriorStep(ctx.input_dir / "음성", "s1_a")
@@ -384,11 +364,7 @@ def step_s2_c(ctx: Ctx) -> str:
 
 
 def step_s2_d(ctx: Ctx) -> str:
-    """a·b·c 를 설문과 같은 칸 이름으로 옮겨 담는다. s3 는 이 파일 하나만 본다.
-
-    a·b·c 는 각각 돈이 드는 단계라, 아직 안 돌린 것이 있을 수 있다. 없는 것은
-    빈 값으로 두고 있는 것만 담는다. 전사만 있어도 말투 예시는 나온다.
-    """
+    """s2 a, b, c 결과를 설문 칸 이름으로 병합 (유료 단계라 없는 결과는 빈 값, s3 는 이 파일만 참조)"""
 
     def maybe(filename: str) -> dict:
         path = ctx.dir / "s2_extraction" / filename
@@ -424,7 +400,7 @@ def step_s2_e(ctx: Ctx) -> str:
             settings=ctx.settings,
         )
         for memory in result["memorySegments"]:
-            memory["recording"] = name  # 어느 통화에서 나왔는지 (s2_f 가 녹음별 태그를 낼 때 쓴다)
+            memory["recording"] = name  # 출처 통화 (s2_f 녹음별 태그용)
             collected.append(memory)
 
     memory_out = [
@@ -447,8 +423,7 @@ def step_s2_e(ctx: Ctx) -> str:
 def step_s2_f(ctx: Ctx) -> str:
     segments = ctx.segments("s2_f")
     memories = ctx.memories("s2_f")
-    # 기억이 어느 통화에서 나왔는지는 s2_e 가 recording 필드로 남긴다. 그 필드가 없으면
-    # 녹음별로 나눌 수 없어 전체 기억으로 태그를 낸다(근사).
+    # recording 필드(s2_e) 없으면 녹음별 구분 불가: 전체 기억으로 태그 (근사)
     tagged_by_recording = any(m.get("recording") for m in memories)
     note = (
         ""
@@ -473,7 +448,7 @@ def step_s2_f(ctx: Ctx) -> str:
 
 
 def step_s3_a(ctx: Ctx) -> str:
-    """설문·전사·따로 넣은 기억을 한 장으로. 뒤 단계는 이 파일만 본다."""
+    """설문, 전사, 별도 기억 통합 (뒤 단계는 이 파일만 참조)"""
     merged = merge_memory(ctx.dir / "s2_extraction")
     if not merged:
         raise NeedPriorStep(ctx.dir / "s2_extraction" / "*_memory.json", "s3_a")
@@ -533,8 +508,7 @@ def step_s3_c(ctx: Ctx) -> str:
 
 
 def _step_s3_c_layered(ctx: Ctx) -> str:
-    """4층 프롬프트(PERSONA_PROMPT_BUILDER=layered): 설문 → 전사 재료 빈칸 → 말투 카드·실제 주고받기 → 렌더.
-    인터뷰 후보는 사람이 확인해야 해서 여기서는 넣지 않는다(python -m pipeline.persona_prompt build --interview …)."""
+    """4층 프롬프트 (PERSONA_PROMPT_BUILDER=layered, 인터뷰 후보는 사람 확인 필요라 제외)"""
     from pipeline.persona_prompt import build
 
     death_talk = build.TOGGLE[ctx.settings.persona_death_talk]
@@ -625,7 +599,7 @@ def main() -> None:
         print("OPENAI_API_KEY / ELEVENLABS_API_KEY가 필요하다 (.env 확인).", file=sys.stderr)
         sys.exit(1)
     subject_dir = Path(args.root) / args.subject
-    # 매뉴얼 산출물(<이름>_manual)도 입력은 같은 사람 것을 쓴다
+    # 매뉴얼 산출물(<이름>_manual)도 같은 입력 사용
     input_dir = Path(args.input_root) / args.subject.removesuffix("_manual")
     if not input_dir.exists():
         print(f"입력 폴더가 없다: {input_dir}", file=sys.stderr)
