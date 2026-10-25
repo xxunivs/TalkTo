@@ -54,6 +54,7 @@ class PersonaContext(ApiModel):
 
 class StyleExample(ApiModel):
     """가족이 고쳐 준 말투 한 쌍(BE StyleExample). 예전 대답 → 그분이라면 했을 말."""
+
     original: str = Field(min_length=1, max_length=2_000)
     corrected: str = Field(min_length=1, max_length=300)
 
@@ -81,6 +82,7 @@ class PersonaResponseRequest(ApiModel):
 
 class MemoryGap(ApiModel):
     """이번 대답에서 그분 기억에 없던 것(BE 가 대화가 끝난 뒤 가족에게 물을 질문 후보로 쓴다)."""
+
     # 모델이 붙인 주제(없으면 빈 글 — 빈틈은 있었다)
     topic: str = Field(default="", max_length=60)
 
@@ -113,6 +115,7 @@ class PersonaResponseResult(ApiModel):
 
 class GapCandidate(ApiModel):
     """대화 한 번에서 나온 기억 빈틈 후보(BE 가 대화 뒤에 보낸다)."""
+
     user_message: str = Field(min_length=1, max_length=4_000)
     reply: str = Field(default="", max_length=4_000)
     # 대답 모델이 붙인 주제(signal=model). 없으면 빈 글

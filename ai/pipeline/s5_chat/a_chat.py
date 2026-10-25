@@ -28,22 +28,22 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from infra.setting import Settings, load_settings
 from infra.schema.persona import (
     ConversationMessage,
     MemoryContext,
     PersonaContext,
     PersonaResponseRequest,
 )
+from infra.setting import Settings, load_settings
 from pipeline.s3_synthesis.c_build_system_prompt import generate_persona_response
 from pipeline.s3_synthesis.d_build_memory_embedding import embed_texts
 
 logger = logging.getLogger(__name__)
 
 # ===== BE persona-runtime 상수 (동일하게 유지 — 프로덕션 파리티) =====
-RUNTIME_MEMORY_LIMIT = 5      # 주입할 기억 상위 개수
+RUNTIME_MEMORY_LIMIT = 5  # 주입할 기억 상위 개수
 LOW_CONFIDENCE_THRESHOLD = 0.18  # 이 유사도 미만이면 버림
-CANDIDATE_LIMIT = 500         # 후보 임베딩 상한
+CANDIDATE_LIMIT = 500  # 후보 임베딩 상한
 # 위기 신호 게이트 — 매칭되면 RAG 없이 안전 응답으로 대체
 BLOCKED_TOPIC_PATTERN = re.compile(
     r"\b(suicide|self-harm|kill|weapon|violence)\b|자살|자해|살해|무기|폭력",
@@ -133,7 +133,15 @@ def load_memories(subject_dir: Path) -> list[dict]:
         text = _first(item, "memoryText", "memory_text", "content", "text")
         if not text:
             continue
-        mid = _first(item, "id", "memorySegmentId", "memory_segment_id", "segmentIndex", "segment_index", default=i)
+        mid = _first(
+            item,
+            "id",
+            "memorySegmentId",
+            "memory_segment_id",
+            "segmentIndex",
+            "segment_index",
+            default=i,
+        )
         memories.append(
             {
                 "id": str(mid),
@@ -163,7 +171,9 @@ def load_embeddings(subject_dir: Path) -> dict[str, list[float]]:
         rows = []
     result: dict[str, list[float]] = {}
     for row in rows:
-        mid = _first(row, "memorySegmentId", "memory_segment_id", "id", "segmentIndex", "segment_index")
+        mid = _first(
+            row, "memorySegmentId", "memory_segment_id", "id", "segmentIndex", "segment_index"
+        )
         vector = _first(row, "embedding", "vector")
         if mid is not None and isinstance(vector, list):
             result[str(mid)] = vector
@@ -197,8 +207,12 @@ def answer(
         return {"text": BLOCKED_REPLY, "safety": "blocked", "used_memory_ids": [], "retrieved": []}
 
     retrieved = retrieve_memories(
-        message, memories, embeddings,
-        settings=settings, top_k=top_k, threshold=threshold,
+        message,
+        memories,
+        embeddings,
+        settings=settings,
+        top_k=top_k,
+        threshold=threshold,
     )
     request = PersonaResponseRequest(
         message=message,
@@ -207,9 +221,7 @@ def answer(
             MemoryContext(id=m["id"], title=m["title"], content=m["text"], tags=m["tags"])
             for m in retrieved
         ],
-        persona=PersonaContext(
-            subject_id=subject, instructions=instructions, voice_id=voice_id
-        ),
+        persona=PersonaContext(subject_id=subject, instructions=instructions, voice_id=voice_id),
     )
     result = generate_persona_response(request, settings=settings)
     return {
@@ -223,8 +235,14 @@ def answer(
     }
 
 
-def _maybe_synthesize(text: str, voice_id: str | None, chat_dir: Path, turn: int, settings: Settings,
-                      emotion: str | None = None) -> str | None:
+def _maybe_synthesize(
+    text: str,
+    voice_id: str | None,
+    chat_dir: Path,
+    turn: int,
+    settings: Settings,
+    emotion: str | None = None,
+) -> str | None:
     """--tts: 응답을 대상자 목소리로 합성해 mp3 저장. 실패해도 대화는 계속."""
     from infra.schema.voice import SpeechSynthesisRequest
     from pipeline.s4_voice.a_voice import synthesize_speech
@@ -284,8 +302,10 @@ def run_repl(args: argparse.Namespace) -> int:
     started = datetime.now()
     log_path = chat_dir / started.strftime("chat_%y%m%d_%H%M.json")
 
-    print(f"[{args.subject}] 대화 시작. 기억 {len(memories)}개, 임베딩 {len(embeddings)}개"
-          f"{', voice_id 있음' if voice_id else ''}. (exit/quit 종료)")
+    print(
+        f"[{args.subject}] 대화 시작. 기억 {len(memories)}개, 임베딩 {len(embeddings)}개"
+        f"{', voice_id 있음' if voice_id else ''}. (exit/quit 종료)"
+    )
     if args.keep_history:
         print("  * --keep-history: 멀티턴 (BE 프로덕션과 어긋남, 로컬 튜닝용)")
 
@@ -337,9 +357,15 @@ def run_repl(args: argparse.Namespace) -> int:
 
             reply = answer(
                 message,
-                instructions=instructions, subject=args.subject, voice_id=voice_id,
-                memories=memories, embeddings=embeddings, history=history,
-                settings=settings, top_k=args.top_k, threshold=args.threshold,
+                instructions=instructions,
+                subject=args.subject,
+                voice_id=voice_id,
+                memories=memories,
+                embeddings=embeddings,
+                history=history,
+                settings=settings,
+                top_k=args.top_k,
+                threshold=args.threshold,
             )
             print(f"{args.subject} > {reply['text']}")
             if reply["retrieved"]:
@@ -348,8 +374,14 @@ def run_repl(args: argparse.Namespace) -> int:
             audio_path = None
             if args.tts and reply["safety"] == "allowed":
                 # 목소리용 글(연기 표시 포함)이 있으면 그것을 읽는다(운영 BE 와 같다)
-                audio_path = _maybe_synthesize(reply.get("speech_text") or reply["text"], voice_id, chat_dir,
-                                               turn, settings, emotion=reply.get("emotion"))
+                audio_path = _maybe_synthesize(
+                    reply.get("speech_text") or reply["text"],
+                    voice_id,
+                    chat_dir,
+                    turn,
+                    settings,
+                    emotion=reply.get("emotion"),
+                )
 
             turns.append(
                 {
@@ -379,11 +411,21 @@ def main() -> None:
     parser.add_argument("--subject", required=True, help="대상자 폴더명 (input/ 아래 폴더 이름)")
     parser.add_argument("--root", default="output", help="산출물 루트 (기본 output)")
     parser.add_argument("--top-k", type=int, default=RUNTIME_MEMORY_LIMIT, help="주입할 기억 개수")
-    parser.add_argument("--threshold", type=float, default=LOW_CONFIDENCE_THRESHOLD, help="유사도 임계값")
-    parser.add_argument("--keep-history", action="store_true", help="멀티턴(이전 대화 주입, BE와 어긋남)")
-    parser.add_argument("--tts", action="store_true", help="응답을 대상자 목소리로 합성해 바로 재생 (mp3도 저장)")
-    parser.add_argument("--ask", action="append", metavar="말",
-                        help="한 번만 묻고 끝낸다. 여러 번 주면 차례로 묻는다 (터미널 없이 쓸 때)")
+    parser.add_argument(
+        "--threshold", type=float, default=LOW_CONFIDENCE_THRESHOLD, help="유사도 임계값"
+    )
+    parser.add_argument(
+        "--keep-history", action="store_true", help="멀티턴(이전 대화 주입, BE와 어긋남)"
+    )
+    parser.add_argument(
+        "--tts", action="store_true", help="응답을 대상자 목소리로 합성해 바로 재생 (mp3도 저장)"
+    )
+    parser.add_argument(
+        "--ask",
+        action="append",
+        metavar="말",
+        help="한 번만 묻고 끝낸다. 여러 번 주면 차례로 묻는다 (터미널 없이 쓸 때)",
+    )
     logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(message)s")
     sys.exit(run_repl(parser.parse_args()))
 

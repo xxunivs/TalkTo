@@ -1,4 +1,5 @@
 """⑤ 생성 모델 어댑터. 모델 교체·스트리밍은 이 뒤에서 한다(스트리밍은 BE SSE 경로와 같이)."""
+
 from __future__ import annotations
 
 import time
@@ -34,14 +35,19 @@ class OpenAIChatLLM:
             if isinstance(v, int):
                 usage[k] = v
         text = (response.choices[0].message.content or "").strip()
-        return Generation(text=text, provider=PROVIDER, model=self.model, usage=usage, latency_s=latency)
+        return Generation(
+            text=text, provider=PROVIDER, model=self.model, usage=usage, latency_s=latency
+        )
 
 
 class FakeLLM:
     """API 없이 정해진 답. 테스트·CLI --mock 용."""
+
     impl = "fake"
 
-    def __init__(self, reply: str | Callable[[list[dict[str, str]]], str] = "어, 그래. 밥은 먹었니?") -> None:
+    def __init__(
+        self, reply: str | Callable[[list[dict[str, str]]], str] = "어, 그래. 밥은 먹었니?"
+    ) -> None:
         self.reply = reply
         self.calls: list[list[dict[str, str]]] = []
 

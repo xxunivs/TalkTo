@@ -9,10 +9,9 @@ import logging
 import unicodedata
 
 from infra.external_api.openai_client import analysis_client, analysis_completion, json_reply
-
-from infra.setting import Settings
 from infra.schema.subject import SubjectContext
 from infra.schema.transcript import TranscriptSegment
+from infra.setting import Settings
 
 logger = logging.getLogger(__name__)
 
@@ -49,12 +48,28 @@ def has_foreign_script(text: str) -> bool:
 # 태그 통제 어휘 — 이 밖의 값은 게이트에서 버린다
 _ALLOWED_TAGS = {
     # 주제
-    "음식요리", "건강병원", "가족안부", "명절기념일", "날씨계절",
-    "신앙", "일·학교", "추억", "장소고향",
+    "음식요리",
+    "건강병원",
+    "가족안부",
+    "명절기념일",
+    "날씨계절",
+    "신앙",
+    "일·학교",
+    "추억",
+    "장소고향",
     # 생애시기
-    "유년", "젊은시절", "중년", "노년", "최근",
+    "유년",
+    "젊은시절",
+    "중년",
+    "노년",
+    "최근",
     # 감정
-    "애정", "그리움", "걱정", "기쁨", "슬픔", "유머",
+    "애정",
+    "그리움",
+    "걱정",
+    "기쁨",
+    "슬픔",
+    "유머",
 }
 
 
@@ -80,7 +95,10 @@ def extract_memory_segments(
             {
                 "role": "user",
                 "content": build_memory_user_prompt(
-                    segments, subject_context, subject_speaker_label, persons_result,
+                    segments,
+                    subject_context,
+                    subject_speaker_label,
+                    persons_result,
                     conversation_partner_name,
                 ),
             },
@@ -127,9 +145,7 @@ def validate_memory_payload(
         if not text or has_foreign_script(text) or not isinstance(source_ids_raw, list):
             dropped["memories"] += 1
             continue
-        source_ids = sorted(
-            {i for i in source_ids_raw if isinstance(i, int) and i in by_index}
-        )
+        source_ids = sorted({i for i in source_ids_raw if isinstance(i, int) and i in by_index})
         if not source_ids or memory.get("confidence") not in _CONFIDENCE_VALUES:
             dropped["memories"] += 1
             continue
@@ -143,21 +159,13 @@ def validate_memory_payload(
         sources = [by_index[i] for i in source_ids]
         speaker_counts: dict[str, int] = {}
         for source in sources:
-            speaker_counts[source.speaker_label] = (
-                speaker_counts.get(source.speaker_label, 0) + 1
-            )
+            speaker_counts[source.speaker_label] = speaker_counts.get(source.speaker_label, 0) + 1
         # 민감플래그 조인은 정확히 인용된 세그먼트가 아니라 기억이 걸친 범위
         # [최소~최대]로 한다 — 중간 세그먼트를 명시 인용하지 않아도 그 범위 안의
         # 민감 내용을 놓치지 않기 위함 (근거 인용은 완전하지 않을 수 있음)
         span = range(source_ids[0], source_ids[-1] + 1)
         span_set = set(span)
-        flags = sorted(
-            {
-                flag_type
-                for flag_ids, flag_type in flag_map
-                if flag_ids & span_set
-            }
-        )
+        flags = sorted({flag_type for flag_ids, flag_type in flag_map if flag_ids & span_set})
         related = [
             str(name).strip()
             for name in (memory.get("relatedPeople") or [])
@@ -166,14 +174,10 @@ def validate_memory_payload(
         # importance: 1~10 정수로 클램프 (범위 밖·비정수는 중앙값 5)
         raw_importance = memory.get("importance")
         importance = (
-            min(10, max(1, int(raw_importance)))
-            if isinstance(raw_importance, (int, float))
-            else 5
+            min(10, max(1, int(raw_importance))) if isinstance(raw_importance, (int, float)) else 5
         )
         # tags: 통제 어휘 밖 값은 버린다
-        tags = [
-            tag for tag in (memory.get("tags") or []) if tag in _ALLOWED_TAGS
-        ]
+        tags = [tag for tag in (memory.get("tags") or []) if tag in _ALLOWED_TAGS]
         memories.append(
             {
                 "segmentIndex": len(memories),
@@ -272,10 +276,17 @@ def build_memory_user_prompt(
     if persons_result and persons_result.get("persons"):
         lines = [
             f"- {person['name']} ({person.get('relationToSubject') or '관계 미상'})"
-            + (f", 전사문 내 지칭: {', '.join(person['mentions'])}" if person.get("mentions") else "")
+            + (
+                f", 전사문 내 지칭: {', '.join(person['mentions'])}"
+                if person.get("mentions")
+                else ""
+            )
             for person in persons_result["persons"]
         ]
-        parts.append("전사문에 언급된 인물 (제3자 언급일 수 있음 — 통화 상대와 동일인이라는 근거가 없으면 상대에 갖다 붙이지 말 것):\n" + "\n".join(lines))
+        parts.append(
+            "전사문에 언급된 인물 (제3자 언급일 수 있음 — 통화 상대와 동일인이라는 근거가 없으면 상대에 갖다 붙이지 말 것):\n"
+            + "\n".join(lines)
+        )
 
     transcript = "\n".join(
         f"{segment.segment_index} [{segment.speaker_label}]: "

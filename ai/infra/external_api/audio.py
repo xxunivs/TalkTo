@@ -59,9 +59,7 @@ def download_audio(
                 for chunk in response.iter_bytes():
                     written += len(chunk)
                     if max_bytes is not None and written > max_bytes:
-                        raise AudioDownloadFailedError(
-                            f"audio exceeds the {max_bytes} byte limit"
-                        )
+                        raise AudioDownloadFailedError(f"audio exceeds the {max_bytes} byte limit")
                     target.write(chunk)
             if written == 0:
                 raise AudioDownloadFailedError("storage returned an empty body")

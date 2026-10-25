@@ -9,6 +9,7 @@ fixture 한 줄: {"id": "...", "turn": {TurnInput}, "state": {SessionState}(선�
   python -m orchestrator.cli <fixture> --memories <memories.json>
   (--mock 없이 끝까지 돌리면 .env 의 OpenAI 를 실제로 부른다 — 비용 발생)
 """
+
 from __future__ import annotations
 
 import argparse
@@ -20,14 +21,30 @@ from orchestrator.contracts import SessionState, TurnInput
 from orchestrator.llm import FakeLLM, OpenAIChatLLM
 from orchestrator.memory import ExportFileMemoryStore
 from orchestrator.pipeline import STAGES, TurnRun
-from orchestrator.service import build_assembler, build_default, build_guard, build_precheck, build_registry, build_selector
+from orchestrator.service import (
+    build_assembler,
+    build_default,
+    build_guard,
+    build_precheck,
+    build_registry,
+    build_selector,
+)
 
 REPO = Path(__file__).resolve().parents[1]
 
 
 def dump_run(row_id: str, run: TurnRun) -> dict:
     out = {"id": row_id, "trace": [t.model_dump() for t in run.trace]}
-    for name in ("state", "selection", "precheck", "bundle", "generation", "guard", "next_state", "result"):
+    for name in (
+        "state",
+        "selection",
+        "precheck",
+        "bundle",
+        "generation",
+        "guard",
+        "next_state",
+        "result",
+    ):
         v = getattr(run, name)
         if v is not None:
             out[name] = v.model_dump(exclude={"trace"}) if name == "result" else v.model_dump()
@@ -39,19 +56,38 @@ def main(argv: list[str] | None = None) -> int:
         sys.stdout.reconfigure(encoding="utf-8")
     except (AttributeError, ValueError):
         pass
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     ap.add_argument("fixture", type=Path)
     ap.add_argument("--until", choices=STAGES)
     ap.add_argument("--mock", action="store_true", help="LLM 대신 고정 답(비용 0)")
-    ap.add_argument("--memories", type=Path, help="Neon memories export JSON — BE top-5 대신 이 파일 전부를 원본으로")
-    ap.add_argument("--assembler", choices=["legacy", "structured"], help="기본: .env ORCHESTRATOR_ASSEMBLER")
-    ap.add_argument("--precheck", choices=["noop", "coverage", "coverage_v11"], help="기본: .env ORCHESTRATOR_PRECHECK")
-    ap.add_argument("--guard", choices=["pass", "v1", "v11"], help="기본: .env ORCHESTRATOR_GUARD (v1·v11 + structured = 근거 헤더)")
-    ap.add_argument("--persona-dir", type=Path, help="페르소나 등록부(profile.json·말투 카드·실제 발화)")
+    ap.add_argument(
+        "--memories",
+        type=Path,
+        help="Neon memories export JSON — BE top-5 대신 이 파일 전부를 원본으로",
+    )
+    ap.add_argument(
+        "--assembler", choices=["legacy", "structured"], help="기본: .env ORCHESTRATOR_ASSEMBLER"
+    )
+    ap.add_argument(
+        "--precheck",
+        choices=["noop", "coverage", "coverage_v11"],
+        help="기본: .env ORCHESTRATOR_PRECHECK",
+    )
+    ap.add_argument(
+        "--guard",
+        choices=["pass", "v1", "v11"],
+        help="기본: .env ORCHESTRATOR_GUARD (v1·v11 + structured = 근거 헤더)",
+    )
+    ap.add_argument(
+        "--persona-dir", type=Path, help="페르소나 등록부(profile.json·말투 카드·실제 발화)"
+    )
     ap.add_argument("--out", type=Path)
     args = ap.parse_args(argv)
 
     from infra.setting import load_settings
+
     settings = load_settings()
     if args.persona_dir:
         settings = settings.model_copy(update={"orchestrator_persona_dir": args.persona_dir})
@@ -72,8 +108,15 @@ def main(argv: list[str] | None = None) -> int:
     if args.memories:
         orch.memories = ExportFileMemoryStore(default=args.memories)
 
-    tag = (f"_{orch.assembler.impl}_{orch.precheck.impl}_{orch.guard.impl}" + (f"_{args.until}" if args.until else "") + ("_MOCK" if args.mock else ""))
-    out = args.out or REPO / "experiments" / "orchestrator" / "results" / f"{args.fixture.stem}{tag}.jsonl"
+    tag = (
+        f"_{orch.assembler.impl}_{orch.precheck.impl}_{orch.guard.impl}"
+        + (f"_{args.until}" if args.until else "")
+        + ("_MOCK" if args.mock else "")
+    )
+    out = (
+        args.out
+        or REPO / "experiments" / "orchestrator" / "results" / f"{args.fixture.stem}{tag}.jsonl"
+    )
     out.parent.mkdir(parents=True, exist_ok=True)
     print(f"구성: {orch.describe()}")
     n = 0

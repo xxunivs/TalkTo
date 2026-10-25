@@ -65,8 +65,14 @@ class MiniMaxTTSProvider:
         return {"Authorization": f"Bearer {self.api_key}"}
 
     def synthesize(
-        self, text: str, *, voice_id: str, speed: float = 1.0,
-        stability: float = 0.3, similarity_boost: float = 0.75, style: float = 0.0,
+        self,
+        text: str,
+        *,
+        voice_id: str,
+        speed: float = 1.0,
+        stability: float = 0.3,
+        similarity_boost: float = 0.75,
+        style: float = 0.0,
         emotion: str | None = None,
     ) -> TTSResult:
         # stability·similarity_boost·style 은 ElevenLabs 값이라 여기선 쓰지 않는다.
@@ -81,14 +87,21 @@ class MiniMaxTTSProvider:
             "stream": False,
             "language_boost": "Korean",
             "voice_setting": voice_setting,
-            "audio_setting": {"sample_rate": 44100, "bitrate": 128000, "format": "mp3", "channel": 1},
+            "audio_setting": {
+                "sample_rate": 44100,
+                "bitrate": 128000,
+                "format": "mp3",
+                "channel": 1,
+            },
         }
         if self.intensity:
             # +면 부드럽게, -면 힘 있게(-100~100)
             body["voice_modify"] = {"intensity": self.intensity}
         try:
             response = httpx.post(
-                f"{MINIMAX_BASE}/v1/t2a_v2", headers=self._headers, json=body,
+                f"{MINIMAX_BASE}/v1/t2a_v2",
+                headers=self._headers,
+                json=body,
                 timeout=self.timeout_seconds,
             )
         except httpx.HTTPError as error:

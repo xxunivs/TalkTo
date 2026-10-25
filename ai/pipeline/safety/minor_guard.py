@@ -12,6 +12,7 @@
 정규식은 아이가 늘 쓰는 말(성적=成績 · 가슴만 답답해 · 자위대 · 죽여준다 · 물총 · 모기 죽이자 · 폭탄 세일 ·
 엄마한테 말하지 그랬어 · 비밀번호)을 막지 않게 좁혔다(test/pipeline/test_minor_guard.py).
 """
+
 from __future__ import annotations
 
 import re
@@ -27,12 +28,14 @@ SEXUAL = re.compile(
     r"성관계|섹스|야동|음란|포르노|자위(?![대권])|애무|알몸|나체"
     r"|성적인\s*(?:말|얘기|이야기|행동|농담|사진|관계|접촉)|야한\s*(?:사진|얘기|이야기|거|것|짓)|몸매"
     r"|가슴\s*(?:만져|만지|보여\s*줘)|벗은\s*(?:몸|사진)|(?<![a-z])(?:sex|porn|nude)",
-    re.IGNORECASE)
+    re.IGNORECASE,
+)
 # '엄마한테는 말하지 마'·'엄마 한테 말 하지 마'처럼 조사 뒤 는·도, 띄어 쓴 말도 잡는다. 가족이 아이를 챙기는
 # '엄마한테 말하지 그랬어'·'왜 말하지 않았어'·'말하지 못할 고민'과 '비밀번호'는 뺀다.
 GROOMING = re.compile(
     r"(?:엄마|아빠|부모님|어른)\s*(?:한테|께|에게)(?:는|도)?\s*(?:말\s*하지(?!\s*(?:그랬|않았|못))|비밀(?!\s*번호))"
-    r"|둘이서만\s*만나|비밀로\s*(?:하자|해)|몰래\s*만나")
+    r"|둘이서만\s*만나|비밀로\s*(?:하자|해)|몰래\s*만나"
+)
 # 대답에만 본다(가족이 '죽겠다'·'죽여준다'고 말하는 것은 막지 않는다). 아이가 늘 쓰는 '죽여준다·죽여주는'(아주 좋다)과
 # 음식 이름 '마약김밥', '물총으로'·'폭탄 세일'·'그네에서 뛰어내리면 다쳐'(챙기는 말) 등은 뺀다.
 # '죽여 줄게'·'죽여 줘'·'옥상에서 뛰어내리자'·'뛰어내려 봐'는 그대로 잡는다.
@@ -41,13 +44,16 @@ DANGER = re.compile(
     r"|(?<!물)총으로|자살\s*방법|목을\s*매"
     r"|(?:옥상|창문|다리|난간)에서\s*뛰어내[리려]|뛰어내리(?:자|라)\b|뛰어내려\s*(?:봐|보자)"
     r"|약을\s*(?:많이|한꺼번에)|술\s*(?:마시자|마셔\s*봐)|담배\s*(?:피우자|피워\s*봐)"
-    r"|마약(?!\s*(?:김밥|떡볶이|옥수수|계란|빵|토스트|베개))|가출하자")
+    r"|마약(?!\s*(?:김밥|떡볶이|옥수수|계란|빵|토스트|베개))|가출하자"
+)
 # 벌레·게임 속 괴물을 죽이자는 아이의 평범한 말('모기 죽이자'·'좀비 죽여')은 DANGER 를 보기 전에 지운다
 PEST_KILL = re.compile(r"(?:모기|파리|벌레|개미|좀비|몬스터)(?:를|을|도|는|부터|만)?\s*죽")
 
 # 말 높이(가족 표 '지금 대화하는 사람' 줄이 존댓말이면 True)별 대체 글
-FALLBACK = {True: "그 이야기는 잘 모르겠어요. 우리 다른 이야기 해요.",
-            False: "그 얘기는 잘 모르겠어. 우리 다른 얘기 하자."}
+FALLBACK = {
+    True: "그 이야기는 잘 모르겠어요. 우리 다른 이야기 해요.",
+    False: "그 얘기는 잘 모르겠어. 우리 다른 얘기 하자.",
+}
 # 입력 검사로 모델을 부르지 않은 대답의 provider·model(BE 는 쓰지 않는다 — 추적용)
 SKIPPED = "minor_guard"
 
@@ -84,8 +90,15 @@ def safe_history(history: list) -> list:
 def reply_hits(text: str) -> list[str]:
     """대답에서 걸린 종류(sexual · grooming · danger). 비어 있으면 통과."""
     text = text or ""
-    return [name for name, hit in (("sexual", SEXUAL.search(text)), ("grooming", GROOMING.search(text)),
-                                   ("danger", DANGER.search(PEST_KILL.sub(" ", text)))) if hit]
+    return [
+        name
+        for name, hit in (
+            ("sexual", SEXUAL.search(text)),
+            ("grooming", GROOMING.search(text)),
+            ("danger", DANGER.search(PEST_KILL.sub(" ", text))),
+        )
+        if hit
+    ]
 
 
 def blocking_hits(text: str, *, safety_turn: bool) -> list[str]:
@@ -106,5 +119,9 @@ def filter_reply(text: str, *, polite: bool, safety_turn: bool) -> tuple[str, bo
 
 def blocked_result(instructions: str) -> PersonaResponseResult:
     """입력 검사에 걸린 턴의 대답(모델을 부르지 않음). 감정·목소리 글·기억 빈틈 없음, 쓴 기억 없음."""
-    return PersonaResponseResult(content=FALLBACK[is_polite(instructions)], retrieved_memory_ids=[],
-                                 provider=SKIPPED, model=SKIPPED)
+    return PersonaResponseResult(
+        content=FALLBACK[is_polite(instructions)],
+        retrieved_memory_ids=[],
+        provider=SKIPPED,
+        model=SKIPPED,
+    )

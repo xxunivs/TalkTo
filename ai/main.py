@@ -3,7 +3,6 @@ from fastapi.exceptions import RequestValidationError
 from pydantic import ValidationError
 
 from infra.be_ai_api.routes import analysis, embeddings, health, persona, voice
-from infra.setting import get_settings
 from infra.error import (
     AppError,
     app_error_handler,
@@ -14,6 +13,7 @@ from infra.error import (
 )
 from infra.log import configure_logging
 from infra.scratch import reset_scratch_dir
+from infra.setting import get_settings
 
 
 def create_app() -> FastAPI:
@@ -61,6 +61,7 @@ def create_app() -> FastAPI:
     if settings.persona_orchestrator:
         # 중간계층을 시작할 때 만든다(형태소 분석기 등 무거운 준비를 첫 요청 전에)
         from orchestrator.service import get_orchestrator
+
         get_orchestrator(settings)
     return application
 

@@ -193,18 +193,15 @@ def load_settings(env_file: str | Path | None = ".env") -> Settings:
         ai_server_token=os.getenv("AI_SERVER_TOKEN"),
         openai_api_key=os.getenv("OPENAI_API_KEY"),
         openai_chat_model=os.getenv("OPENAI_CHAT_MODEL", "gpt-6-luna"),
-        openai_chat_reasoning_effort=os.getenv("OPENAI_CHAT_REASONING_EFFORT", "none").strip() or None,
+        openai_chat_reasoning_effort=os.getenv("OPENAI_CHAT_REASONING_EFFORT", "none").strip()
+        or None,
         openai_analysis_model=os.getenv("OPENAI_ANALYSIS_MODEL", "gpt-6-luna"),
         openai_judge_model=os.getenv("OPENAI_JUDGE_MODEL", "gpt-6-luna"),
         openai_stt_model=os.getenv("OPENAI_STT_MODEL", "whisper-1"),
         openai_correction_model=os.getenv("OPENAI_CORRECTION_MODEL", "gpt-6-luna"),
         correction_max_jamo_ratio=os.getenv("CORRECTION_MAX_JAMO_RATIO", "0.45"),
-        openai_embedding_model=os.getenv(
-            "OPENAI_EMBEDDING_MODEL", "text-embedding-3-small"
-        ),
-        openai_embedding_dimensions=os.getenv(
-            "OPENAI_EMBEDDING_DIMENSIONS", "1536"
-        ),
+        openai_embedding_model=os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small"),
+        openai_embedding_dimensions=os.getenv("OPENAI_EMBEDDING_DIMENSIONS", "1536"),
         openai_timeout_seconds=os.getenv("OPENAI_TIMEOUT_SECONDS", "60"),
         openai_max_retries=os.getenv("OPENAI_MAX_RETRIES", "2"),
         openai_chat_timeout_seconds=os.getenv("OPENAI_CHAT_TIMEOUT_SECONDS", "20"),
@@ -233,9 +230,7 @@ def load_settings(env_file: str | Path | None = ".env") -> Settings:
         stt_provider=os.getenv("STT_PROVIDER", "elevenlabs"),
         elevenlabs_stt_model=os.getenv("ELEVENLABS_STT_MODEL") or "scribe_v2",
         stt_timeout_seconds=os.getenv("STT_TIMEOUT_SECONDS", "1800"),
-        audio_download_timeout_seconds=os.getenv(
-            "AUDIO_DOWNLOAD_TIMEOUT_SECONDS", "120"
-        ),
+        audio_download_timeout_seconds=os.getenv("AUDIO_DOWNLOAD_TIMEOUT_SECONDS", "120"),
         preview_window_ms=os.getenv("PREVIEW_WINDOW_MS", "180000"),
         min_speech_ms=os.getenv("MIN_SPEECH_MS", "3000"),
         max_audio_bytes=os.getenv("MAX_AUDIO_BYTES"),
@@ -253,7 +248,8 @@ def load_settings(env_file: str | Path | None = ".env") -> Settings:
         orchestrator_precheck_threshold=os.getenv("ORCHESTRATOR_PRECHECK_THRESHOLD", "0.6"),
         orchestrator_guard=os.getenv("ORCHESTRATOR_GUARD", "pass").strip() or "pass",
         orchestrator_lang_guard=os.getenv("ORCHESTRATOR_LANG_GUARD", "off").strip() or "off",
-        orchestrator_selector=os.getenv("ORCHESTRATOR_SELECTOR", "passthrough").strip() or "passthrough",
+        orchestrator_selector=os.getenv("ORCHESTRATOR_SELECTOR", "passthrough").strip()
+        or "passthrough",
         orchestrator_selector_st_top_k=os.getenv("ORCHESTRATOR_SELECTOR_ST_TOPK", "5"),
         orchestrator_selector_threshold=os.getenv("ORCHESTRATOR_SELECTOR_THRESHOLD", "0.18"),
         memory_full_max=os.getenv("MEMORY_FULL_MAX", "400"),

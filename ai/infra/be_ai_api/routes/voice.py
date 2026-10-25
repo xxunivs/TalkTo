@@ -4,18 +4,7 @@ from fastapi import APIRouter, Depends, File, Form, Response, UploadFile
 
 from infra.be_ai_api.dependencies import SettingsDependency, require_internal_request
 from infra.error import AudioTooLargeError
-from pipeline.s4_voice.a_voice import (
-    clone_voice_from_sample,
-    clone_voice_from_transcript,
-    collect_subject_samples,
-    synthesize_speech,
-    transcribe_voice_message,
-)
 from infra.external_api.tts import create_tts_provider, provider_for_voice
-from pipeline.s4_voice.d_answer_transcription import (
-    ANSWER_AUDIO_MAX_BYTES,
-    transcribe_answer,
-)
 from infra.schema.voice import (
     AnswerTranscriptionResponse,
     OkResponse,
@@ -23,12 +12,22 @@ from infra.schema.voice import (
     SubjectSampleCollectionRequest,
     SubjectSampleCollectionResponse,
     VoiceCloneFromTranscriptRequest,
-    VoiceDeleteRequest,
     VoiceCloneRequest,
     VoiceCloneResponse,
+    VoiceDeleteRequest,
     VoiceTranscriptionResponse,
 )
-
+from pipeline.s4_voice.a_voice import (
+    clone_voice_from_sample,
+    clone_voice_from_transcript,
+    collect_subject_samples,
+    synthesize_speech,
+    transcribe_voice_message,
+)
+from pipeline.s4_voice.d_answer_transcription import (
+    ANSWER_AUDIO_MAX_BYTES,
+    transcribe_answer,
+)
 
 router = APIRouter(tags=["voice"])
 InternalRequest = Annotated[None, Depends(require_internal_request)]

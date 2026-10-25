@@ -5,13 +5,20 @@
 - 사실(생몰·직장·주소·병력 같은 기억)은 뽑지 않는다 — 그건 기억 DB 몫이고 프롬프트에 넣지 않는다.
 - 적용(apply_candidates)은 설문이 비운 칸만 채운다(사실·정책은 설문 > 인터뷰 > 전사). 목록 칸은 없는 값만 덧붙인다.
 """
+
 from __future__ import annotations
 
 import json
 import re
 
 from pipeline.persona_prompt.spec import PersonaSpec, Relation, Situation, Topic, is_death_topic
-from pipeline.persona_prompt.textnorm import is_address_term, mostly_covered, same_topic, split_quoted, unquote
+from pipeline.persona_prompt.textnorm import (
+    is_address_term,
+    mostly_covered,
+    same_topic,
+    split_quoted,
+    unquote,
+)
 
 CHAR_FIELDS = ("traits", "values", "affection_style", "advice_style")
 CHAR_SCALARS = ("comfort_style", "conflict_style")
@@ -64,7 +71,9 @@ def verify(items: list[dict], lines: list[str]) -> tuple[list[dict], int]:
         if not isinstance(it, dict):
             dropped += 1
             continue
-        ev = [e for e in _as_list(it.get("evidence")) if isinstance(e, int) and 1 <= e <= len(lines)]
+        ev = [
+            e for e in _as_list(it.get("evidence")) if isinstance(e, int) and 1 <= e <= len(lines)
+        ]
         quote = str(it.get("quote") or "")
         body = _norm(" ".join(lines[e - 1] for e in ev))
         if not ev or not quote or _norm(quote) not in body:
@@ -78,8 +87,13 @@ def extract_candidates(text: str, *, client, model: str) -> dict:
     """LLM 호출 한 번 → 검증된 후보. 반환: {"relations": [...], …, "dropped": n, "model": model}"""
     body, lines = numbered(text)
     r = client.chat.completions.create(
-        model=model, response_format={"type": "json_object"},
-        messages=[{"role": "system", "content": INTERVIEW_PROMPT}, {"role": "user", "content": body}])
+        model=model,
+        response_format={"type": "json_object"},
+        messages=[
+            {"role": "system", "content": INTERVIEW_PROMPT},
+            {"role": "user", "content": body},
+        ],
+    )
     payload = json.loads(r.choices[0].message.content or "{}")
     out: dict = {"model": model, "reviewed": False, "dropped": 0}
     for key in ("relations", "character", "style", "situations", "topics"):
@@ -150,19 +164,25 @@ def apply_candidates(spec: PersonaSpec, cands: dict) -> list[str]:
         f, v = it.get("field"), str(it.get("value") or "").strip()
         if not v or (f == "sentence_endings" and "사랑" in v):
             continue
-        if f == "avoid_styles":  # "장황한 조언, 과한 사투리" 처럼 여러 개가 한 줄로 오면 나눠서 겹치는 것을 뺀다
+        if (
+            f == "avoid_styles"
+        ):  # "장황한 조언, 과한 사투리" 처럼 여러 개가 한 줄로 오면 나눠서 겹치는 것을 뺀다
             have = spec.style.avoid_styles
             for item in (unquote(x) for x in v.split(",")):
                 if not item:
                     continue
                 if mostly_covered(item, have):
-                    log.append(f"건너뜀: style.avoid_styles '{item}' 는 이미 있는 값과 같은 내용 ({_src(it)})")
+                    log.append(
+                        f"건너뜀: style.avoid_styles '{item}' 는 이미 있는 값과 같은 내용 ({_src(it)})"
+                    )
                     continue
                 have.append(item)
                 log.append(f"style.avoid_styles += {item} ({_src(it)})")
         elif f in STYLE_LISTS:
             have = getattr(spec.style, f)
-            for item in _add_items(have, v, have + (said if f in ("words", "interjections") else [])):
+            for item in _add_items(
+                have, v, have + (said if f in ("words", "interjections") else [])
+            ):
                 log.append(f"style.{f} += {item} ({_src(it)})")
         elif f in STYLE_SCALARS and not getattr(spec.style, f):
             setattr(spec.style, f, unquote(v))
@@ -179,7 +199,9 @@ def apply_candidates(spec: PersonaSpec, cands: dict) -> list[str]:
             continue
         same = next((t for t in spec.topics if same_topic(topic, t.topic, {spec.name})), None)
         if same is not None:
-            log.append(f"건너뜀: 주제 '{topic}'({grade}) 는 이미 있는 '{same.topic}'({same.grade}) 와 같은 주제 ({_src(it)})")
+            log.append(
+                f"건너뜀: 주제 '{topic}'({grade}) 는 이미 있는 '{same.topic}'({same.grade}) 와 같은 주제 ({_src(it)})"
+            )
             continue
         spec.topics.append(Topic(topic=topic, grade=grade, source=_src(it)))
         log.append(f"주제 추가: {topic}={grade} ({_src(it)})")

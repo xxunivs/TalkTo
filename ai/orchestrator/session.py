@@ -3,6 +3,7 @@
 프로세스 메모리. 주의 — uvicorn workers=2 면 워커마다 따로라서 같은 세션이 다른 워커로 가면
 상태가 끊긴다. 여러 워커에서 이으려면 DB 테이블이나 공유 캐시로 바꿔야 한다.
 """
+
 from __future__ import annotations
 
 import threading
@@ -13,7 +14,9 @@ from orchestrator.contracts import SessionState, TurnInput
 
 
 def fresh_state(turn: TurnInput) -> SessionState:
-    return SessionState(session_id=turn.session_id, subject_id=turn.subject_id, speaker=turn.speaker_hint)
+    return SessionState(
+        session_id=turn.session_id, subject_id=turn.subject_id, speaker=turn.speaker_hint
+    )
 
 
 class InMemorySessionStore:

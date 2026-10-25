@@ -8,7 +8,6 @@ import json
 import logging
 
 from infra.error import AppError
-from infra.setting import Settings
 from infra.external_api.openai_client import create_openai_client
 from infra.schema.embedding import (
     EmbeddingRequest,
@@ -17,6 +16,7 @@ from infra.schema.embedding import (
     QueryEmbeddingRequest,
     QueryEmbeddingResponse,
 )
+from infra.setting import Settings
 
 logger = logging.getLogger(__name__)
 
@@ -48,15 +48,19 @@ def _batches(texts: list[str]) -> list[list[str]]:
     return batches
 
 
-def embed_texts(texts: list[str], *, settings: Settings, interactive: bool = False) -> list[list[float]]:
+def embed_texts(
+    texts: list[str], *, settings: Settings, interactive: bool = False
+) -> list[list[float]]:
     """글마다 벡터 하나(순서 그대로). 많으면 나눠 보낸다. interactive 면 대화 중 시간 한도를 쓴다."""
     if not texts:
         return []
 
     if interactive:
         client = create_openai_client(
-            settings, "query embedding",
-            timeout=QUERY_EMBED_TIMEOUT_SECONDS, max_retries=QUERY_EMBED_MAX_RETRIES,
+            settings,
+            "query embedding",
+            timeout=QUERY_EMBED_TIMEOUT_SECONDS,
+            max_retries=QUERY_EMBED_MAX_RETRIES,
         )
     else:
         client = create_openai_client(settings, "embeddings")
@@ -78,9 +82,7 @@ def embed_texts(texts: list[str], *, settings: Settings, interactive: bool = Fal
     return vectors
 
 
-def generate_embeddings(
-    request: EmbeddingRequest, *, settings: Settings
-) -> EmbeddingResponse:
+def generate_embeddings(request: EmbeddingRequest, *, settings: Settings) -> EmbeddingResponse:
     """계약 엔드포인트 — memory segment 텍스트들을 배치 벡터화해 항목별로 되돌린다."""
     vectors = embed_texts([item.text for item in request.items], settings=settings)
     results = [
@@ -118,8 +120,10 @@ REWRITE_HISTORY = 4  # 최근 메시지 수(E6 의 history[-4:])
 
 def rewrite_query(request: QueryEmbeddingRequest, *, settings: Settings) -> str | None:
     """앞 대화로 질문을 완결된 한 문장으로. 실패하면 None(원문으로 검색). 검색 한 번을 막느니 원문이 낫다."""
-    hist = "\n".join(f"{'가족' if m.role == 'user' else '대상자'}: {m.content}"
-                     for m in request.history[-REWRITE_HISTORY:])
+    hist = "\n".join(
+        f"{'가족' if m.role == 'user' else '대상자'}: {m.content}"
+        for m in request.history[-REWRITE_HISTORY:]
+    )
     prompt = QUERY_REWRITE_PROMPT.format(history=hist, msg=request.text)
     try:
         # 대화 중이라 짧게 한 번만. 못 끝내면 원문으로 찾는다(아래 except)
@@ -127,9 +131,16 @@ def rewrite_query(request: QueryEmbeddingRequest, *, settings: Settings) -> str 
             settings, "query rewrite", timeout=REWRITE_TIMEOUT_SECONDS, max_retries=0
         )
         response = client.chat.completions.create(
-            model=settings.openai_analysis_model, messages=[{"role": "user", "content": prompt}])
-        text = (response.choices[0].message.content or "").strip().strip("`").removeprefix("json").strip()
-        rewritten = json.loads(text[text.find("{"):text.rfind("}") + 1]).get("rewritten")
+            model=settings.openai_analysis_model, messages=[{"role": "user", "content": prompt}]
+        )
+        text = (
+            (response.choices[0].message.content or "")
+            .strip()
+            .strip("`")
+            .removeprefix("json")
+            .strip()
+        )
+        rewritten = json.loads(text[text.find("{") : text.rfind("}") + 1]).get("rewritten")
     except Exception as e:  # noqa: BLE001 — API 오류·JSON 깨짐 모두 원문으로
         logger.warning("query rewrite failed, using original text: %s", type(e).__name__)
         return None

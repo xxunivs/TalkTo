@@ -8,16 +8,16 @@ torch/speechbrain은 무거운 선택 의존성이라 모듈 import 시점이 �
 사용 시점에 로드한다 — 미설치 환경에서도 서버는 뜬다.
 """
 
-import threading
 import json
 import logging
+import threading
 from dataclasses import dataclass
 from pathlib import Path
 
-from infra.setting import Settings
 from infra.external_api.openai_client import create_openai_client
 from infra.schema.subject import SubjectContext
 from infra.schema.transcript import TranscriptSegment
+from infra.setting import Settings
 
 logger = logging.getLogger(__name__)
 
@@ -162,8 +162,19 @@ def load_mono_16k(audio_path: Path):
     import torch
 
     result = subprocess.run(
-        ["ffmpeg", "-nostdin", "-i", str(audio_path), "-ac", "1", "-ar",
-         str(SAMPLE_RATE), "-f", "f32le", "-"],
+        [
+            "ffmpeg",
+            "-nostdin",
+            "-i",
+            str(audio_path),
+            "-ac",
+            "1",
+            "-ar",
+            str(SAMPLE_RATE),
+            "-f",
+            "f32le",
+            "-",
+        ],
         check=True,
         capture_output=True,
     )
@@ -191,8 +202,22 @@ def decode_to_raw(audio_path: Path) -> Path:
     raw = audio_path.with_name(audio_path.name + ".f32")
     try:
         subprocess.run(
-            ["ffmpeg", "-nostdin", "-loglevel", "error", "-y", "-i", str(audio_path),
-             "-ac", "1", "-ar", str(SAMPLE_RATE), "-f", "f32le", str(raw)],
+            [
+                "ffmpeg",
+                "-nostdin",
+                "-loglevel",
+                "error",
+                "-y",
+                "-i",
+                str(audio_path),
+                "-ac",
+                "1",
+                "-ar",
+                str(SAMPLE_RATE),
+                "-f",
+                "f32le",
+                str(raw),
+            ],
             check=True,
             capture_output=True,
         )

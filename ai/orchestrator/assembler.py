@@ -7,6 +7,7 @@ LegacyAssembler: 기존 generate_persona_response 와 같은 메시지를 만든
 StructuredAssembler: 공통 규칙 → 페르소나 → 말투 → 음성 지침 → 기억 → 델타 → 세션 상태 순으로 조립한다.
 '기억이 적을 때' 절(LOW_MEMORY_NOTE, pipeline/persona_prompt/low_memory.py)은 structured 에서 세션 상태 절 안에 든다.
 """
+
 from __future__ import annotations
 
 import os
@@ -15,10 +16,14 @@ from functools import lru_cache
 from types import SimpleNamespace
 
 from orchestrator.contracts import (
-    MemoryItem, MemorySelection, PrecheckResult, PromptBundle, PromptSection, SessionState, TurnInput,
+    MemoryItem,
+    MemorySelection,
+    PrecheckResult,
+    PromptBundle,
+    PromptSection,
+    SessionState,
+    TurnInput,
 )
-from pipeline.s3_synthesis.c_build_system_prompt import build_memory_block, late_style_note
-from pipeline.s3_synthesis.e_memory_gap import extra_system
 from orchestrator.guard import HEADER_RULE, _deceased, header_block
 from orchestrator.persona import has_layered_rules, infer_profile
 from orchestrator.precheck import sent_memories
@@ -27,14 +32,22 @@ from orchestrator.text import listener_speech_level
 from orchestrator.voice import VoiceMarks
 from pipeline.persona_prompt.layers import SHOTS_MODES, RuntimeContext, runtime_section
 from pipeline.persona_prompt.low_memory import LOW_MEMORY_MAX, low_memory_note, memory_count
+from pipeline.s3_synthesis.c_build_system_prompt import build_memory_block, late_style_note
 from pipeline.s3_synthesis.common_rules import (
-    DEATH_POLICIES, RULES_DIR, render_block_file, render_common_rules, render_rules,
+    DEATH_POLICIES,
+    RULES_DIR,
+    render_block_file,
+    render_common_rules,
+    render_rules,
 )
+from pipeline.s3_synthesis.e_memory_gap import extra_system
 from pipeline.safety.minor_guard import MINOR_NOTE
 
 
 def legacy_memory_block(memories: list[MemoryItem]) -> str:
-    return build_memory_block([SimpleNamespace(id=m.id, title=m.title, content=m.text) for m in memories])
+    return build_memory_block(
+        [SimpleNamespace(id=m.id, title=m.title, content=m.text) for m in memories]
+    )
 
 
 def delta_block(delta: list[MemoryItem]) -> str:
@@ -42,7 +55,9 @@ def delta_block(delta: list[MemoryItem]) -> str:
         return ""
     lines = []
     for m in delta:
-        who = f"({m.told_by}{'·' + m.relation if m.relation else ''}이 알려 줌) " if m.told_by else ""
+        who = (
+            f"({m.told_by}{'·' + m.relation if m.relation else ''}이 알려 줌) " if m.told_by else ""
+        )
         lines.append(f"- {who}{m.text.strip()}")
     return "이번 통화에서 새로 들은 것:\n" + "\n".join(lines)
 
@@ -62,13 +77,17 @@ def extra_sections(turn: TurnInput) -> list[PromptSection]:
     """
     names = ("gap", "style") if turn.flag_gaps else ("style",)
     texts = extra_system(turn.flag_gaps, turn.style_examples)
-    sections = [PromptSection(name=name, role="system", content=text) for name, text in zip(names, texts)]
+    sections = [
+        PromptSection(name=name, role="system", content=text) for name, text in zip(names, texts)
+    ]
     if turn.minor:
         sections.append(PromptSection(name="minor", role="system", content=MINOR_NOTE))
     return sections
 
 
-def turn_memory_count(turn: TurnInput, selection: MemorySelection, low_max: int | None) -> int | None:
+def turn_memory_count(
+    turn: TurnInput, selection: MemorySelection, low_max: int | None
+) -> int | None:
     """이 페르소나의 기억 수(BE memoryTotal, 없으면 받은 수로 짐작). low_max=None(LOW_MEMORY_NOTE=off)·모름이면 None."""
     if low_max is None:
         return None
@@ -80,21 +99,37 @@ def low_memory_text(turn: TurnInput, prof, n: int | None, low_max: int | None) -
     비공개 고인은 잊은 듯 말하지 않는 문구(잠금 2), 존댓말 상대면 예시도 존댓말."""
     if n is None or low_max is None or n > low_max:
         return ""
-    return low_memory_note(n, public=prof.public, deceased=_deceased(turn, prof),
-                           polite=listener_speech_level(turn.persona_instructions) == "존댓말")
+    return low_memory_note(
+        n,
+        public=prof.public,
+        deceased=_deceased(turn, prof),
+        polite=listener_speech_level(turn.persona_instructions) == "존댓말",
+    )
 
 
 class LegacyAssembler:
     impl = "legacy_v0"
 
-    def __init__(self, *, late_note: bool = False, voice: VoiceMarks | None = None,
-                 low_memory_max: int | None = LOW_MEMORY_MAX) -> None:
-        self.late_note = late_note  # STYLE_LATE_NOTE=on: 기존 경로와 같게 마지막 말 앞에 말투 덧붙임
+    def __init__(
+        self,
+        *,
+        late_note: bool = False,
+        voice: VoiceMarks | None = None,
+        low_memory_max: int | None = LOW_MEMORY_MAX,
+    ) -> None:
+        self.late_note = (
+            late_note  # STYLE_LATE_NOTE=on: 기존 경로와 같게 마지막 말 앞에 말투 덧붙임
+        )
         self.voice = voice  # FISH_EMOTION: 기존 경로와 같은 자리(지시문 바로 뒤)에 음성 지침
         self.low_memory_max = low_memory_max  # None = LOW_MEMORY_NOTE=off
 
-    def assemble(self, turn: TurnInput, state: SessionState, selection: MemorySelection,
-                 precheck: PrecheckResult) -> PromptBundle:
+    def assemble(
+        self,
+        turn: TurnInput,
+        state: SessionState,
+        selection: MemorySelection,
+        precheck: PrecheckResult,
+    ) -> PromptBundle:
         sections = [PromptSection(name="persona", role="system", content=turn.persona_instructions)]
         sections += voice_section(self.voice, turn)
         sections += extra_sections(turn)
@@ -105,12 +140,18 @@ class LegacyAssembler:
         if dblock:
             sections.append(PromptSection(name="delta", role="system", content=dblock))
         if precheck.directive:
-            sections.append(PromptSection(name="directive", role="system", content=precheck.directive))
+            sections.append(
+                PromptSection(name="directive", role="system", content=precheck.directive)
+            )
         for i, t in enumerate(turn.history):
             sections.append(PromptSection(name=f"history{i}", role=t.role, content=t.content))
         # 기억이 적을 때 절: 기존 경로와 같은 자리(앞 대화 뒤, 말투 덧붙임 앞). 등록부가 없어 지시문으로 추정한다
-        lm = low_memory_text(turn, infer_profile(turn.persona_instructions),
-                             turn_memory_count(turn, selection, self.low_memory_max), self.low_memory_max)
+        lm = low_memory_text(
+            turn,
+            infer_profile(turn.persona_instructions),
+            turn_memory_count(turn, selection, self.low_memory_max),
+            self.low_memory_max,
+        )
         if lm:
             sections.append(PromptSection(name="low_memory", role="system", content=lm))
         note = late_style_note(turn.persona_instructions) if self.late_note else ""
@@ -122,6 +163,7 @@ class LegacyAssembler:
 
 # ---------------------------------------------------------------- structured_v1
 
+
 def dedupe_rules(instructions: str, rule_lines: set[str]) -> str:
     """페르소나 지시문에서 공통 규칙과 글자 그대로 같은 줄을 지우고, 비게 된 제목 줄도 지운다."""
     lines = instructions.splitlines()
@@ -131,7 +173,7 @@ def dedupe_rules(instructions: str, rule_lines: set[str]) -> str:
     out: list[str] = []
     for i, ln in enumerate(kept):
         if ln.lstrip().startswith("#"):
-            nxt = next((x for x in kept[i + 1:] if x.strip()), None)
+            nxt = next((x for x in kept[i + 1 :] if x.strip()), None)
             if nxt is None or nxt.lstrip().startswith("#"):
                 continue  # 내용 없는 제목
         out.append(ln)
@@ -142,10 +184,17 @@ def dedupe_rules(instructions: str, rule_lines: set[str]) -> str:
 @lru_cache(maxsize=1)
 def death_rule_lead() -> str:
     """공통 규칙 death 모듈 줄(사망 정책 네 변형)의 같은 앞부분 — 이 글로 시작하는 줄이 사망·임종 규칙이다."""
-    lines = [ln.strip() for p in DEATH_POLICIES
-             for ln in render_block_file(RULES_DIR / "death.md", {"deceased", f"death_{p}"}, {"death_answer": "-"})]
+    lines = [
+        ln.strip()
+        for p in DEATH_POLICIES
+        for ln in render_block_file(
+            RULES_DIR / "death.md", {"deceased", f"death_{p}"}, {"death_answer": "-"}
+        )
+    ]
     lead = os.path.commonprefix(lines) if lines else ""
-    return lead if len(lead) >= 20 else ""  # 변형이 서로 너무 달라지면 알아보지 않는다(아무 줄이나 잡지 않게)
+    return (
+        lead if len(lead) >= 20 else ""
+    )  # 변형이 서로 너무 달라지면 알아보지 않는다(아무 줄이나 잡지 않게)
 
 
 def adopt_death_rule(rules: str, instructions: str) -> str:
@@ -157,7 +206,11 @@ def adopt_death_rule(rules: str, instructions: str) -> str:
     공통 규칙에 사망 줄이 없으면(생존) 그대로 둔다.
     """
     lead = death_rule_lead()
-    own = list(dict.fromkeys(ln.strip() for ln in instructions.splitlines() if lead and ln.strip().startswith(lead)))
+    own = list(
+        dict.fromkeys(
+            ln.strip() for ln in instructions.splitlines() if lead and ln.strip().startswith(lead)
+        )
+    )
     if not own:
         return rules
     out: list[str] = []
@@ -187,13 +240,25 @@ class StructuredAssembler:
     rules="layered" 인데 등록부 없이 4층 지시문(L1 포함)이 오면 공통 규칙을 다시 붙이지 않고 지시문만 쓴다.
     정적인 것을 앞에 둬 프롬프트 캐시를 살린다.
     """
+
     impl = "structured_v1"
 
-    def __init__(self, profiles, *, max_recent_turns: int = 6, header: bool = False, rules: str = "legacy",
-                 shots_mode: str = "system", late_note: bool = False, voice: VoiceMarks | None = None,
-                 low_memory_max: int | None = LOW_MEMORY_MAX) -> None:
+    def __init__(
+        self,
+        profiles,
+        *,
+        max_recent_turns: int = 6,
+        header: bool = False,
+        rules: str = "legacy",
+        shots_mode: str = "system",
+        late_note: bool = False,
+        voice: VoiceMarks | None = None,
+        low_memory_max: int | None = LOW_MEMORY_MAX,
+    ) -> None:
         self.profiles = profiles
-        self.low_memory_max = low_memory_max  # None = LOW_MEMORY_NOTE=off. 런타임 모듈 low_memory 도 이 값을 쓴다
+        self.low_memory_max = (
+            low_memory_max  # None = LOW_MEMORY_NOTE=off. 런타임 모듈 low_memory 도 이 값을 쓴다
+        )
         self.late_note = late_note  # STYLE_LATE_NOTE=on: 마지막 말 앞에 말투 덧붙임(카드가 등록부에서 와도 head 로 가린다)
         self.voice = voice  # FISH_EMOTION: 첫 system(규칙+페르소나) 바로 뒤에 음성 지침
         # shots_mode="messages": 실제 주고받기를 지시문 글 대신 기억 뒤 user/assistant 메시지로 넣는다
@@ -212,22 +277,38 @@ class StructuredAssembler:
         if shots_mode == "messages":
             self.impl += "+shotmsgs"
 
-    def assemble(self, turn: TurnInput, state: SessionState, selection: MemorySelection,
-                 precheck: PrecheckResult) -> PromptBundle:
+    def assemble(
+        self,
+        turn: TurnInput,
+        state: SessionState,
+        selection: MemorySelection,
+        precheck: PrecheckResult,
+    ) -> PromptBundle:
         prof = self.profiles.profile_for(turn)
         # 미성년 규칙(turn.minor)은 L1 안전 절 self_harm 뒤에도 넣는다(고인이면 공통 규칙이 빼 준다)
-        flags = dict(public=prof.public, deceased=prof.deceased, has_family=prof.has_family, minor=turn.minor)
+        flags = dict(
+            public=prof.public, deceased=prof.deceased, has_family=prof.has_family, minor=turn.minor
+        )
         instructions, _ = redact_instructions(turn.persona_instructions, prof.restricted)
-        if self.rules == "layered" and prof.source == "inferred" and has_layered_rules(instructions):
+        if (
+            self.rules == "layered"
+            and prof.source == "inferred"
+            and has_layered_rules(instructions)
+        ):
             # 등록부 없이 4층 지시문을 받았다: L1(만들 때 정한 사망 정책 포함)이 이미 들어 있다. 앞에 다시 붙이면
             # 사망 정책이 두 벌(앞 deny + 저장 ask_only 등)이 되고, 추정한 가족 유무로 다른 줄도 어긋난다.
             rules, extra = None, None
         elif self.rules == "layered":
             r = prof.restricted
-            rules = render_rules("layered", **flags,
-                                 death_policy=(r.policy if r is not None and prof.deceased else "deny"),
-                                 vars={"death_answer": (r.brief_answer if r is not None else None) or "그렇게 됐지",
-                                       "family_list": "아래 가족 표"})
+            rules = render_rules(
+                "layered",
+                **flags,
+                death_policy=(r.policy if r is not None and prof.deceased else "deny"),
+                vars={
+                    "death_answer": (r.brief_answer if r is not None else None) or "그렇게 됐지",
+                    "family_list": "아래 가족 표",
+                },
+            )
             extra = None  # 사인 정책은 L1 사망 모듈 변형이 맡는다
         else:
             rules = render_common_rules(**flags)
@@ -235,11 +316,20 @@ class StructuredAssembler:
         if rules is not None and prof.restricted is None:
             # 등록부가 사망 정책을 주지 않았으면 지시문이 이미 고른 사망 규칙을 쓴다(위 deny 는 기본값일 뿐)
             rules = adopt_death_rule(rules, instructions)
-        rule_lines = {ln.strip() for ln in (rules or "").splitlines() if ln.strip().startswith("- ")}
+        rule_lines = {
+            ln.strip() for ln in (rules or "").splitlines() if ln.strip().startswith("- ")
+        }
         persona = dedupe_rules(instructions, rule_lines)
         # legacy 머리말은 측정한 프롬프트와 글자까지 같게 둔다
         label = "prompts/rules" if self.rules == "layered" else "shared_rules.md"
-        head = persona if rules is None else f"# 공통 규칙 (모든 페르소나 공통, {label})\n" + rules + "\n\n# 페르소나\n" + persona
+        head = (
+            persona
+            if rules is None
+            else f"# 공통 규칙 (모든 페르소나 공통, {label})\n"
+            + rules
+            + "\n\n# 페르소나\n"
+            + persona
+        )
         if extra:
             head += "\n\n" + extra
         # 지시문(4층 생성기 결과 등)에 이미 들어 있으면 다시 붙이지 않는다
@@ -268,11 +358,15 @@ class StructuredAssembler:
         sections[1:1] = voice_section(self.voice, turn) + extra_sections(turn)
         if prof.shots and self.shots_mode == "messages" and not shots_in_text:
             for i, sh in enumerate(prof.shots):
-                sections += [PromptSection(name=f"shot{i}u", role="user", content=sh.user),
-                             PromptSection(name=f"shot{i}a", role="assistant", content=sh.persona)]
+                sections += [
+                    PromptSection(name=f"shot{i}u", role="user", content=sh.user),
+                    PromptSection(name=f"shot{i}a", role="assistant", content=sh.persona),
+                ]
         if precheck.directive:
-            sections.append(PromptSection(name="directive", role="system", content=precheck.directive))
-        history = turn.history or state.recent_turns[-self.max_recent_turns:]
+            sections.append(
+                PromptSection(name="directive", role="system", content=precheck.directive)
+            )
+        history = turn.history or state.recent_turns[-self.max_recent_turns :]
         session = self.session_text(prof, state, history, turn=turn, selection=selection)
         if session:
             sections.append(PromptSection(name="session", role="system", content=session))
@@ -284,17 +378,30 @@ class StructuredAssembler:
         sections.append(PromptSection(name="message", role="user", content=turn.message))
         return PromptBundle(sections=sections)
 
-    def session_text(self, prof, state: SessionState, history, *, turn: TurnInput | None = None,
-                     selection: MemorySelection | None = None) -> str:
+    def session_text(
+        self,
+        prof,
+        state: SessionState,
+        history,
+        *,
+        turn: TurnInput | None = None,
+        selection: MemorySelection | None = None,
+    ) -> str:
         """턴마다 바뀌는 절. layered 이고 등록부에 명세가 있으면 layers.json 의 런타임 모듈로 만든다.
         명세가 없으면(손으로 쓴 지시문 · 운영) 가족 표를 모르니 화자 이름만 알리고, 기억이 적으면 그 절을 붙인다."""
         n = None
         if turn is not None and selection is not None:
             n = turn_memory_count(turn, selection, self.low_memory_max)
         if self.rules == "layered" and prof.persona_spec is not None:
-            ctx = RuntimeContext(speaker=state.speaker, history=[(t.role, t.content) for t in history],
-                                 memory_count=n, low_memory_max=self.low_memory_max or 0)
-            if turn is not None:  # 고인·말 높이 판정은 가드와 같게(BE persona.deceased 먼저, 듣는 사람 줄)
+            ctx = RuntimeContext(
+                speaker=state.speaker,
+                history=[(t.role, t.content) for t in history],
+                memory_count=n,
+                low_memory_max=self.low_memory_max or 0,
+            )
+            if (
+                turn is not None
+            ):  # 고인·말 높이 판정은 가드와 같게(BE persona.deceased 먼저, 듣는 사람 줄)
                 ctx.deceased = _deceased(turn, prof)
                 ctx.polite = listener_speech_level(turn.persona_instructions) == "존댓말"
             return runtime_section(prof.persona_spec, ctx)

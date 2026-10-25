@@ -26,9 +26,7 @@ def verify_internal_token(
 
     expected = configured_token.get_secret_value()
     # 바이트로 비교한다. 문자열 비교는 ASCII 밖 글자가 오면 TypeError(500)가 난다.
-    if not provided_token or not secrets.compare_digest(
-        expected.encode(), provided_token.encode()
-    ):
+    if not provided_token or not secrets.compare_digest(expected.encode(), provided_token.encode()):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail={

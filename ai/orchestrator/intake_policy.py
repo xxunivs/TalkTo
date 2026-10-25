@@ -14,6 +14,7 @@ intake 에 답이 있으면 아래 규칙으로 정책을 정한다.
 사실(T1-01 날짜·T1-02 경위·T1-03 곁에 있던 가족)은 여기서 프롬프트로 보내지 않는다.
 답할 때 쓰는 말은 restricted.json 의 brief_answer 가 있으면 그것, 없으면 T1-02 분류별 기본 문장.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -59,5 +60,7 @@ def death_policy(intake: dict | None) -> DeathPolicy | None:
         if any(k in topic for k in DEATH_TOPIC_KEYS):
             policy = GRADE_TO_POLICY.get((t.get("grade") or "").strip())
             if policy:
-                return DeathPolicy(policy=policy, source="M9-01", note=t.get("note"), default_answer=answer)
+                return DeathPolicy(
+                    policy=policy, source="M9-01", note=t.get("note"), default_answer=answer
+                )
     return None

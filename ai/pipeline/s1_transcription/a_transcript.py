@@ -1,18 +1,17 @@
 import logging
 from pathlib import Path
 
-from infra.setting import Settings
 from infra.error import AppError, AudioTooShortError, EmptyTranscriptError
+from infra.external_api.audio import download_audio
 from infra.external_api.stt import STTProvider
 from infra.schema.transcript import (
     TranscriptionRequest,
     TranscriptionResponse,
     TranscriptSegment,
 )
-from infra.external_api.audio import download_audio
 from infra.scratch import scratch_dir
-from pipeline.s1_transcription.c_correction import correct_segments
-from pipeline.s1_transcription.c_correction import build_glossary
+from infra.setting import Settings
+from pipeline.s1_transcription.c_correction import build_glossary, correct_segments
 
 logger = logging.getLogger(__name__)
 
@@ -57,9 +56,7 @@ def _identify_subject_speaker(
         with EMBED_LOCK:
             reference = embedder.embed_clip(ref_path)
             speakers = embedder.embed_speakers(audio_path, segments)
-        match = identify_subject(
-            speakers, reference, threshold=settings.speaker_id_threshold
-        )
+        match = identify_subject(speakers, reference, threshold=settings.speaker_id_threshold)
         return match.speaker_label if match else None
     except Exception as error:  # 매칭 실패가 전사를 깨지 않게 (대상자 미확정 진행)
         logger.warning("speaker identification failed: %s", error)
@@ -96,24 +93,18 @@ def transcribe_recording(
         if 0 < last_end_ms < settings.min_speech_ms:
             raise AudioTooShortError(last_end_ms, settings.min_speech_ms)
         # 화자 식별은 오디오가 아직 살아있을 때(unlink 전) 수행한다.
-        subject_speaker_label = _identify_subject_speaker(
-            audio_path, segments, request, settings
-        )
+        subject_speaker_label = _identify_subject_speaker(audio_path, segments, request, settings)
     finally:
         audio_path.unlink(missing_ok=True)
 
     if request.mode == "preview":
         segments = [
-            segment
-            for segment in segments
-            if segment.start_ms < settings.preview_window_ms
+            segment for segment in segments if segment.start_ms < settings.preview_window_ms
         ]
 
     derived = build_glossary(request.subject_context, request.intake_context)
     merged_glossary = list(dict.fromkeys([*request.glossary, *derived]))
-    segments = correct_segments(
-        segments, glossary=merged_glossary, settings=settings
-    )
+    segments = correct_segments(segments, glossary=merged_glossary, settings=settings)
 
     return TranscriptionResponse(
         segments=segments,

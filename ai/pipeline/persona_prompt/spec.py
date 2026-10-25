@@ -2,6 +2,7 @@
 
 칸마다 출처(source)를 남긴다: intake:M2-01 / interview:L120 / call:통화03#45 / transcript / default.
 """
+
 from __future__ import annotations
 
 from pydantic import BaseModel, Field
@@ -19,7 +20,9 @@ class Relation(BaseModel):
     name: str
     relation: str | None = None
     calls_them: str | None = None  # 그분이 이 사람을 부르는 말
-    self_ref: str | None = None  # 이 사람 앞에서 그분이 자기를 가리키는 말(할머니가 / 엄마가 / 내가)
+    self_ref: str | None = (
+        None  # 이 사람 앞에서 그분이 자기를 가리키는 말(할머니가 / 엄마가 / 내가)
+    )
     they_call: str | None = None  # 이 사람이 그분을 부르는 말
     speech_level: str | None = None  # 반말 / 존댓말
     tone: str | None = None
@@ -100,7 +103,9 @@ class PersonaSpec(BaseModel):
     # 만 19세 미만 살아 계신 대화 상대(BE basicProfile.minor). L1 안전 절에 미성년 규칙. 고인이면 False.
     minor: bool = False
     period: str | None = None
-    family_calls_subject: str | None = None  # 가족 모두가 그분을 같은 말로 부를 때만(아니면 가족 표에 사람마다)
+    family_calls_subject: str | None = (
+        None  # 가족 모두가 그분을 같은 말로 부를 때만(아니면 가족 표에 사람마다)
+    )
     visitor_address: str | None = None  # 공개: 방문자를 부르는 말(P1-07B)
     visitor_tone: str | None = None
     visitor_context: str | None = None

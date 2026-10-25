@@ -20,7 +20,9 @@ import logging
 import sys
 from pathlib import Path
 
-from infra.setting import Settings, load_settings
+from infra.external_api.stt import create_stt_provider
+from infra.schema.insight import ReflectionMemoryInput, ReflectionRequest
+from infra.schema.persona import PersonaAssemblyRequest
 from infra.schema.subject import (
     FamilyNote,
     IntakeContext,
@@ -28,10 +30,8 @@ from infra.schema.subject import (
     SubjectContext,
     TabooTopic,
 )
-from infra.schema.persona import PersonaAssemblyRequest
-from infra.schema.insight import ReflectionMemoryInput, ReflectionRequest
 from infra.schema.transcript import TranscriptSegment
-from infra.external_api.stt import create_stt_provider
+from infra.setting import Settings, load_settings
 from pipeline.s1_transcription.b_speaker_id import identify_subject_by_content
 from pipeline.s1_transcription.c_correction import build_glossary, correct_segments
 from pipeline.s2_extraction.a_extract_persons import run_persons_analysis
@@ -50,15 +50,34 @@ logger = logging.getLogger(__name__)
 AUDIO_EXTS = ("*.wav", "*.m4a", "*.mp3", "*.webm", "*.ogg", "*.flac")
 
 STEP_ORDER = [
-    "s1_a", "s1_b", "s1_c",
-    "s2_a", "s2_b", "s2_c", "s2_d", "s2_e", "s2_f",
-    "s3_a", "s3_b", "s3_c", "s3_d",
+    "s1_a",
+    "s1_b",
+    "s1_c",
+    "s2_a",
+    "s2_b",
+    "s2_c",
+    "s2_d",
+    "s2_e",
+    "s2_f",
+    "s3_a",
+    "s3_b",
+    "s3_c",
+    "s3_d",
 ]
 STEP_LABEL = {
-    "s1_a": "전사", "s1_b": "화자 판별", "s1_c": "교정",
-    "s2_a": "인물", "s2_b": "민감도", "s2_c": "말투",
-    "s2_d": "프롬프트 재료 합치기", "s2_e": "기억", "s2_f": "요약과 태그",
-    "s3_a": "기억 모으기", "s3_b": "통찰", "s3_c": "프롬프트 조립", "s3_d": "임베딩",
+    "s1_a": "전사",
+    "s1_b": "화자 판별",
+    "s1_c": "교정",
+    "s2_a": "인물",
+    "s2_b": "민감도",
+    "s2_c": "말투",
+    "s2_d": "프롬프트 재료 합치기",
+    "s2_e": "기억",
+    "s2_f": "요약과 태그",
+    "s3_a": "기억 모으기",
+    "s3_b": "통찰",
+    "s3_c": "프롬프트 조립",
+    "s3_d": "임베딩",
 }
 
 
@@ -168,24 +187,29 @@ class Ctx:
 
     def labels(self, needed_by: str) -> dict[str, str | None]:
         if self._labels is None:
-            self._labels = _read_json(self.dir / "s1_transcription" / "b_speaker_id.json", needed_by)
+            self._labels = _read_json(
+                self.dir / "s1_transcription" / "b_speaker_id.json", needed_by
+            )
         return self._labels
 
     def persons(self, needed_by: str) -> dict[str, dict]:
         if self._persons is None:
-            self._persons = _read_json(self.dir / "s2_extraction" / "a_recording_persons.json", needed_by)
+            self._persons = _read_json(
+                self.dir / "s2_extraction" / "a_recording_persons.json", needed_by
+            )
         return self._persons
 
     def sensitivity(self, needed_by: str) -> dict[str, dict]:
         if self._sensitivity is None:
-            self._sensitivity = _read_json(self.dir / "s2_extraction" / "b_recording_sensitivity.json", needed_by)
+            self._sensitivity = _read_json(
+                self.dir / "s2_extraction" / "b_recording_sensitivity.json", needed_by
+            )
         return self._sensitivity
 
     def memories(self, needed_by: str) -> list[dict]:
         """s3_a 가 모아 둔 한 장을 본다. 출처별 파일을 직접 세지 않는다."""
         if self._memories is None:
-            self._memories = _read_json(
-                self.dir / "s3_synthesis" / "a_memory.json", needed_by)
+            self._memories = _read_json(self.dir / "s3_synthesis" / "a_memory.json", needed_by)
         return self._memories
 
     def prompt_material(self) -> tuple[IntakeContext, dict]:
@@ -211,7 +235,8 @@ class Ctx:
             # 앞에 오고, 녹음에서 새로 나온 것이 뒤에 붙는다.
             found = intake.speech_style.interjections
             intake.speech_style.interjections = found + [
-                w for w in style.get("interjections", []) if w not in found]
+                w for w in style.get("interjections", []) if w not in found
+            ]
             if not intake.speech_style.summary:
                 intake.speech_style.summary = style.get("summary")
         elif intake.speech_style is None and style:
@@ -255,6 +280,7 @@ class Ctx:
 
 # ────────────────────────── s1 전사 ──────────────────────────
 
+
 def step_s1_a(ctx: Ctx) -> str:
     """전사는 유료라, a_transcript.json 에 이미 있는 녹음은 다시 전사하지 않는다.
 
@@ -276,7 +302,8 @@ def step_s1_a(ctx: Ctx) -> str:
         provider = create_stt_provider(ctx.settings)
         for clip in todo:
             done[clip.name] = provider.transcribe(
-                clip, language="ko", speaker_diarization=True).segments
+                clip, language="ko", speaker_diarization=True
+            ).segments
 
     ctx._segments = done
     ctx.save_segments()
@@ -290,10 +317,9 @@ def step_s1_b(ctx: Ctx) -> str:
     segments = ctx.segments("s1_b")
     labels: dict[str, str | None] = {}
     for name, segs in segments.items():
-        labels[name] = (
-            identify_subject_by_content(segs, ctx.subject_context, settings=ctx.settings)
-            or _majority_label(segs)
-        )
+        labels[name] = identify_subject_by_content(
+            segs, ctx.subject_context, settings=ctx.settings
+        ) or _majority_label(segs)
     ctx._labels = labels
     _write_json(ctx.dir / "s1_transcription" / "b_speaker_id.json", labels)
     found = sum(1 for v in labels.values() if v)
@@ -314,12 +340,16 @@ def step_s1_c(ctx: Ctx) -> str:
 
 # ────────────────────────── s2 추출 ──────────────────────────
 
+
 def step_s2_a(ctx: Ctx) -> str:
     segments, labels = ctx.segments("s2_a"), ctx.labels("s2_a")
     out = {
         name: run_persons_analysis(
-            segs, subject_context=ctx.subject_context,
-            subject_speaker_label=labels.get(name), settings=ctx.settings)
+            segs,
+            subject_context=ctx.subject_context,
+            subject_speaker_label=labels.get(name),
+            settings=ctx.settings,
+        )
         for name, segs in segments.items()
     }
     ctx._persons = out
@@ -329,7 +359,10 @@ def step_s2_a(ctx: Ctx) -> str:
 
 def step_s2_b(ctx: Ctx) -> str:
     segments = ctx.segments("s2_b")
-    out = {name: run_sensitivity_analysis(segs, settings=ctx.settings) for name, segs in segments.items()}
+    out = {
+        name: run_sensitivity_analysis(segs, settings=ctx.settings)
+        for name, segs in segments.items()
+    }
     ctx._sensitivity = out
     _write_json(ctx.dir / "s2_extraction" / "b_recording_sensitivity.json", out)
     return f"{len(out)}건 분석"
@@ -339,8 +372,11 @@ def step_s2_c(ctx: Ctx) -> str:
     segments, labels = ctx.segments("s2_c"), ctx.labels("s2_c")
     out = {
         name: run_linguistic_style_analysis(
-            segs, subject_context=ctx.subject_context,
-            subject_speaker_label=labels.get(name), settings=ctx.settings)["linguisticStyle"]
+            segs,
+            subject_context=ctx.subject_context,
+            subject_speaker_label=labels.get(name),
+            settings=ctx.settings,
+        )["linguisticStyle"]
         for name, segs in segments.items()
     }
     _write_json(ctx.dir / "s2_extraction" / "c_recording_linguistic_style.json", out)
@@ -353,6 +389,7 @@ def step_s2_d(ctx: Ctx) -> str:
     a·b·c 는 각각 돈이 드는 단계라, 아직 안 돌린 것이 있을 수 있다. 없는 것은
     빈 값으로 두고 있는 것만 담는다. 전사만 있어도 말투 예시는 나온다.
     """
+
     def maybe(filename: str) -> dict:
         path = ctx.dir / "s2_extraction" / filename
         return json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
@@ -364,8 +401,10 @@ def step_s2_d(ctx: Ctx) -> str:
         speech_examples=ctx.speech_examples("s2_d"),
     )
     _write_json(ctx.dir / "s2_extraction" / "d_recording_prompt.json", merged)
-    return (f"가족 {len(merged['familyMap'])}명 / 금기 {len(merged['tabooTopics'])}건 / "
-            f"말투 예시 {len(merged['speechExamples'])}건")
+    return (
+        f"가족 {len(merged['familyMap'])}명 / 금기 {len(merged['tabooTopics'])}건 / "
+        f"말투 예시 {len(merged['speechExamples'])}건"
+    )
 
 
 def step_s2_e(ctx: Ctx) -> str:
@@ -377,9 +416,13 @@ def step_s2_e(ctx: Ctx) -> str:
     collected: list[dict] = []
     for name, segs in segments.items():
         result = extract_memory_segments(
-            segs, subject_context=ctx.subject_context, subject_speaker_label=labels.get(name),
-            persons_result=persons.get(name, {}), sensitivity_result=sensitivity.get(name, {}),
-            settings=ctx.settings)
+            segs,
+            subject_context=ctx.subject_context,
+            subject_speaker_label=labels.get(name),
+            persons_result=persons.get(name, {}),
+            sensitivity_result=sensitivity.get(name, {}),
+            settings=ctx.settings,
+        )
         for memory in result["memorySegments"]:
             memory["recording"] = name  # 어느 통화에서 나왔는지 (s2_f 가 녹음별 태그를 낼 때 쓴다)
             collected.append(memory)
@@ -407,11 +450,17 @@ def step_s2_f(ctx: Ctx) -> str:
     # 기억이 어느 통화에서 나왔는지는 s2_e 가 recording 필드로 남긴다. 그 필드가 없으면
     # 녹음별로 나눌 수 없어 전체 기억으로 태그를 낸다(근사).
     tagged_by_recording = any(m.get("recording") for m in memories)
-    note = "" if tagged_by_recording else " (기억에 통화 구분이 없어 전체 기준으로 태그. s2_e 를 다시 돌리면 통화별로 나뉜다)"
+    note = (
+        ""
+        if tagged_by_recording
+        else " (기억에 통화 구분이 없어 전체 기준으로 태그. s2_e 를 다시 돌리면 통화별로 나뉜다)"
+    )
 
     out: dict[str, dict] = {}
     for name, segs in segments.items():
-        mine = [m for m in memories if m.get("recording") == name] if tagged_by_recording else memories
+        mine = (
+            [m for m in memories if m.get("recording") == name] if tagged_by_recording else memories
+        )
         out[name] = {
             "summary": summarize_recording(segs, settings=ctx.settings),
             "tags": aggregate_tags({"memorySegments": mine}),
@@ -421,6 +470,7 @@ def step_s2_f(ctx: Ctx) -> str:
 
 
 # ────────────────────────── s3 종합 ──────────────────────────
+
 
 def step_s3_a(ctx: Ctx) -> str:
     """설문·전사·따로 넣은 기억을 한 장으로. 뒤 단계는 이 파일만 본다."""
@@ -446,8 +496,11 @@ def step_s3_b(ctx: Ctx) -> str:
                 subject_context=ctx.subject_context,
                 memories=[
                     ReflectionMemoryInput(
-                        id=m["id"], memory_text=m["memoryText"], tags=m["tags"],
-                        importance_score=m["importanceScore"])
+                        id=m["id"],
+                        memory_text=m["memoryText"],
+                        tags=m["tags"],
+                        importance_score=m["importanceScore"],
+                    )
                     for m in memories
                 ],
             ),
@@ -467,8 +520,12 @@ def step_s3_c(ctx: Ctx) -> str:
     insights = ctx.insights("s3_c")
     assembled = assemble_persona_instructions(
         PersonaAssemblyRequest(
-            subject_context=ctx.subject_context, intake_context=intake,
-            speech_examples=examples[:40], persona_insights=insights))
+            subject_context=ctx.subject_context,
+            intake_context=intake,
+            speech_examples=examples[:40],
+            persona_insights=insights,
+        )
+    )
     path = ctx.dir / "s3_synthesis" / "c_system_prompt.txt"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(assembled.instructions, encoding="utf-8")
@@ -479,6 +536,7 @@ def _step_s3_c_layered(ctx: Ctx) -> str:
     """4층 프롬프트(PERSONA_PROMPT_BUILDER=layered): 설문 → 전사 재료 빈칸 → 말투 카드·실제 주고받기 → 렌더.
     인터뷰 후보는 사람이 확인해야 해서 여기서는 넣지 않는다(python -m pipeline.persona_prompt build --interview …)."""
     from pipeline.persona_prompt import build
+
     death_talk = build.TOGGLE[ctx.settings.persona_death_talk]
     spec, log = build.for_local(ctx.dir, ctx.input_dir, death_talk=death_talk)
     text = build.prompt(spec)
@@ -500,10 +558,19 @@ def step_s3_d(ctx: Ctx) -> str:
 
 
 STEP_FUNC = {
-    "s1_a": step_s1_a, "s1_b": step_s1_b, "s1_c": step_s1_c,
-    "s2_a": step_s2_a, "s2_b": step_s2_b, "s2_c": step_s2_c,
-    "s2_d": step_s2_d, "s2_e": step_s2_e, "s2_f": step_s2_f,
-    "s3_a": step_s3_a, "s3_b": step_s3_b, "s3_c": step_s3_c, "s3_d": step_s3_d,
+    "s1_a": step_s1_a,
+    "s1_b": step_s1_b,
+    "s1_c": step_s1_c,
+    "s2_a": step_s2_a,
+    "s2_b": step_s2_b,
+    "s2_c": step_s2_c,
+    "s2_d": step_s2_d,
+    "s2_e": step_s2_e,
+    "s2_f": step_s2_f,
+    "s3_a": step_s3_a,
+    "s3_b": step_s3_b,
+    "s3_c": step_s3_c,
+    "s3_d": step_s3_d,
 }
 
 
@@ -536,11 +603,15 @@ def run(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="파이프라인 로컬 실행 (input/<대상자> -> output/<대상자>/sN)")
+    parser = argparse.ArgumentParser(
+        description="파이프라인 로컬 실행 (input/<대상자> -> output/<대상자>/sN)"
+    )
     parser.add_argument("--subject", required=True, help="대상자 폴더명 (input/ 아래 폴더 이름)")
     parser.add_argument("--root", default="output", help="산출물 루트 (기본 output)")
     parser.add_argument("--input-root", default="input", help="입력 루트 (기본 input)")
-    parser.add_argument("--limit", type=int, default=None, help="음성 파일 최대 개수(빠른 테스트용)")
+    parser.add_argument(
+        "--limit", type=int, default=None, help="음성 파일 최대 개수(빠른 테스트용)"
+    )
     parser.add_argument("--only", help="이 단계만 (s2 또는 s2_d)")
     parser.add_argument("--from", dest="start", help="이 단계부터")
     parser.add_argument("--to", dest="end", help="이 단계까지")

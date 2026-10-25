@@ -7,10 +7,10 @@
 
 import logging
 
-from infra.setting import Settings
 from infra.external_api.openai_client import analysis_client, analysis_completion, json_reply
 from infra.schema.subject import SubjectContext
 from infra.schema.transcript import TranscriptSegment
+from infra.setting import Settings
 
 logger = logging.getLogger(__name__)
 
@@ -50,9 +50,7 @@ def _clean_source_ids(raw: object, valid_ids: set[int]) -> list[int] | None:
     return cleaned or None
 
 
-def validate_linguistic_style_payload(
-    payload: dict, segments: list[TranscriptSegment]
-) -> dict:
+def validate_linguistic_style_payload(payload: dict, segments: list[TranscriptSegment]) -> dict:
     """근거 실존을 강제하고, 근거 없는 인용 항목은 버린다. 파생 없음."""
     valid_ids = {segment.segment_index for segment in segments}
     style = payload.get("linguisticStyle")
@@ -63,7 +61,9 @@ def validate_linguistic_style_payload(
     recurring_phrases = []
     for item in style.get("recurringPhrases") or []:
         phrase = str((item or {}).get("phrase") or "").strip() if isinstance(item, dict) else ""
-        ids = _clean_source_ids(item.get("sourceSegmentIds") if isinstance(item, dict) else None, valid_ids)
+        ids = _clean_source_ids(
+            item.get("sourceSegmentIds") if isinstance(item, dict) else None, valid_ids
+        )
         if not phrase or ids is None:
             dropped += 1
             continue

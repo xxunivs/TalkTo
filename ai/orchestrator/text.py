@@ -3,6 +3,7 @@
 사전 판정 임계 0.6 은 아래 품사·불용어 정의로 잰 값이라, 정의를 바꾸면 임계도 다시 재야 한다.
 listener_speech_level 은 글만 읽는다(kiwipiepy 없이도 된다).
 """
+
 from __future__ import annotations
 
 import threading
@@ -10,8 +11,27 @@ from functools import lru_cache
 
 KEEP_TAGS = ("NNG", "NNP", "NR", "SN", "VV", "VA", "XR", "SL", "MAG")
 # 이름은 여기 두지 않고 호출 쪽이 extra_stop 으로 더한다.
-GENERIC_STOP = frozenset({"할머니", "할아버지", "나", "우리", "때", "거", "것", "기억", "이야기", "얘기",
-                          "뭐", "어디", "몇", "누구", "처음", "예전", "같이"})
+GENERIC_STOP = frozenset(
+    {
+        "할머니",
+        "할아버지",
+        "나",
+        "우리",
+        "때",
+        "거",
+        "것",
+        "기억",
+        "이야기",
+        "얘기",
+        "뭐",
+        "어디",
+        "몇",
+        "누구",
+        "처음",
+        "예전",
+        "같이",
+    }
+)
 
 _lock = threading.Lock()
 _kiwi = None
@@ -25,8 +45,10 @@ def _get_kiwi():
                 try:
                     from kiwipiepy import Kiwi
                 except ImportError as e:  # 설정으로 켰는데 패키지가 없으면 바로 알린다
-                    raise RuntimeError("kiwipiepy is required for orchestrator precheck/guard "
-                                       "(pip install '.[orchestrator]')") from e
+                    raise RuntimeError(
+                        "kiwipiepy is required for orchestrator precheck/guard "
+                        "(pip install '.[orchestrator]')"
+                    ) from e
                 _kiwi = Kiwi()
     return _kiwi
 
@@ -67,7 +89,9 @@ def morph_set(text: str) -> frozenset[str]:
     return frozenset(morphs(text))
 
 
-LISTENER_BIT = "지금 대화하는 사람"  # 4층 가족 표 줄 첫 칸(pipeline/persona_prompt/render.relation_bits)
+LISTENER_BIT = (
+    "지금 대화하는 사람"  # 4층 가족 표 줄 첫 칸(pipeline/persona_prompt/render.relation_bits)
+)
 SPEECH_LEVELS = ("존댓말", "반말")
 
 

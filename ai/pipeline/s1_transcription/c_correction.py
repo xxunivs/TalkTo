@@ -12,10 +12,10 @@ import re
 
 from openai import OpenAI  # 타입 힌트용
 
-from infra.setting import Settings
 from infra.external_api.openai_client import create_openai_client
 from infra.schema.subject import IntakeContext, SubjectContext
 from infra.schema.transcript import TranscriptSegment
+from infra.setting import Settings
 
 logger = logging.getLogger(__name__)
 
@@ -80,12 +80,8 @@ def _correct_chunk(
     glossary: list[str],
     settings: Settings,
 ) -> None:
-    lines = "\n".join(
-        f"{segment.segment_index}: {segment.transcript_text}" for segment in chunk
-    )
-    user_prompt = (
-        f"고유명사 목록: {', '.join(glossary)}\n\n전사문:\n{lines}"
-    )
+    lines = "\n".join(f"{segment.segment_index}: {segment.transcript_text}" for segment in chunk)
+    user_prompt = f"고유명사 목록: {', '.join(glossary)}\n\n전사문:\n{lines}"
     response = client.chat.completions.create(
         model=settings.openai_correction_model,
         response_format={"type": "json_object"},
@@ -120,9 +116,7 @@ def apply_corrections(
         if not _LENGTH_RATIO_BOUNDS[0] <= ratio <= _LENGTH_RATIO_BOUNDS[1]:
             segment.needs_review = True
             continue
-        if not _phonetically_plausible(
-            segment.transcript_text, corrected, max_jamo_ratio
-        ):
+        if not _phonetically_plausible(segment.transcript_text, corrected, max_jamo_ratio):
             segment.needs_review = True
             continue
         segment.corrected_text = corrected
@@ -133,9 +127,7 @@ def apply_corrections(
             segment.needs_review = True
 
 
-def _phonetically_plausible(
-    original: str, corrected: str, max_jamo_ratio: float
-) -> bool:
+def _phonetically_plausible(original: str, corrected: str, max_jamo_ratio: float) -> bool:
     """모든 교체 단어 쌍이 발음(자모) 수준에서 유사할 때만 True."""
     original_tokens = original.split()
     corrected_tokens = corrected.split()

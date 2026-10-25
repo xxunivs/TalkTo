@@ -9,6 +9,7 @@ Fish 목소리이고 FISH_EMOTION 이 cue·inline 이면
   (다른 글에 고른 것이라서).
 MiniMax 감정(VOICE_EMOTION)은 기존 경로(generate_persona_response)에만 있다. 여기서는 지금처럼 감정이 없다.
 """
+
 from __future__ import annotations
 
 import re
@@ -31,7 +32,7 @@ def peel_header(text: str) -> tuple[str, str]:
     m = _LEAD_HEADER.match(text)
     if not m:
         return "", text
-    return m.group(2), (m.group(1) + text[m.end():]).strip()
+    return m.group(2), (m.group(1) + text[m.end() :]).strip()
 
 
 @dataclass
@@ -41,8 +42,12 @@ class VoiceRun:
     header: bool = False
 
     def summary(self) -> dict:
-        return {"mode": self.split.mode, "emotion": self.split.emotion,
-                "cues": [cue for _, cue in self.split.cues], "header": self.header}
+        return {
+            "mode": self.split.mode,
+            "emotion": self.split.emotion,
+            "cues": [cue for _, cue in self.split.cues],
+            "header": self.header,
+        }
 
 
 class VoiceMarks:

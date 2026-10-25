@@ -9,6 +9,7 @@
 - TieredSelector(ORCHESTRATOR_SELECTOR=tiered): 장기 기억 전부 + 단기만 발화 분해 단서로 top-k.
   BE 가 기억 유형(memoryType)을 안 보내면 전부 장기로 들어와 PassThrough 와 같은 결과가 된다.
 """
+
 from __future__ import annotations
 
 import ast
@@ -59,10 +60,16 @@ def memory_from_export_row(row: dict) -> MemoryItem:
 
 class ExportFileMemoryStore:
     """파일 하나 = 대상자 한 명. subject_id → 파일 경로. default 는 어느 subject 에나 쓴다."""
+
     impl = "export_file"
 
-    def __init__(self, files: dict[str, Path] | None = None, *, default: Path | None = None,
-                 statuses: tuple[str, ...] = ("ACTIVE", "active")) -> None:
+    def __init__(
+        self,
+        files: dict[str, Path] | None = None,
+        *,
+        default: Path | None = None,
+        statuses: tuple[str, ...] = ("ACTIVE", "active"),
+    ) -> None:
         self.files = {k: Path(v) for k, v in (files or {}).items()}
         self.default = Path(default) if default else None
         self.statuses = statuses
@@ -86,14 +93,19 @@ class PassThroughSelector:
     impl = "passthrough_v0"
 
     def select(self, turn: TurnInput, state: SessionState, store: MemoryStore) -> MemorySelection:
-        return MemorySelection(memories=store.list_for_subject(turn), delta=list(state.delta_memories),
-                               strategy=f"passthrough:{store.impl}")
+        return MemorySelection(
+            memories=store.list_for_subject(turn),
+            delta=list(state.delta_memories),
+            strategy=f"passthrough:{store.impl}",
+        )
 
 
 # ---------------------------------------------------------------- 장기 전부 + 단기 분해 검색
 
+
 class Embedder(Protocol):
     """텍스트 → 벡터. 기억 벡터와 같은 모델이어야 서로 견줄 수 있다(운영: text-embedding-3-small)."""
+
     impl: str
 
     def embed(self, texts: list[str]) -> list[list[float]]: ...
@@ -101,6 +113,7 @@ class Embedder(Protocol):
 
 class OpenAIEmbedder:
     """AI 서버의 기존 임베딩 함수(pipeline d_build_memory_embedding.embed_texts) 그대로."""
+
     impl = "openai"
 
     def __init__(self, settings) -> None:
@@ -108,6 +121,7 @@ class OpenAIEmbedder:
 
     def embed(self, texts: list[str]) -> list[list[float]]:
         from pipeline.s3_synthesis.d_build_memory_embedding import embed_texts
+
         return embed_texts(texts, settings=self.settings)
 
 
@@ -132,6 +146,7 @@ class CachedEmbedder:
 
 class FileEmbedder:
     """오프라인 재현용: {텍스트: 벡터} json 캐시. 없는 텍스트는 KeyError."""
+
     impl = "file"
 
     def __init__(self, *paths: Path) -> None:
@@ -145,6 +160,7 @@ class FileEmbedder:
 
 class MemoryVectors(Protocol):
     """기억 → 벡터. 못 구한 기억은 결과에서 빠진다(검색 대상에서 제외)."""
+
     impl: str
 
     def vectors_for(self, items: list[MemoryItem]) -> dict[str, list[float]]: ...
@@ -165,6 +181,7 @@ class EmbedOnDemandVectors:
 
 class ExportVectors:
     """운영 memory_embeddings export(Neon SQL 편집기, 행 {"j": json}) → memoryId 별 벡터. 오프라인 재현용."""
+
     impl = "export"
 
     def __init__(self, *paths: Path) -> None:
@@ -194,10 +211,18 @@ class TieredSelector:
     - 델타(이번 세션에 새로 들은 기억)는 PassThrough 와 같이 그대로 넘긴다.
     strategy 예: "tiered:lt72+st5/237", "tiered:lt72+st0/237|nocue", "…|embed-fail"
     """
+
     impl = "tiered_v1"
 
-    def __init__(self, profiles, embedder: Embedder, vectors: MemoryVectors, *,
-                 st_top_k: int = 5, threshold: float = 0.18) -> None:
+    def __init__(
+        self,
+        profiles,
+        embedder: Embedder,
+        vectors: MemoryVectors,
+        *,
+        st_top_k: int = 5,
+        threshold: float = 0.18,
+    ) -> None:
         self.profiles = profiles
         self.embedder = embedder
         self.vectors = vectors
@@ -213,14 +238,22 @@ class TieredSelector:
         sp = self._splitters.get(key)
         if sp is None:
             from orchestrator.split import Splitter, lexicon_from_terms
-            sp = self._splitters[key] = Splitter(lexicon_from_terms(prof.address_terms, prof.family_names))
+
+            sp = self._splitters[key] = Splitter(
+                lexicon_from_terms(prof.address_terms, prof.family_names)
+            )
         return sp.split(turn.message).cue
 
     def rank_short(self, cue: str, short: list[MemoryItem]) -> list[MemoryItem]:
         qv = self.embedder.embed([cue])[0]
         vecs = self.vectors.vectors_for(short)
-        scored = [(s, i, m) for i, m in enumerate(short) if m.id in vecs
-                  for s in [_cos(qv, vecs[m.id])] if s >= self.threshold]
+        scored = [
+            (s, i, m)
+            for i, m in enumerate(short)
+            if m.id in vecs
+            for s in [_cos(qv, vecs[m.id])]
+            if s >= self.threshold
+        ]
         scored.sort(key=lambda t: (-t[0], t[1]))
         return [m for _, _, m in scored[: self.st_top_k]]
 
@@ -237,7 +270,12 @@ class TieredSelector:
             try:
                 picked = self.rank_short(cue, short)
             except Exception:  # 임베딩 API·캐시 실패가 응답을 막으면 안 된다
-                log.exception("tiered selector: short-term ranking failed, falling back to given order")
+                log.exception(
+                    "tiered selector: short-term ranking failed, falling back to given order"
+                )
                 picked, tag = short[: self.st_top_k], "|embed-fail"
-        return MemorySelection(memories=long_ + picked, delta=list(state.delta_memories),
-                               strategy=f"tiered:lt{len(long_)}+st{len(picked)}/{len(short)}{tag}")
+        return MemorySelection(
+            memories=long_ + picked,
+            delta=list(state.delta_memories),
+            strategy=f"tiered:lt{len(long_)}+st{len(picked)}/{len(short)}{tag}",
+        )

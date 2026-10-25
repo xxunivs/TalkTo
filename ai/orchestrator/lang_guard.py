@@ -10,6 +10,7 @@
 모드(ORCHESTRATOR_LANG_GUARD): off(기본) / flag(답은 그대로, 이유만 기록) / fix(걸린 문장을 지운다).
 fix 에서 문장이 다 지워지면 되묻는다. 가족 표의 '지금 대화하는 사람' 줄이 존댓말이면 높인 되묻기(family_polite).
 """
+
 from __future__ import annotations
 
 import re
@@ -24,15 +25,23 @@ _LATIN_WORD = re.compile(r"[A-Za-z][A-Za-z'’-]+")
 _SENT = re.compile(r"(?<=[.?!。])\s+|\n+")
 # 추론·메타 문장의 표지(문장 첫머리). 대소문자 무시.
 # 강한 표지는 영어로 대화할 때도 누출이고, 약한 표지는 영어 대화에서는 평범한 말이라 한국어 대화에서만 본다.
-LEAK_STRONG = re.compile(r"^\s*(?:<\/?think>|the user\b|user:|assistant:|final answer\b|reasoning:|note:)", re.IGNORECASE)
-LEAK_WEAK = re.compile(r"^\s*(?:wait\b|okay\b|alright\b|hmm+\b|let me\b|let's\b|i (?:should|need|will|think|must)\b"
-                       r"|answer:|thinking\b|good\.)", re.IGNORECASE)
+LEAK_STRONG = re.compile(
+    r"^\s*(?:<\/?think>|the user\b|user:|assistant:|final answer\b|reasoning:|note:)", re.IGNORECASE
+)
+LEAK_WEAK = re.compile(
+    r"^\s*(?:wait\b|okay\b|alright\b|hmm+\b|let me\b|let's\b|i (?:should|need|will|think|must)\b"
+    r"|answer:|thinking\b|good\.)",
+    re.IGNORECASE,
+)
 # 가족 말·앞 대화에 영어 낱말이 이만큼 있으면 영어로 대화하는 중으로 본다
 ENGLISH_DIALOGUE_WORDS = 3
 # 맥락에 없어도 넘길 영어 약어(대화에서 흔한 것만)
 ALLOWED_LATIN = {"ok", "tv", "pc", "sns", "ktx", "kt", "lg", "sk"}
-ASK_BACK = {"family": "응? 다시 말해 줄래?", "family_polite": "네? 다시 한 번 말해 주실래요?",
-            "public": "네? 다시 한 번 말씀해 주시겠어요?"}
+ASK_BACK = {
+    "family": "응? 다시 말해 줄래?",
+    "family_polite": "네? 다시 한 번 말해 주실래요?",
+    "public": "네? 다시 한 번 말씀해 주시겠어요?",
+}
 
 
 def script_of(ch: str) -> str | None:
@@ -93,7 +102,9 @@ def sentence_hit(sent: str, hits: list[str], english: bool) -> bool:
         return True
     bad_scripts = {h.split(":", 1)[1] for h in hits if h.startswith("script:")}
     bad_words = {h.split(":", 1)[1] for h in hits if h.startswith("latin:")}
-    return bool(scripts(sent) & bad_scripts) or any(w in _LATIN_WORD.findall(sent) for w in bad_words)
+    return bool(scripts(sent) & bad_scripts) or any(
+        w in _LATIN_WORD.findall(sent) for w in bad_words
+    )
 
 
 def turn_dialogue(turn: TurnInput, state: SessionState) -> str:
@@ -115,13 +126,23 @@ class LanguageGuard:
         self.inner, self.profiles, self.mode = inner, profiles, mode
         self.impl = f"{inner.impl}+lang_{mode}"
 
-    def apply(self, generation: Generation, turn: TurnInput, state: SessionState,
-              selection: MemorySelection) -> GuardResult:
+    def apply(
+        self,
+        generation: Generation,
+        turn: TurnInput,
+        state: SessionState,
+        selection: MemorySelection,
+    ) -> GuardResult:
         res = self.inner.apply(generation, turn, state, selection)
         dialogue = turn_dialogue(turn, state)
         prof = self.profiles.profile_for(turn)
-        extra = [prof.style_card or "", *(f"{s.user} {s.persona}" for s in prof.shots)]  # 조립기가 덧붙이는 말투 재료
-        hits = findings(res.text, "\n".join([turn_context(turn, state, selection), *extra]), dialogue)
+        extra = [
+            prof.style_card or "",
+            *(f"{s.user} {s.persona}" for s in prof.shots),
+        ]  # 조립기가 덧붙이는 말투 재료
+        hits = findings(
+            res.text, "\n".join([turn_context(turn, state, selection), *extra]), dialogue
+        )
         if not hits:
             return res
         reasons = res.reasons + [f"lang:{h}" for h in hits]
@@ -131,7 +152,18 @@ class LanguageGuard:
         english = english_dialogue(dialogue)
         kept = [s for s in sents if not sentence_hit(s, hits, english)]
         if kept:
-            return res.model_copy(update={"text": " ".join(kept), "action": "trim", "reasons": reasons})
-        kind = "public" if prof.public else (
-            "family_polite" if listener_speech_level(turn.persona_instructions) == "존댓말" else "family")
-        return res.model_copy(update={"text": ASK_BACK[kind], "action": "ask_back", "reasons": reasons})
+            return res.model_copy(
+                update={"text": " ".join(kept), "action": "trim", "reasons": reasons}
+            )
+        kind = (
+            "public"
+            if prof.public
+            else (
+                "family_polite"
+                if listener_speech_level(turn.persona_instructions) == "존댓말"
+                else "family"
+            )
+        )
+        return res.model_copy(
+            update={"text": ASK_BACK[kind], "action": "ask_back", "reasons": reasons}
+        )

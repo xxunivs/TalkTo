@@ -4,6 +4,7 @@
 대답에 성적·비밀 만남·위험한 내용이 있으면 대체 글(말 높이별)로 통째로 바꾼다(action=redact → 음성 표시 버림).
 위기·죽음을 묻는 턴이거나 대답에 위기 상담 번호가 있으면 성적인 내용만 바꾼다. 판정·문구: pipeline/safety/minor_guard.py
 """
+
 from __future__ import annotations
 
 import logging
@@ -20,8 +21,13 @@ class MinorGuard:
         self.inner = inner
         self.impl = f"{inner.impl}+minor"
 
-    def apply(self, generation: Generation, turn: TurnInput, state: SessionState,
-              selection: MemorySelection) -> GuardResult:
+    def apply(
+        self,
+        generation: Generation,
+        turn: TurnInput,
+        state: SessionState,
+        selection: MemorySelection,
+    ) -> GuardResult:
         res = self.inner.apply(generation, turn, state, selection)
         if not turn.minor:
             return res
@@ -29,7 +35,14 @@ class MinorGuard:
         hits = blocking_hits(res.text, safety_turn=is_safety_turn(turn.message))
         if not hits:
             return res
-        log.warning("minor guard replaced reply for subject %s", turn.subject_id)  # 내용은 남기지 않는다
+        log.warning(
+            "minor guard replaced reply for subject %s", turn.subject_id
+        )  # 내용은 남기지 않는다
         text = FALLBACK[is_polite(turn.persona_instructions)]
-        return res.model_copy(update={"text": text, "action": "redact",
-                                      "reasons": res.reasons + [f"minor:{h}" for h in hits]})
+        return res.model_copy(
+            update={
+                "text": text,
+                "action": "redact",
+                "reasons": res.reasons + [f"minor:{h}" for h in hits],
+            }
+        )

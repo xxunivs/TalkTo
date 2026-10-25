@@ -3,13 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 
 from infra.be_ai_api.dependencies import SettingsDependency, require_internal_request
-from pipeline.s3_synthesis.b_extract_insight import run_reflection
-from pipeline.s3_synthesis.c_build_system_prompt import (
-    assemble_persona_instructions,
-    extract_memory_candidates,
-    generate_persona_response,
-)
-from pipeline.s3_synthesis.e_memory_gap import make_gap_question
+from infra.schema.insight import ReflectionRequest, ReflectionResponse
 from infra.schema.persona import (
     GapQuestionRequest,
     GapQuestionResponse,
@@ -20,9 +14,14 @@ from infra.schema.persona import (
     PersonaResponseRequest,
     PersonaResponseResult,
 )
-from infra.schema.insight import ReflectionRequest, ReflectionResponse
 from orchestrator.service import orchestrate_persona_response
-
+from pipeline.s3_synthesis.b_extract_insight import run_reflection
+from pipeline.s3_synthesis.c_build_system_prompt import (
+    assemble_persona_instructions,
+    extract_memory_candidates,
+    generate_persona_response,
+)
+from pipeline.s3_synthesis.e_memory_gap import make_gap_question
 
 router = APIRouter(tags=["persona"])
 InternalRequest = Annotated[None, Depends(require_internal_request)]

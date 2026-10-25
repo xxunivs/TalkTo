@@ -146,9 +146,7 @@ def forget_speech(api_key: str, *, voice_id: str, headers: object) -> None:
             if found:
                 delete_history_item(api_key, found)
             else:
-                logger.warning(
-                    "elevenlabs history item not found for request_id=%s", request_id
-                )
+                logger.warning("elevenlabs history item not found for request_id=%s", request_id)
 
         in_background(lookup_and_delete)
         return

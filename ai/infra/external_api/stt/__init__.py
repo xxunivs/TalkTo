@@ -1,10 +1,10 @@
-from infra.setting import Settings
 from infra.error import ProviderNotConfiguredError
 from infra.external_api.stt.elevenlabs_scribe import (
     ElevenLabsScribeProvider,
     STTProvider,
     STTResult,
 )
+from infra.setting import Settings
 
 __all__ = ["STTProvider", "STTResult", "create_stt_provider"]
 

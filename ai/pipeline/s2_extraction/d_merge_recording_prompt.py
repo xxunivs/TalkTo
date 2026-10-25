@@ -54,12 +54,15 @@ def _taboo_topics(sensitivity_by_recording: dict[str, dict]) -> list[dict]:
         for flag in result.get("sensitivityFlags", []):
             kind = flag.get("type") or "기타"
             topic = TABOO_TOPIC.get(kind, kind)
-            out.setdefault(topic, {
-                "topic": topic,
-                "grade": "물으면만",
-                "note": flag.get("description"),
-                "sourceQuestion": None,
-            })
+            out.setdefault(
+                topic,
+                {
+                    "topic": topic,
+                    "grade": "물으면만",
+                    "note": flag.get("description"),
+                    "sourceQuestion": None,
+                },
+            )
     return list(out.values())
 
 
@@ -77,7 +80,8 @@ def _speech_style(style_by_recording: dict[str, dict]) -> dict:
                 patterns.append(pattern)
 
     interjections = [
-        phrase for phrase, n in counts.most_common()
+        phrase
+        for phrase, n in counts.most_common()
         if len(phrase) <= INTERJECTION_MAX and n >= INTERJECTION_MIN_COUNT
     ]
     out: dict = {"interjections": interjections[:10]}
@@ -105,8 +109,13 @@ def merge_recording_prompt(
         "familyMap": _family_map(persons, _address_terms(linguistic_style)),
         "speechStyle": _speech_style(linguistic_style),
         "speechExamples": [
-            {"text": text, "situation": None, "listener": None,
-             "inferred": False, "sourceQuestion": None}
+            {
+                "text": text,
+                "situation": None,
+                "listener": None,
+                "inferred": False,
+                "sourceQuestion": None,
+            }
             for text in speech_examples
         ],
         "tabooTopics": _taboo_topics(sensitivity),

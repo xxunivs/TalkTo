@@ -9,9 +9,8 @@
 import logging
 
 from infra.external_api.openai_client import analysis_client, analysis_completion, json_reply
-
-from infra.setting import Settings
 from infra.schema.transcript import TranscriptSegment
+from infra.setting import Settings
 
 logger = logging.getLogger(__name__)
 
@@ -63,9 +62,7 @@ def run_sensitivity_analysis(
                 {"role": "system", "content": SENSITIVITY_JUDGE_PROMPT},
                 {
                     "role": "user",
-                    "content": build_sensitivity_judge_prompt(
-                        result["sensitivityFlags"], segments
-                    ),
+                    "content": build_sensitivity_judge_prompt(result["sensitivityFlags"], segments),
                 },
             ],
         )
@@ -100,9 +97,7 @@ def apply_judge_decisions(result: dict, judge_payload: dict) -> dict:
     return {"sensitivityFlags": kept, "judgeDropped": removed}
 
 
-def validate_sensitivity_payload(
-    payload: dict, segments: list[TranscriptSegment]
-) -> dict:
+def validate_sensitivity_payload(payload: dict, segments: list[TranscriptSegment]) -> dict:
     """구조 검증만 한다 — 내용 필터링은 안전 항목에선 금지.
 
     enum 밖의 type이나 실존하지 않는 근거는 "덜 플래그된 것"이 아니라
@@ -113,9 +108,7 @@ def validate_sensitivity_payload(
     flags = []
     for n, flag in enumerate(payload.get("sensitivityFlags") or []):
         if not isinstance(flag, dict):
-            raise SensitivityValidationError(
-                f"flag {n} is not an object ({type(flag).__name__})"
-            )
+            raise SensitivityValidationError(f"flag {n} is not an object ({type(flag).__name__})")
         flag_type = flag.get("type")
         if flag_type not in SENSITIVITY_TYPES:
             raise SensitivityValidationError(
@@ -189,9 +182,7 @@ SENSITIVITY_JUDGE_PROMPT = """너는 민감정보 플래그의 2차 검증기다
 {"decisions": [{"index": 0, "verdict": "keep | drop", "reason": "한 문장"}]}"""
 
 
-def build_sensitivity_judge_prompt(
-    flags: list[dict], segments: list[TranscriptSegment]
-) -> str:
+def build_sensitivity_judge_prompt(flags: list[dict], segments: list[TranscriptSegment]) -> str:
     by_index = {segment.segment_index: segment for segment in segments}
     blocks = []
     for i, flag in enumerate(flags):

@@ -26,12 +26,19 @@ class TTSProvider(Protocol):
     name: str
 
     def synthesize(
-        self, text: str, *, voice_id: str, speed: float = 1.0,
-        stability: float = 0.3, similarity_boost: float = 0.75, style: float = 0.0,
+        self,
+        text: str,
+        *,
+        voice_id: str,
+        speed: float = 1.0,
+        stability: float = 0.3,
+        similarity_boost: float = 0.75,
+        style: float = 0.0,
         emotion: str | None = None,
     ) -> TTSResult: ...
 
     def delete_voice(self, voice_id: str) -> None: ...
+
 
 logger = logging.getLogger(__name__)
 
@@ -101,13 +108,21 @@ class ElevenLabsTTSProvider:
             if not ready:
                 logger.warning(
                     "voice not ready for %s (category=%s) — falling back to %s",
-                    self.model_id, voice.get("category"), _DEFAULT_MODEL,
+                    self.model_id,
+                    voice.get("category"),
+                    _DEFAULT_MODEL,
                 )
         return self.model_id if self._v4_ok.get(voice_id) else _DEFAULT_MODEL
 
     def synthesize(
-        self, text: str, *, voice_id: str, speed: float = 1.0,
-        stability: float = 0.3, similarity_boost: float = 0.75, style: float = 0.0,
+        self,
+        text: str,
+        *,
+        voice_id: str,
+        speed: float = 1.0,
+        stability: float = 0.3,
+        similarity_boost: float = 0.75,
+        style: float = 0.0,
         emotion: str | None = None,
     ) -> TTSResult:
         # emotion 은 받지만 쓰지 않는다. v4 는 글을 보고 감정을 스스로 싣는다.

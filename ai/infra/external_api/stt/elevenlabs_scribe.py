@@ -32,6 +32,7 @@ class STTProvider(Protocol):
         num_speakers: int | None = None,
     ) -> STTResult: ...
 
+
 ELEVENLABS_BASE = "https://api.elevenlabs.io"
 
 # Scribe가 무음·소리를 텍스트로 서술하는 패턴 — tag_audio_events를 꺼도
@@ -85,9 +86,7 @@ class ElevenLabsScribeProvider:
                 timeout=self.timeout_seconds,
             )
         if response.status_code != 200:
-            raise STTProviderError(
-                f"Scribe error {response.status_code}: {response.text[:500]}"
-            )
+            raise STTProviderError(f"Scribe error {response.status_code}: {response.text[:500]}")
         body = response.json()
         # ElevenLabs 계정에 남는 받아쓰기 기록(보낸 녹음·받아쓴 글)을 바로 지운다
         forget_transcript(self._api_key, body)
@@ -153,9 +152,7 @@ def group_scribe_words(words: list[dict]) -> list[TranscriptSegment]:
         nonlocal current
         if current and strip_non_speech_notes(current["text"]):
             logprobs: list[float] = current["logprobs"]
-            confidence = (
-                round(math.exp(sum(logprobs) / len(logprobs)), 4) if logprobs else None
-            )
+            confidence = round(math.exp(sum(logprobs) / len(logprobs)), 4) if logprobs else None
             segments.append(
                 TranscriptSegment(
                     segment_index=len(segments),
@@ -177,7 +174,8 @@ def group_scribe_words(words: list[dict]) -> list[TranscriptSegment]:
         end_ms = int(float(word.get("end") or 0) * 1000)
         too_long = (
             current is not None
-            and word.get("type", "word") == "word"  # 낱말 앞에서만 나눈다(띄어쓰기에서 시작하지 않게)
+            and word.get("type", "word")
+            == "word"  # 낱말 앞에서만 나눈다(띄어쓰기에서 시작하지 않게)
             and (
                 len(current["text"]) >= MAX_SEGMENT_CHARS
                 or current["endMs"] - current["startMs"] >= MAX_SEGMENT_MS

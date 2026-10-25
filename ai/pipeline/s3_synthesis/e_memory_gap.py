@@ -70,7 +70,9 @@ _NO_GAP_TOPIC = re.compile(
 def gap_blocked(*texts: str | None) -> bool:
     """빈틈 질문을 만들지 않을 말인가. 위기·죽음(precheck.is_safety_turn), 위기 상담 번호, 죽음·장례·임종·건강·종교 화제."""
     for text in texts:
-        if text and (is_safety_turn(text) or CRISIS_LINE.search(text) or _NO_GAP_TOPIC.search(text)):
+        if text and (
+            is_safety_turn(text) or CRISIS_LINE.search(text) or _NO_GAP_TOPIC.search(text)
+        ):
             return True
     return False
 
@@ -80,6 +82,7 @@ def turn_gap(message: str, topic: str | None) -> str | None:
     if topic is None or gap_blocked(message, topic):
         return None
     return topic
+
 
 # [기억없음:주제] — 모델이 괄호·띄어쓰기·쌍점을 조금씩 바꿔 낸다: [기억 없음: 노래], (기억없음:노래), 【기억없음】
 _GAP = re.compile(
@@ -121,7 +124,7 @@ def _gap_spans(text: str) -> list[tuple[int, int, str]]:
         if any(start <= opener < end for start, end, _ in spans):
             continue  # 이미 뗄 표시(엄격한 표시·앞의 어긋난 표시) 안이다
         end, closed = _loose_end(text, m.end())
-        body = text[m.end():end - 1 if closed else end]
+        body = text[m.end() : end - 1 if closed else end]
         body = _GAP_LOOSE.split(body, maxsplit=1)[0]  # 속에 든 표시는 주제가 아니다
         spans.append((m.start(), end, " ".join(_LOOSE_LEAD.sub("", body).split())))
     return sorted(spans)
@@ -160,7 +163,9 @@ def style_block(examples: list[StyleExample]) -> str:
         return ""
     lines = [STYLE_HEAD, STYLE_LEAD]
     for e in rows:
-        lines.append(f"- 예전 대답: \"{_quote(e.original, 200)}\"\n  고친 말: \"{_quote(e.corrected, 300)}\"")
+        lines.append(
+            f'- 예전 대답: "{_quote(e.original, 200)}"\n  고친 말: "{_quote(e.corrected, 300)}"'
+        )
     return "\n".join(lines)
 
 
@@ -192,7 +197,7 @@ GAP_QUESTION_PROMPT = """너는 TalkTo 서비스다. 가족이 돌아가신 분�
 
 JSON으로만: {{"action": "new|merge|skip", "question": "...", "topic": "...", "mergeInto": "열린 질문 id 또는 null"}}"""
 
-_SELF_TENSE = "만든 분 자신이 그분이다. 그분께 직접 묻는다(예: \"평소 즐겨 부르시는 노래가 있나요?\"). 그분 호칭은 쓰지 않는다."
+_SELF_TENSE = '만든 분 자신이 그분이다. 그분께 직접 묻는다(예: "평소 즐겨 부르시는 노래가 있나요?"). 그분 호칭은 쓰지 않는다.'
 _PAST = "돌아가신 분이다. 지난 일로 묻는다(…셨나요, …있었나요)."
 _PRESENT = "살아 계신 분이다. 지금 일로 묻는다(…하시나요, …있나요)."
 # 함께 쓰는 가족의 대화·고침에서 온 후보(fromMember). 질문과 주제는 만든 분이 보므로 그 가족이 한 말을 옮기지 않는다
@@ -200,8 +205,8 @@ _PRESENT = "살아 계신 분이다. 지금 일로 묻는다(…하시나요, �
 _MEMBER_RULE = (
     "\n- 이 말을 한 사람은 질문을 읽을 만든 분이 아니라 함께 쓰는 다른 가족이다. 그 가족이 한 말을 옮기지 않는다"
     "(따옴표로든 바꿔 말해서든 인용하지 않는다). 그 가족이 한 말에 나온 사람 이름·호칭·장소·날짜·사건과 그 가족 자신의 사정은 "
-    "질문과 topic 에 넣지 않는다. 질문은 주제만 일반적으로 묻는다(예: \"민수 결혼식에 오셨던 거\" → "
-    "\"{label}께서 가족 잔치 때 즐겨 하시던 일이 있었나요?\"). 그렇게 묻지 못하면 skip."
+    '질문과 topic 에 넣지 않는다. 질문은 주제만 일반적으로 묻는다(예: "민수 결혼식에 오셨던 거" → '
+    '"{label}께서 가족 잔치 때 즐겨 하시던 일이 있었나요?"). 그렇게 묻지 못하면 skip.'
 )
 # 함께 쓰는 가족 후보에서 만든 질문에 따옴표가 있으면 그 가족의 말을 옮긴 것으로 보고 버린다(일반적인 질문에는 따옴표가 없다)
 _QUOTES = re.compile(r"[\"'“”‘’「」『』]")
@@ -239,10 +244,14 @@ def _user_content(request: GapQuestionRequest) -> str:
     elif c.signal == "low_recall":
         lines.append("대화 상대의 기억에서 맞는 것을 찾지 못했다.")
     if request.from_member:
-        lines.append("이 말을 한 사람: 함께 쓰는 다른 가족(질문은 만든 분이 본다 — 이 가족이 한 말은 옮기지 않는다).")
+        lines.append(
+            "이 말을 한 사람: 함께 쓰는 다른 가족(질문은 만든 분이 본다 — 이 가족이 한 말은 옮기지 않는다)."
+        )
     if request.open_questions:
         lines.append("열린 질문:")
-        lines += [f"- id={q.id} 주제={q.topic or '-'}: {q.question}" for q in request.open_questions]
+        lines += [
+            f"- id={q.id} 주제={q.topic or '-'}: {q.question}" for q in request.open_questions
+        ]
     else:
         lines.append("열린 질문: 없음")
     return "\n".join(lines)
@@ -263,12 +272,18 @@ def make_gap_question(request: GapQuestionRequest, *, settings: Settings) -> Gap
         return _skip(settings)
     client = chat_client(settings, "gap question")
     label = _label(request)
-    system = GAP_QUESTION_PROMPT.format(label=label, tense=_tense(request),
-                                        member=_MEMBER_RULE.format(label=label) if request.from_member else "")
+    system = GAP_QUESTION_PROMPT.format(
+        label=label,
+        tense=_tense(request),
+        member=_MEMBER_RULE.format(label=label) if request.from_member else "",
+    )
     response = client.chat.completions.create(
         model=settings.openai_chat_model,
         response_format={"type": "json_object"},
-        messages=[{"role": "system", "content": system}, {"role": "user", "content": _user_content(request)}],
+        messages=[
+            {"role": "system", "content": system},
+            {"role": "user", "content": _user_content(request)},
+        ],
     )
     try:
         payload = json.loads(response.choices[0].message.content or "{}")
@@ -287,12 +302,21 @@ def make_gap_question(request: GapQuestionRequest, *, settings: Settings) -> Gap
     if action == "merge":
         target = str(payload.get("mergeInto") or payload.get("merge_into") or "").strip()
         if target in open_ids:
-            return GapQuestionResponse(action="merge", merge_into=target, provider=PROVIDER,
-                                       model=settings.openai_chat_model)
+            return GapQuestionResponse(
+                action="merge",
+                merge_into=target,
+                provider=PROVIDER,
+                model=settings.openai_chat_model,
+            )
         action = "new"  # 없는 id 에 합치라고 하면 질문이 있을 때만 새로 만든다
     if action != "new" or not question or _PROBING.search(question) or gap_blocked(question, topic):
         return _skip(settings)
     if request.from_member and _QUOTES.search(question):  # 함께 쓰는 가족의 말을 옮겼다
         return _skip(settings)
-    return GapQuestionResponse(action="new", question=question, topic=topic or None, provider=PROVIDER,
-                               model=settings.openai_chat_model)
+    return GapQuestionResponse(
+        action="new",
+        question=question,
+        topic=topic or None,
+        provider=PROVIDER,
+        model=settings.openai_chat_model,
+    )

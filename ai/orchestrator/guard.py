@@ -24,11 +24,19 @@ GuardV1(ORCHESTRATOR_GUARD=v1) — 규칙은 서로 독립인 순수 함수, 아
 가족 표의 '지금 대화하는 사람' 줄이 존댓말이면 높인 되묻기(family_polite)를 쓴다(가드 문구는 모델을 거치지 않는다).
 GuardV11(ORCHESTRATOR_GUARD=v11): v1 의 오차단을 줄인 판정(아래 클래스 설명).
 """
+
 from __future__ import annotations
 
 import re
 
-from orchestrator.contracts import Generation, GuardResult, MemoryItem, MemorySelection, SessionState, TurnInput
+from orchestrator.contracts import (
+    Generation,
+    GuardResult,
+    MemoryItem,
+    MemorySelection,
+    SessionState,
+    TurnInput,
+)
 from orchestrator.persona import subject_name_from
 from orchestrator.precheck import is_question, is_safety_turn, profile_section, strip_preamble
 from orchestrator.restricted import redact_instructions
@@ -38,15 +46,22 @@ from orchestrator.text import listener_speech_level
 class PassGuard:
     impl = "pass_v0"
 
-    def apply(self, generation: Generation, turn: TurnInput, state: SessionState,
-              selection: MemorySelection) -> GuardResult:
+    def apply(
+        self,
+        generation: Generation,
+        turn: TurnInput,
+        state: SessionState,
+        selection: MemorySelection,
+    ) -> GuardResult:
         return GuardResult(text=generation.text)
 
 
 # ---------------------------------------------------------------- 헤더 (조립기와 같이 씀)
 
-HEADER_RULE = ("# 답변 형식 (꼭 지킬 것)\n첫 줄에 이 답의 근거가 된 참고 기억 id 를 \"[근거: m12,m40]\" 처럼 쓴다. "
-               "참고 기억에 근거가 없으면 \"[근거: 없음]\" 이라고 쓴다. 둘째 줄부터 평소처럼 답한다. 근거가 없으면 지어내지 말고 되물어라.")
+HEADER_RULE = (
+    '# 답변 형식 (꼭 지킬 것)\n첫 줄에 이 답의 근거가 된 참고 기억 id 를 "[근거: m12,m40]" 처럼 쓴다. '
+    '참고 기억에 근거가 없으면 "[근거: 없음]" 이라고 쓴다. 둘째 줄부터 평소처럼 답한다. 근거가 없으면 지어내지 말고 되물어라.'
+)
 HEADER = re.compile(r"^\s*\[근거:\s*([^\]]*)\]\s*")
 
 
@@ -59,17 +74,24 @@ def header_block(selection: MemorySelection) -> str:
     items = labeled(selection)
     if not items:
         return ""
-    lines = [f"- (m{i}) " + (f"[{m.title}] " if m.title else "") + m.text.strip() for i, m in enumerate(items)]
-    return ("참고 기억(각 줄 앞 (m번호)가 기억 id. 대화 화제가 닿으면 구체 사실을 그대로 녹이고, 없는 내용은 지어내지 않는다):\n"
-            + "\n".join(lines))
+    lines = [
+        f"- (m{i}) " + (f"[{m.title}] " if m.title else "") + m.text.strip()
+        for i, m in enumerate(items)
+    ]
+    return (
+        "참고 기억(각 줄 앞 (m번호)가 기억 id. 대화 화제가 닿으면 구체 사실을 그대로 녹이고, 없는 내용은 지어내지 않는다):\n"
+        + "\n".join(lines)
+    )
 
 
-def parse_header(text: str, selection: MemorySelection) -> tuple[str, list[MemoryItem] | None, bool]:
+def parse_header(
+    text: str, selection: MemorySelection
+) -> tuple[str, list[MemoryItem] | None, bool]:
     """(본문, 인용 기억(None=헤더 없음), 잘못된 id 있음)."""
     m = HEADER.match(text)
     if not m:
         return text, None, False
-    body = text[m.end():].strip()
+    body = text[m.end() :].strip()
     raw = [x.strip() for x in m.group(1).split(",") if x.strip()]
     if not raw or raw == ["없음"]:
         return body, [], False
@@ -85,16 +107,24 @@ def parse_header(text: str, selection: MemorySelection) -> tuple[str, list[Memor
 
 # ---------------------------------------------------------------- 규칙 재료
 
-DONT_KNOW = re.compile(r"(몰라|모르겠|모른다|기억이\s?(잘\s?)?안|생각이\s?(잘\s?)?안\s?나|가물가물|글쎄|잊어버|까먹|얘기\s?(좀\s?)?해\s?줄래|말해\s?줄래"
-                       # 고인 페르소나의 되묻기(잊은 듯 말하지 않고 가족에게 듣고 싶어 한다: ASK_BACK *_deceased)
-                       r"|얘기[^.?!\n]{0,8}해\s?줄래|이야기[^.?!\n]{0,10}(들려|해)\s?주실래|들려\s?줄래)")
+DONT_KNOW = re.compile(
+    r"(몰라|모르겠|모른다|기억이\s?(잘\s?)?안|생각이\s?(잘\s?)?안\s?나|가물가물|글쎄|잊어버|까먹|얘기\s?(좀\s?)?해\s?줄래|말해\s?줄래"
+    # 고인 페르소나의 되묻기(잊은 듯 말하지 않고 가족에게 듣고 싶어 한다: ASK_BACK *_deceased)
+    r"|얘기[^.?!\n]{0,8}해\s?줄래|이야기[^.?!\n]{0,10}(들려|해)\s?주실래|들려\s?줄래)"
+)
 # DONT_KNOW 중 이야기를 청하는 되묻기만. 고인은 이 말일 때만 지어내기 검사를 건너뛴다('글쎄·몰라' 뒤에 지어낸 말이 숨지 않게)
-TELL_ME = re.compile(r"얘기\s?(좀\s?)?해\s?줄래|말해\s?줄래|얘기[^.?!\n]{0,8}해\s?줄래|이야기[^.?!\n]{0,10}(들려|해)\s?주실래"
-                     r"|들려\s?줄래")
+TELL_ME = re.compile(
+    r"얘기\s?(좀\s?)?해\s?줄래|말해\s?줄래|얘기[^.?!\n]{0,8}해\s?줄래|이야기[^.?!\n]{0,10}(들려|해)\s?주실래"
+    r"|들려\s?줄래"
+)
 AFFECTION = re.compile(r"사랑")
 USER_LOVE = re.compile(r"사랑|보고\s?싶")
-CLOSING = re.compile(r"(끊(어|을게|는다|자|을께)|들어가(세요|요|라|볼게)|잘\s?(자|있어|지내)|또\s?(전화|연락)|안녕히|다음에\s?(또|전화)|이만)")
-CARE = re.compile(r"(밥|끼니|챙겨\s?먹|건강\s?(잘\s?)?챙|건강이\s?제일|몸\s?(조심|건강|챙|잘\s?돌)|아프지\s?마|감기\s?조심|푹\s?쉬|잘\s?먹어|무리하지\s?마)")
+CLOSING = re.compile(
+    r"(끊(어|을게|는다|자|을께)|들어가(세요|요|라|볼게)|잘\s?(자|있어|지내)|또\s?(전화|연락)|안녕히|다음에\s?(또|전화)|이만)"
+)
+CARE = re.compile(
+    r"(밥|끼니|챙겨\s?먹|건강\s?(잘\s?)?챙|건강이\s?제일|몸\s?(조심|건강|챙|잘\s?돌)|아프지\s?마|감기\s?조심|푹\s?쉬|잘\s?먹어|무리하지\s?마)"
+)
 NUM = re.compile(r"\d+")
 # 위기 상담 번호(자살예방 109·옛 1393, 정신건강 위기상담 1577-0199, 응급 119)
 CRISIS_LINE = re.compile(r"(?<!\d)(?:109|119|1393|1577-0199)(?!\d)")
@@ -104,18 +134,33 @@ SENT = re.compile(r"(?<=[.!?…~])\s+|\n+")
 # 지금은 첫 단계에 질문 화제어를 넣어 구체적으로 되묻고(ASK_BACK_TOPIC, 화제어가 없으면 [0]),
 # 세 번째부터는 상대 근황으로 돌린다.
 ASK_BACK = {
-    "family": ("글쎄, 그건 기억이 잘 안 나네. 그게 언제 적 일이야?", "그건 잘 모르겠다.",
-               "그건 잘 모르겠고, 너는 요즘 어떻게 지내?"),
-    "family_polite": ("글쎄요, 그건 기억이 잘 안 나네요. 그게 언제 적 일이에요?", "그건 잘 모르겠어요.",
-                      "그건 잘 모르겠고, 요즘은 어떻게 지내세요?"),
-    "public": ("그건 제가 잘 모르겠네요. 언제 적 이야기예요?", "그 부분은 제가 잘 모르겠어요.",
-               "그건 제가 모르겠고, 요즘은 어떻게 지내세요?"),
+    "family": (
+        "글쎄, 그건 기억이 잘 안 나네. 그게 언제 적 일이야?",
+        "그건 잘 모르겠다.",
+        "그건 잘 모르겠고, 너는 요즘 어떻게 지내?",
+    ),
+    "family_polite": (
+        "글쎄요, 그건 기억이 잘 안 나네요. 그게 언제 적 일이에요?",
+        "그건 잘 모르겠어요.",
+        "그건 잘 모르겠고, 요즘은 어떻게 지내세요?",
+    ),
+    "public": (
+        "그건 제가 잘 모르겠네요. 언제 적 이야기예요?",
+        "그 부분은 제가 잘 모르겠어요.",
+        "그건 제가 모르겠고, 요즘은 어떻게 지내세요?",
+    ),
     # 고인 페르소나는 '기억이 안 난다'·'모르겠다'고 말하지 않는다(잠금 2, 대표 지시 2026-10-21).
     # 지어내지도 않고, 가족에게서 그 이야기를 듣고 싶어 하며 되묻는다. 세 번째도 모른다는 말 없이 근황으로 돌린다.
-    "family_deceased": ("그 얘기 네가 한번 해 줄래? 듣고 싶구나.", "그래, 네 얘기 더 들려줄래?",
-                        "그 얘기는 다음에 또 들려줄래? 너는 요즘 어떻게 지내?"),
-    "family_polite_deceased": ("그 이야기 한번 들려주실래요? 듣고 싶네요.", "이야기 더 들려주실래요?",
-                               "그 이야기는 다음에 또 들려주실래요? 요즘은 어떻게 지내세요?"),
+    "family_deceased": (
+        "그 얘기 네가 한번 해 줄래? 듣고 싶구나.",
+        "그래, 네 얘기 더 들려줄래?",
+        "그 얘기는 다음에 또 들려줄래? 너는 요즘 어떻게 지내?",
+    ),
+    "family_polite_deceased": (
+        "그 이야기 한번 들려주실래요? 듣고 싶네요.",
+        "이야기 더 들려주실래요?",
+        "그 이야기는 다음에 또 들려주실래요? 요즘은 어떻게 지내세요?",
+    ),
 }
 # 첫 되묻기에 질문 화제어(명사 최대 2개)를 넣은 꼴. {topic} 은 GuardV1.ask_back_topic.
 # 고인(*_deceased)은 화제어를 넣지 않고 늘 ASK_BACK[kind][0] — 가드 문구는 모델을 거치지 않아, 가족 말의 병명·
@@ -147,7 +192,9 @@ def sentences(text: str) -> list[str]:
 # '안 잊었다'·'못 잊었지'(기억한다), '네 생각이 안 나는 날이 없다'·'잊었을 리가'·'잊었던 일'(그리움),
 # '보고 싶은지 모르겠다'·'어쩔 줄을 모르겠다'(감탄), '아무·다른 생각이 안 나더라'(마음), '잘 모르겠으면'(조건).
 # 맨 '몰라·모른다'는 넣지 않는다(no_advice 의 "그건 내가 잘 모른다" 같은 약 이야기 피하기까지 지워진다).
-_ADV = r"(?:잘|하나도|전혀|통|영|도통|도무지|이젠|이제는|이제|요즘|요새|다)"  # 둘까지(이젠 잘 안 나)
+_ADV = (
+    r"(?:잘|하나도|전혀|통|영|도통|도무지|이젠|이제는|이제|요즘|요새|다)"  # 둘까지(이젠 잘 안 나)
+)
 _NA = r"안\s?(?:나(?!면|도|는\s?(?:날|때|적))|난(?!다면|다고|\s?(?:날|때|적))|났|납)"  # 안 나·난다·났어·납니다
 FORGOT = re.compile(
     rf"기억(?:이|도)?\s?(?:{_ADV}\s?){{0,2}}{_NA}|기억(?:이|도)?\s?(?:잘\s?)?나지\s?않(?!는\s?(?:날|때|적))"
@@ -155,7 +202,8 @@ FORGOT = re.compile(
     r"|(?<!안)(?<!안\s)(?<!못)(?<!못\s)(?:잊어\s?버렸|잊어먹었|잊었|까먹었|까먹어\s?버렸|깜[빡박]\s?했|다\s?잊어서)"
     r"(?!을\s?(?:리|까)|으면|던|다고|다면)"
     rf"|(?<!아무)(?<!아무\s)(?<!다른\s)(?<!딴\s)생각이\s?(?:{_ADV}\s?){{0,2}}{_NA}"
-    r"|(?<!지)(?<!지\s)(?<!줄\s)(?<!줄을\s)(?<!바\s)(?<!바를\s)(?:잘\s?)?모르겠(?!으면|나요?[?？])")  # '내가 모르겠나?'는 안다는 말
+    r"|(?<!지)(?<!지\s)(?<!줄\s)(?<!줄을\s)(?<!바\s)(?<!바를\s)(?:잘\s?)?모르겠(?!으면|나요?[?？])"
+)  # '내가 모르겠나?'는 안다는 말
 # 걸린 말이 묻는 꼴이면("까먹었니?", "기억 안 나지?", "잊었어?", "내가 너를 잊었겠니?") 잊은 말이 아니다
 _ASKS = re.compile(r"[^\s,.!…~]*?(?:[?？]|(?:니|냐)(?=$|[\s,.!…~]))")
 # 단, 혼잣말로 묻는 꼴("잊어버렸나?", "안 나네?", "왜 이렇게 기억이 안 나지?")은 잊은 말이다
@@ -164,8 +212,12 @@ _WHY = re.compile(r"왜\s?(?:이렇게|이리|자꾸)")
 # 걸린 말 앞 마디(쉼표부터)가 듣는 사람 이야기면("너 또 까먹었구나", "넌 모르겠지만") 잊은 말이 아니다.
 # 단, 듣는 사람이 한 말을 내가 잊은 꼴("네가 말한 거 다 까먹었다", "네가 해 준 얘기는 기억이 안 나네")은 잊은 말이다
 _YOU = re.compile(r"(?<![가-힣])(?:너|넌|너는|너도|네가|니가|자네|당신)(?![가-힣])")
-_ME = re.compile(r"(?<![가-힣])(?:난|나는|나도|내가|저는|저도|제가)(?![가-힣])")  # 맨 '나'는 '안 나'와 겹쳐 뺀다
-_TOLD = re.compile(r"(?:한|준|던|낸)\s?(?:거|건|걸|것|얘기|이야기|말|일)(?:[은는을를도]|(?![가-힣]))")
+_ME = re.compile(
+    r"(?<![가-힣])(?:난|나는|나도|내가|저는|저도|제가)(?![가-힣])"
+)  # 맨 '나'는 '안 나'와 겹쳐 뺀다
+_TOLD = re.compile(
+    r"(?:한|준|던|낸)\s?(?:거|건|걸|것|얘기|이야기|말|일)(?:[은는을를도]|(?![가-힣]))"
+)
 
 
 def forgot(sentence: str) -> bool:
@@ -173,8 +225,11 @@ def forgot(sentence: str) -> bool:
     if CRISIS_LINE.search(sentence):
         return False
     for m in FORGOT.finditer(sentence):
-        head = sentence[max(sentence.rfind(",", 0, m.start()), sentence.rfind("，", 0, m.start())) + 1:m.start()]
-        tail = sentence[m.end():]
+        head = sentence[
+            max(sentence.rfind(",", 0, m.start()), sentence.rfind("，", 0, m.start()))
+            + 1 : m.start()
+        ]
+        tail = sentence[m.end() :]
         if _ASKS.match(tail) and not (_WONDER.match(tail) or _WHY.search(head)):
             continue
         you = _YOU.search(head)
@@ -207,15 +262,70 @@ def _deceased(turn: TurnInput, prof) -> bool:
 # 지어내기(R1b) 근거로 함께 보는 앞 대화 줄 수(가족 말만 쓴다. BE 는 최근 12줄을 보낸다)
 HEARD_TURNS = 12
 # 화제 확인(R1t)에서 빼는 말: 가벼운 동사·빈도어(질문 화제가 아님). 오차단 사례를 보고 정했다.
-TOPIC_LIGHT =frozenset({"하", "있", "되", "어떻", "가", "오", "보", "알", "말하", "그렇", "이렇", "기억나", "맨날", "자주", "늘"})
+TOPIC_LIGHT = frozenset(
+    {
+        "하",
+        "있",
+        "되",
+        "어떻",
+        "가",
+        "오",
+        "보",
+        "알",
+        "말하",
+        "그렇",
+        "이렇",
+        "기억나",
+        "맨날",
+        "자주",
+        "늘",
+    }
+)
 # 가족 호칭 ↔ 기억에 쓰인 말(가드 전용, 사전 판정 사전은 그대로)
 TOPIC_ALIASES = {"아빠": ("아버지",), "엄마": ("어머니",)}
 # 되묻기 문구의 화제어에서 빼는 명사: 때·호칭·인사·묻는 말·막연한 말(화제가 아니라 "글쎄, 그때 얘기는…"·
 # "얼마 얘기는…"처럼 어색해진다)
-TOPIC_PHRASE_STOP = frozenset({"저번", "이번", "그때", "요즘", "오늘", "어제", "옛날", "안녕", "할머니", "할아버지", "할매", "할배",
-                               "엄마", "아빠", "어머니", "아버지", "어머님", "아버님", "여보", "당신", "우리", "얘기", "이야기",
-                               "얼마", "얼마큼", "무엇", "언제", "어디", "누구", "정도", "이유", "때문", "사람", "생각", "마음",
-                               "기분", "느낌"})
+TOPIC_PHRASE_STOP = frozenset(
+    {
+        "저번",
+        "이번",
+        "그때",
+        "요즘",
+        "오늘",
+        "어제",
+        "옛날",
+        "안녕",
+        "할머니",
+        "할아버지",
+        "할매",
+        "할배",
+        "엄마",
+        "아빠",
+        "어머니",
+        "아버지",
+        "어머님",
+        "아버님",
+        "여보",
+        "당신",
+        "우리",
+        "얘기",
+        "이야기",
+        "얼마",
+        "얼마큼",
+        "무엇",
+        "언제",
+        "어디",
+        "누구",
+        "정도",
+        "이유",
+        "때문",
+        "사람",
+        "생각",
+        "마음",
+        "기분",
+        "느낌",
+    }
+)
 # 가족 말(또는 화제어)에 이런 말이 있으면 되묻기에 화제어를 넣지 않는다(화제 없는 [0] 문구). 가드 문구는 모델을 거치지
 # 않아 가족 말의 명사가 그대로 대답이 된다 — 병·돈·법·부부 사이처럼 아픈 말, 성·위험한 말(SEXUAL·GROOMING·DANGER,
 # 위기·죽음 SAFETY 는 ask_back_topic 에서 같이 본다). 넘쳐 걸러도 예전 문구가 될 뿐이라 넓게 잡는다(10/24 리뷰).
@@ -229,11 +339,13 @@ SENSITIVE_TOPIC = re.compile(
     r"|감옥|교도소|구치소|수감|징역|감방|전과|범죄|체포|구속|재판|소송|고소|경찰|벌금|사기"
     r"|채무|대출|사채|파산|부도|보증|월급|연봉|재산|상속|유언|증여|보험|연금|통장|계좌|비밀번호"
     r"|폭력|폭행|학대|때렸|때리|맞았|도박|노름|중독|술주정"
-    r"|죽음|사망|죽었|죽은|사고|부고|유골|납골|영정")
+    r"|죽음|사망|죽었|죽은|사고|부고|유골|납골|영정"
+)
 
 
 def proper_nouns(text: str) -> list[str]:
     from orchestrator.text import proper_nouns as nnp
+
     return nnp(text)
 
 
@@ -248,8 +360,11 @@ class GuardV1:
 
     def __init__(self, profiles, *, topic_threshold: float = 0.5, care_limit: int = 2) -> None:
         from orchestrator.precheck import CoveragePrecheck
+
         self.profiles = profiles
-        self.cov = CoveragePrecheck(profiles, threshold=topic_threshold)  # 화제어·동의어 판정 재사용
+        self.cov = CoveragePrecheck(
+            profiles, threshold=topic_threshold
+        )  # 화제어·동의어 판정 재사용
         self.topic_threshold = topic_threshold
         self.care_limit = care_limit
 
@@ -269,17 +384,35 @@ class GuardV1:
         가족 말에 아픈 말·성·위험·위기 말이 있으면 화제어를 하나도 넣지 않는다(빈 문자열 → 화제 없는 되묻기)."""
         from orchestrator.precheck import SAFETY
         from orchestrator.text import GENERIC_STOP, nouns
+
         # 이 모듈을 import 하는 쪽이라 여기서 import 한다(순환)
         from pipeline.safety.minor_guard import DANGER, GROOMING, SEXUAL
-        names = {n for n in (subject_name_from(turn.persona_instructions), state.speaker, turn.speaker_hint) if n}
+
+        names = {
+            n
+            for n in (
+                subject_name_from(turn.persona_instructions),
+                state.speaker,
+                turn.speaker_hint,
+            )
+            if n
+        }
         try:
             question = self.question_text(turn)
-            if any(p.search(t) for p in (SENSITIVE_TOPIC, SAFETY, SEXUAL, GROOMING, DANGER)
-                   for t in (turn.message or "", question)):
+            if any(
+                p.search(t)
+                for p in (SENSITIVE_TOPIC, SAFETY, SEXUAL, GROOMING, DANGER)
+                for t in (turn.message or "", question)
+            ):
                 return ""
             stop = GENERIC_STOP | TOPIC_LIGHT | TOPIC_PHRASE_STOP | names
-            terms = [t for t in nouns(question) if t not in stop and not SENSITIVE_TOPIC.search(t)
-                     and not any(t in x or x in t for x in leak_terms if x)]
+            terms = [
+                t
+                for t in nouns(question)
+                if t not in stop
+                and not SENSITIVE_TOPIC.search(t)
+                and not any(t in x or x in t for x in leak_terms if x)
+            ]
         except Exception:  # noqa: BLE001 — 문구는 덧붙임일 뿐, 화제어 추출 실패로 가드가 죽으면 안 된다
             return ""
         return " ".join(list(dict.fromkeys(terms))[:2])
@@ -287,18 +420,41 @@ class GuardV1:
     def has_topic(self, turn: TurnInput, state: SessionState) -> bool:
         """안부·인사·마음 말'만' 있는 질문이 아닌가. 원래 화제어가 없던 질문도 True(전처럼 R1a 를 본다)."""
         from orchestrator.precheck import is_relational
-        names = {n for n in (subject_name_from(turn.persona_instructions), state.speaker, turn.speaker_hint) if n}
-        return not is_relational(self.question_text(turn),
-                                 lambda x: [t for t in self.cov.topic_terms(x, names) if t not in TOPIC_LIGHT])
 
-    def topic_covered(self, turn: TurnInput, state: SessionState, cited: list[MemoryItem], profile: str) -> bool | None:
+        names = {
+            n
+            for n in (
+                subject_name_from(turn.persona_instructions),
+                state.speaker,
+                turn.speaker_hint,
+            )
+            if n
+        }
+        return not is_relational(
+            self.question_text(turn),
+            lambda x: [t for t in self.cov.topic_terms(x, names) if t not in TOPIC_LIGHT],
+        )
+
+    def topic_covered(
+        self, turn: TurnInput, state: SessionState, cited: list[MemoryItem], profile: str
+    ) -> bool | None:
         body = self.question_text(turn)
-        names = {n for n in (subject_name_from(turn.persona_instructions), state.speaker, turn.speaker_hint) if n}
+        names = {
+            n
+            for n in (
+                subject_name_from(turn.persona_instructions),
+                state.speaker,
+                turn.speaker_hint,
+            )
+            if n
+        }
         terms = [t for t in self.cov.topic_terms(body, names) if t not in TOPIC_LIGHT]
         if not terms:
             return None
         # 인용 기억 전부(+프로필)를 한 덩어리로 본다 — 여러 기억을 묶어 답하는 게 정상이라서
-        raw = " ".join((m.title + " " if m.title else "") + m.text for m in cited) + (" " + profile if profile else "")
+        raw = " ".join((m.title + " " if m.title else "") + m.text for m in cited) + (
+            " " + profile if profile else ""
+        )
         doc = self.cov._morph_set(raw)
 
         def hit(t: str) -> bool:
@@ -307,14 +463,27 @@ class GuardV1:
             if len(t) >= 2 and t in raw:  # 합성어 속(병원 ⊂ 서울대병원)
                 return True
             return any(a in raw for a in self.aliases(t))
+
         return sum(hit(t) for t in terms) / len(terms) >= self.topic_threshold
 
-    def apply(self, generation: Generation, turn: TurnInput, state: SessionState,
-              selection: MemorySelection) -> GuardResult:
+    def apply(
+        self,
+        generation: Generation,
+        turn: TurnInput,
+        state: SessionState,
+        selection: MemorySelection,
+    ) -> GuardResult:
         prof = self.profiles.profile_for(turn)
         restricted = prof.restricted
-        kind = "public" if prof.public else (
-            "family_polite" if listener_speech_level(turn.persona_instructions) == "존댓말" else "family")
+        kind = (
+            "public"
+            if prof.public
+            else (
+                "family_polite"
+                if listener_speech_level(turn.persona_instructions) == "존댓말"
+                else "family"
+            )
+        )
         if kind != "public" and _deceased(turn, prof):
             kind += "_deceased"
         deceased = kind.endswith("_deceased")
@@ -327,7 +496,13 @@ class GuardV1:
             """되묻기 문구(쓸 때만 화제어를 뽑는다). 고인은 화제어를 넣지 않는다(ASK_BACK_TOPIC 참고).
             고인 문구는 잊은 말이 되지 않게 한 번 더 본다(done 의 drop_forgetting 도 거친다)."""
             if not made:
-                topic = "" if deceased else self.ask_back_topic(turn, state, restricted.leak_terms if restricted else ())
+                topic = (
+                    ""
+                    if deceased
+                    else self.ask_back_topic(
+                        turn, state, restricted.leak_terms if restricted else ()
+                    )
+                )
                 text = ask_back_text(kind, streak, topic)
                 made.append(ASK_BACK[kind][0] if deceased and says_forgot(text) else text)
             return made[0]
@@ -353,8 +528,13 @@ class GuardV1:
                 delta["ask_back_streak"] = 1
             elif streak:
                 delta["ask_back_streak"] = -streak
-            return GuardResult(text=text, action=action, reasons=reasons, cited_memory_ids=cited_ids,
-                               counter_delta=delta)
+            return GuardResult(
+                text=text,
+                action=action,
+                reasons=reasons,
+                cited_memory_ids=cited_ids,
+                counter_delta=delta,
+            )
 
         # 1. 누출
         if restricted and restricted.leak_terms:
@@ -408,8 +588,19 @@ class GuardV1:
             # 가족이 앞 대화에서 직접 말한 것(부산으로 이사 간다 등)도 근거다 — 들은 걸 되받는 걸 지어내기로 보지 않는다.
             # 페르소나가 앞서 한 말은 넣지 않는다(그때 지어낸 말이 근거가 되지 않게)
             heard = " ".join(t.content for t in turn.history[-HEARD_TURNS:] if t.role == "user")
-            base = (" ".join(f"{m.title} {m.text}" for m in ground) + " " + turn.message + " " + instructions
-                    + " " + self.extra_ground(turn) + " " + speakers + " " + heard)
+            base = (
+                " ".join(f"{m.title} {m.text}" for m in ground)
+                + " "
+                + turn.message
+                + " "
+                + instructions
+                + " "
+                + self.extra_ground(turn)
+                + " "
+                + speakers
+                + " "
+                + heard
+            )
             bad = unsupported_tokens(body, base)
             if bad:
                 reasons.append("R1b_unsupported:" + ",".join(bad))
@@ -435,7 +626,9 @@ class GuardV1:
                 care_used += 1
                 delta["care"] = delta.get("care", 0) + 1
             kept.append(s)
-        if not kept:  # 다 지워지면 원래 답의 첫 문장만이라도(빈 답보다 낫다), 카운터는 올리지 않는다
+        if (
+            not kept
+        ):  # 다 지워지면 원래 답의 첫 문장만이라도(빈 답보다 낫다), 카운터는 올리지 않는다
             reasons.append("all_dropped_keep_first")
             kept = sents[:1]
         text = " ".join(kept) if len(kept) < len(sents) else body
@@ -449,11 +642,13 @@ class GuardV11(GuardV1):
     - 화제 확인은 사전 판정 v1.1 의 화제어(이름 조각 합치기·가벼운 말/부르는 말 빼기)와 동의어(SYN_V11)를 쓴다.
     - R1b: 가족 이름과 부르는 꼴(서연아·정우야·도윤이)은 근거 없는 고유명사로 보지 않는다.
     """
+
     impl = "guard_v1.1"
 
     def __init__(self, profiles, *, topic_threshold: float = 0.5, care_limit: int = 2) -> None:
         super().__init__(profiles, topic_threshold=topic_threshold, care_limit=care_limit)
         from orchestrator.precheck import CoveragePrecheckV11
+
         self.cov = CoveragePrecheckV11(profiles, threshold=topic_threshold)
 
     def question_text(self, turn: TurnInput) -> str:
@@ -461,6 +656,7 @@ class GuardV11(GuardV1):
 
     def aliases(self, term: str) -> tuple[str, ...]:
         from orchestrator.precheck import SYN_V11
+
         return TOPIC_ALIASES.get(term, ()) + SYN_V11.get(term, ())
 
     def extra_ground(self, turn: TurnInput) -> str:

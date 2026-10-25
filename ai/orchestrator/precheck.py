@@ -11,23 +11,36 @@ CoveragePrecheck(ORCHESTRATOR_PRECHECK=coverage): 질문이면 화제어(형태�
     (기억 수는 BE memoryTotal, 없으면 받은 수로 짐작 — pipeline/persona_prompt/low_memory.memory_count)
 CoveragePrecheckV11(coverage_v11): v1 의 오판 원인을 고친 판정(아래 클래스 설명).
 """
+
 from __future__ import annotations
 
 import json
 import re
 from pathlib import Path
 
-from orchestrator.contracts import MemoryItem, MemorySelection, PrecheckResult, SessionState, TurnInput
+from orchestrator.contracts import (
+    MemoryItem,
+    MemorySelection,
+    PrecheckResult,
+    SessionState,
+    TurnInput,
+)
 from orchestrator.persona import subject_name_from
 from orchestrator.restricted import redact_instructions
 from orchestrator.text import listener_speech_level
 
 SYNONYMS_PATH = Path(__file__).resolve().parents[1] / "prompts" / "topic_synonyms.json"
 
-_QUESTION_WORDS = re.compile(r"(뭐|뭘|무슨|무엇|어디|언제|누구|누가|몇|어떻게|어떡|어땠|왜|얼마|어느|기억\s?(나|해|하))")
-_QUESTION_END = re.compile(r"(니|냐|나요|까|까요|죠|지요|어요|아요|예요|에요|래|대|지|나)\s*[?？]?\s*$")
+_QUESTION_WORDS = re.compile(
+    r"(뭐|뭘|무슨|무엇|어디|언제|누구|누가|몇|어떻게|어떡|어땠|왜|얼마|어느|기억\s?(나|해|하))"
+)
+_QUESTION_END = re.compile(
+    r"(니|냐|나요|까|까요|죠|지요|어요|아요|예요|에요|래|대|지|나)\s*[?？]?\s*$"
+)
 # 앞머리 호칭("할머니,")과 자기소개("나 도윤이야.")는 화제가 아니다
-_VOCATIVE = re.compile(r"^\s*(할머니|할머이|할매|할아버지|엄마|어머니|어머님|아빠|아버지|아버님|여보|당신)\s*[,.!~]*\s*")
+_VOCATIVE = re.compile(
+    r"^\s*(할머니|할머이|할매|할아버지|엄마|어머니|어머님|아빠|아버지|아버님|여보|당신)\s*[,.!~]*\s*"
+)
 _SELF_INTRO = re.compile(r"^\s*나\s*[,]?\s*[가-힣]{1,4}?(이야|야|이에요|예요|에요|이)\s*[.!,~]+\s*")
 _PROFILE_HEAD = re.compile(r"^#+[^\n]*기본\s*정보[^\n]*\n(.*?)(?=^#|\Z)", re.M | re.S)
 # 기억을 묻는 말이 아닌 관계 말: 그분 안부("편안하게 잘 계시죠", "거기는 어때"), 인사, 마음("보고 싶어요"),
@@ -47,7 +60,8 @@ _RELATIONAL = re.compile(
     r"|사랑(?:해|합|한다|하고)\S{0,4}|고마워\S{0,3}|고맙(?:다|습|네|구나|고)\S{0,4}"
     r"|감사(?:합|해|하|드)\S{0,6}|미안(?:해|하|합)\S{0,6}|죄송(?:해|하|합)\S{0,6}"
     r"|안녕(?:하|히)\S{0,6}|안녕(?=$|[\s.,!?~…])|여보세요\S{0,3}|오랜만\S{0,6}|반가워\S{0,3}|반갑\S{0,6}"
-    r"|별일\s*없\S{0,6}|밥\s*(?:은|잘|좀)?\s*(?:먹었|드셨|먹)\S{0,6}|식사\s*(?:하셨|했|하)\S{0,6}")
+    r"|별일\s*없\S{0,6}|밥\s*(?:은|잘|좀)?\s*(?:먹었|드셨|먹)\S{0,6}|식사\s*(?:하셨|했|하)\S{0,6}"
+)
 
 
 # 위기(자해·자살 생각)와 그분의 죽음·임종을 묻는 말. 기억을 묻는 질문이 아니다.
@@ -56,7 +70,8 @@ _RELATIONAL = re.compile(
 # 이런 말은 사전 판정·가드의 지어내기 검사(R1)를 건너뛰고 공통 규칙(위기 대응·사망 정책)을 따른다.
 SAFETY = re.compile(
     r"죽고\s?싶|죽을\s?것\s?같|죽어\s?버리|사라지고\s?싶|없어지고\s?싶|살기\s?싫|살고\s?싶지\s?않"
-    r"|자살|자해|목숨|돌아가셨|돌아가신|임종|장례|세상을\s?떠|마지막\s?(?:순간|모습)")
+    r"|자살|자해|목숨|돌아가셨|돌아가신|임종|장례|세상을\s?떠|마지막\s?(?:순간|모습)"
+)
 
 
 def is_safety_turn(text: str) -> bool:
@@ -89,7 +104,9 @@ def is_relational(text: str, topic_terms) -> bool:
 class NoopPrecheck:
     impl = "noop_v0"
 
-    def check(self, turn: TurnInput, state: SessionState, selection: MemorySelection) -> PrecheckResult:
+    def check(
+        self, turn: TurnInput, state: SessionState, selection: MemorySelection
+    ) -> PrecheckResult:
         return PrecheckResult()
 
 
@@ -128,33 +145,51 @@ def _directive(terms: list[str], public: bool, polite: bool = False, deceased: b
     """
     topic = "·".join(terms[:4])
     if deceased and not public:
-        ask = ("\"그 이야기 한번 들려주실래요? 듣고 싶네요\"처럼 존댓말로" if polite
-               else "\"그 얘기 네가 한번 해 줄래? 듣고 싶구나\"처럼")
-        return ("# 이번 질문에 대해 (코드 판정)\n"
-                f"가족이 물은 것({topic})은 기억에 없다. 지어내지 말고, '기억이 안 난다'·'잊어버렸다'·"
-                f"'모르겠다'처럼 잊은 듯 말하지도 말고, 그 이야기를 가족에게서 듣고 싶다는 마음으로 {ask} "
-                "다정하게 되물어라. 장소·날짜·이름 같은 세부를 만들지 않는다.")
+        ask = (
+            '"그 이야기 한번 들려주실래요? 듣고 싶네요"처럼 존댓말로'
+            if polite
+            else '"그 얘기 네가 한번 해 줄래? 듣고 싶구나"처럼'
+        )
+        return (
+            "# 이번 질문에 대해 (코드 판정)\n"
+            f"가족이 물은 것({topic})은 기억에 없다. 지어내지 말고, '기억이 안 난다'·'잊어버렸다'·"
+            f"'모르겠다'처럼 잊은 듯 말하지도 말고, 그 이야기를 가족에게서 듣고 싶다는 마음으로 {ask} "
+            "다정하게 되물어라. 장소·날짜·이름 같은 세부를 만들지 않는다."
+        )
     if public:
-        return ("# 이번 질문에 대해 (코드 판정)\n"
-                f"방문자가 물은 것({topic})은 기억에 없다. 지어내지 말고 \"그건 제가 잘 모르겠네요\"처럼 "
-                "모른다고 짧게 말한 뒤, 방문자에게 어떤 이야기인지 되물어라. 장소·날짜·이름 같은 세부를 만들지 않는다.")
+        return (
+            "# 이번 질문에 대해 (코드 판정)\n"
+            f'방문자가 물은 것({topic})은 기억에 없다. 지어내지 말고 "그건 제가 잘 모르겠네요"처럼 '
+            "모른다고 짧게 말한 뒤, 방문자에게 어떤 이야기인지 되물어라. 장소·날짜·이름 같은 세부를 만들지 않는다."
+        )
     if polite:
-        return ("# 이번 질문에 대해 (코드 판정)\n"
-                f"가족이 물은 것({topic})은 기억에 없다. 지어내지 말고 \"글쎄요, 그건 기억이 잘 안 나네요\"처럼 "
-                "모른다고 짧게 말한 뒤, \"이야기 좀 해 주실래요?\"처럼 존댓말로 가족에게 되물어라. "
-                "장소·날짜·이름 같은 세부를 만들지 않는다.")
-    return ("# 이번 질문에 대해 (코드 판정)\n"
-            f"가족이 물은 것({topic})은 기억에 없다. 지어내지 말고 \"글쎄, 그건 기억이 잘 안 나네\"처럼 "
-            "모른다고 짧게 말한 뒤, \"네가 얘기 좀 해 줄래?\"처럼 가족에게 되물어라. "
-            "장소·날짜·이름 같은 세부를 만들지 않는다.")
+        return (
+            "# 이번 질문에 대해 (코드 판정)\n"
+            f'가족이 물은 것({topic})은 기억에 없다. 지어내지 말고 "글쎄요, 그건 기억이 잘 안 나네요"처럼 '
+            '모른다고 짧게 말한 뒤, "이야기 좀 해 주실래요?"처럼 존댓말로 가족에게 되물어라. '
+            "장소·날짜·이름 같은 세부를 만들지 않는다."
+        )
+    return (
+        "# 이번 질문에 대해 (코드 판정)\n"
+        f'가족이 물은 것({topic})은 기억에 없다. 지어내지 말고 "글쎄, 그건 기억이 잘 안 나네"처럼 '
+        '모른다고 짧게 말한 뒤, "네가 얘기 좀 해 줄래?"처럼 가족에게 되물어라. '
+        "장소·날짜·이름 같은 세부를 만들지 않는다."
+    )
 
 
 class CoveragePrecheck:
     impl = "coverage_v1"
 
-    def __init__(self, profiles=None, *, threshold: float = 0.6,
-                 synonyms: dict[str, tuple[str, ...]] | None = None, min_memories: int = 0) -> None:
+    def __init__(
+        self,
+        profiles=None,
+        *,
+        threshold: float = 0.6,
+        synonyms: dict[str, tuple[str, ...]] | None = None,
+        min_memories: int = 0,
+    ) -> None:
         from orchestrator.text import morph_set  # kiwipiepy 를 이 구현을 쓸 때만 요구
+
         self._morph_set = morph_set
         self.profiles = profiles
         self.threshold = threshold
@@ -166,6 +201,7 @@ class CoveragePrecheck:
     def low_memory(self, turn: TurnInput, selection: MemorySelection) -> bool:
         """기억이 min_memories 보다 적어 판정을 건너뛸 턴인가. 기억이 하나도 없으면 문턱과 상관없이 건너뛴다."""
         from pipeline.persona_prompt.low_memory import memory_count
+
         n_sent = sent_memories(turn, selection)
         if n_sent == 0:
             return True
@@ -174,16 +210,21 @@ class CoveragePrecheck:
 
     def topic_terms(self, text: str, extra_stop: set[str]) -> list[str]:
         from orchestrator.text import GENERIC_STOP
+
         stop = GENERIC_STOP | extra_stop
         return sorted({t for t in self._morph_set(text) if t not in stop})
 
-    def _docs(self, turn: TurnInput, selection: MemorySelection) -> list[tuple[str, frozenset[str]]]:
+    def _docs(
+        self, turn: TurnInput, selection: MemorySelection
+    ) -> list[tuple[str, frozenset[str]]]:
         docs = []
         for m in list(selection.memories) + list(selection.delta):
             docs.append((m.id, self._morph_set(_doc_text(m))))
         instructions = turn.persona_instructions
         if self.profiles is not None:
-            instructions, _ = redact_instructions(instructions, self.profiles.profile_for(turn).restricted)
+            instructions, _ = redact_instructions(
+                instructions, self.profiles.profile_for(turn).restricted
+            )
         prof = profile_section(instructions)
         if prof:
             docs.append(("m-profile", self._morph_set(prof)))
@@ -192,7 +233,9 @@ class CoveragePrecheck:
     def _covered(self, term: str, doc: frozenset[str]) -> bool:
         return term in doc or any(s in doc for s in self.synonyms.get(term, ()))
 
-    def check(self, turn: TurnInput, state: SessionState, selection: MemorySelection) -> PrecheckResult:
+    def check(
+        self, turn: TurnInput, state: SessionState, selection: MemorySelection
+    ) -> PrecheckResult:
         if is_safety_turn(turn.message):  # 위기·죽음 말에는 "모른다·되묻기"를 넣지 않는다
             return PrecheckResult()
         body = strip_preamble(turn.message)
@@ -200,9 +243,19 @@ class CoveragePrecheck:
             return PrecheckResult()
         if self.low_memory(turn, selection):
             return PrecheckResult()
-        names = {n for n in (subject_name_from(turn.persona_instructions), state.speaker, turn.speaker_hint) if n}
+        names = {
+            n
+            for n in (
+                subject_name_from(turn.persona_instructions),
+                state.speaker,
+                turn.speaker_hint,
+            )
+            if n
+        }
         terms = self.topic_terms(body, names)
-        if not terms or is_relational(body, lambda t: self.topic_terms(t, names)):  # 화제어 없음·안부뿐 → 판정 안 함
+        if not terms or is_relational(
+            body, lambda t: self.topic_terms(t, names)
+        ):  # 화제어 없음·안부뿐 → 판정 안 함
             return PrecheckResult(topic_terms=[])
         best, best_id = 0.0, None
         for doc_id, doc in self._docs(turn, selection):
@@ -211,10 +264,16 @@ class CoveragePrecheck:
                 best, best_id = cover, doc_id
         known = best >= self.threshold
         public = bool(self.profiles and self.profiles.profile_for(turn).public)
-        return PrecheckResult(known=known, coverage=round(best, 3), topic_terms=terms,
-                              directive=None if known else _directive(
-                                  terms, public, polite=_polite(turn),
-                                  deceased=_is_deceased(turn, self.profiles)))
+        return PrecheckResult(
+            known=known,
+            coverage=round(best, 3),
+            topic_terms=terms,
+            directive=None
+            if known
+            else _directive(
+                terms, public, polite=_polite(turn), deceased=_is_deceased(turn, self.profiles)
+            ),
+        )
 
 
 def _is_deceased(turn: TurnInput, profiles) -> bool:
@@ -240,14 +299,43 @@ def _doc_text(m: MemoryItem) -> str:
 
 
 # ---------------------------------------------------------------- v1.1 (ORCHESTRATOR_PRECHECK=coverage_v11)
-LIGHT_V11 = frozenset({"하", "있", "되", "어떻", "가", "오", "보", "알", "말하", "그렇", "이렇", "기억나", "맨날", "자주", "늘",
-                       "사람", "좀", "막", "그", "적"})
-ADDRESS_V11 = frozenset({"엄마", "어머니", "어머님", "아빠", "아버지", "아버님", "여보", "할매", "할머님"})
+LIGHT_V11 = frozenset(
+    {
+        "하",
+        "있",
+        "되",
+        "어떻",
+        "가",
+        "오",
+        "보",
+        "알",
+        "말하",
+        "그렇",
+        "이렇",
+        "기억나",
+        "맨날",
+        "자주",
+        "늘",
+        "사람",
+        "좀",
+        "막",
+        "그",
+        "적",
+    }
+)
+ADDRESS_V11 = frozenset(
+    {"엄마", "어머니", "어머님", "아빠", "아버지", "아버님", "여보", "할매", "할머님"}
+)
 # 기억 원문에 대신 쓰이는 말(부분 문자열로 찾는다). topic_synonyms.json(v1 보정값)은 건드리지 않으려고 따로 둔다.
 SYN_V11 = {
-    "나오": ("졸업", "나왔", "나온"), "대학": ("학과", "학부", "대학"), "대학교": ("학과", "학부", "대학"),
-    "고등학교": ("고등", "과학고", "여고", "부고"), "잔소리": ("뭐라고", "하던 말", "자주 하던", "끊어라", "하지 마"),
-    "일하": ("근무", "직장", "회사"), "일": ("근무", "직장", "회사"), "다니": ("재학", "근무", "다녔", "다니"),
+    "나오": ("졸업", "나왔", "나온"),
+    "대학": ("학과", "학부", "대학"),
+    "대학교": ("학과", "학부", "대학"),
+    "고등학교": ("고등", "과학고", "여고", "부고"),
+    "잔소리": ("뭐라고", "하던 말", "자주 하던", "끊어라", "하지 마"),
+    "일하": ("근무", "직장", "회사"),
+    "일": ("근무", "직장", "회사"),
+    "다니": ("재학", "근무", "다녔", "다니"),
 }
 _MERGE_TAGS = ("NNG", "NNP", "MAG", "XR")
 
@@ -262,11 +350,22 @@ class CoveragePrecheckV11(CoveragePrecheck):
        단서가 비면(인사·군말뿐) 판정하지 않는다("별일 없지?"에 '모름'이 붙지 않게).
     주의: 이 고침은 특정 평가 세트의 오판을 보고 만들었다 → 새 질문으로 다시 확인해야 한다.
     """
+
     impl = "coverage_v1.1"
 
-    def __init__(self, profiles=None, *, threshold: float = 0.6, synonyms=None, extra_synonyms=None,
-                 address_words=ADDRESS_V11, min_memories: int = 0) -> None:
-        super().__init__(profiles, threshold=threshold, synonyms=synonyms, min_memories=min_memories)
+    def __init__(
+        self,
+        profiles=None,
+        *,
+        threshold: float = 0.6,
+        synonyms=None,
+        extra_synonyms=None,
+        address_words=ADDRESS_V11,
+        min_memories: int = 0,
+    ) -> None:
+        super().__init__(
+            profiles, threshold=threshold, synonyms=synonyms, min_memories=min_memories
+        )
         self.extra = SYN_V11 if extra_synonyms is None else extra_synonyms
         self.address = frozenset(address_words)
         self._splitters: dict = {}
@@ -279,12 +378,16 @@ class CoveragePrecheckV11(CoveragePrecheck):
             sp = self._splitters.get(key)
             if sp is None:
                 from orchestrator.split import Splitter, lexicon_from_terms
-                sp = self._splitters[key] = Splitter(lexicon_from_terms(prof.address_terms, prof.family_names))
+
+                sp = self._splitters[key] = Splitter(
+                    lexicon_from_terms(prof.address_terms, prof.family_names)
+                )
             return sp.split(turn.message).cue, frozenset(sp.lex.addresses)
         return strip_preamble(turn.message), frozenset()
 
     def topic_terms(self, text: str, extra_stop: set[str]) -> list[str]:
         from orchestrator.text import GENERIC_STOP, KEEP_TAGS, _get_kiwi, _lock
+
         kiwi = _get_kiwi()
         with _lock:
             toks = kiwi.tokenize(text)
@@ -311,7 +414,9 @@ class CoveragePrecheckV11(CoveragePrecheck):
             return True
         return any(s in raw for s in self.extra.get(term, ()))
 
-    def check(self, turn: TurnInput, state: SessionState, selection: MemorySelection) -> PrecheckResult:
+    def check(
+        self, turn: TurnInput, state: SessionState, selection: MemorySelection
+    ) -> PrecheckResult:
         if is_safety_turn(turn.message):  # 위기·죽음 말에는 "모른다·되묻기"를 넣지 않는다
             return PrecheckResult()
         body, addr = self.question_text(turn)
@@ -319,14 +424,26 @@ class CoveragePrecheckV11(CoveragePrecheck):
             return PrecheckResult()
         if self.low_memory(turn, selection):
             return PrecheckResult()
-        names = {n for n in (subject_name_from(turn.persona_instructions), state.speaker, turn.speaker_hint) if n}
+        names = {
+            n
+            for n in (
+                subject_name_from(turn.persona_instructions),
+                state.speaker,
+                turn.speaker_hint,
+            )
+            if n
+        }
         terms = self.topic_terms(body, names | addr)
-        if not terms or is_relational(body, lambda t: self.topic_terms(t, names | addr)):  # 화제어 없음·안부뿐 → 판정 안 함
+        if not terms or is_relational(
+            body, lambda t: self.topic_terms(t, names | addr)
+        ):  # 화제어 없음·안부뿐 → 판정 안 함
             return PrecheckResult(topic_terms=[])
         raws = [_doc_text(m) for m in list(selection.memories) + list(selection.delta)]
         instructions = turn.persona_instructions
         if self.profiles is not None:
-            instructions, _ = redact_instructions(instructions, self.profiles.profile_for(turn).restricted)
+            instructions, _ = redact_instructions(
+                instructions, self.profiles.profile_for(turn).restricted
+            )
         prof = profile_section(instructions)
         if prof:
             raws.append(prof)
@@ -336,7 +453,13 @@ class CoveragePrecheckV11(CoveragePrecheck):
             best = max(best, sum(self._covered_raw(t, doc, raw) for t in terms) / len(terms))
         known = best >= self.threshold
         public = bool(self.profiles and self.profiles.profile_for(turn).public)
-        return PrecheckResult(known=known, coverage=round(best, 3), topic_terms=terms,
-                              directive=None if known else _directive(
-                                  terms, public, polite=_polite(turn),
-                                  deceased=_is_deceased(turn, self.profiles)))
+        return PrecheckResult(
+            known=known,
+            coverage=round(best, 3),
+            topic_terms=terms,
+            directive=None
+            if known
+            else _directive(
+                terms, public, polite=_polite(turn), deceased=_is_deceased(turn, self.profiles)
+            ),
+        )

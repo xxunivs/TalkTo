@@ -82,15 +82,23 @@ FISH_CUES: dict[str, str | None] = {
 # FISH_EMOTION=inline: 대답 LLM 이 대답 안에 쓸 수 있는 연기 표시. 여기 없는 표시는 떼어 버린다.
 # 울음·흐느낌 표시는 일부러 두지 않는다(고인 페르소나 안전선).
 FISH_INLINE_CUES: tuple[str, ...] = (
-    "[웃으며]", "[작게 웃으며]", "[한숨 쉬며]", "[다정하게]", "[반갑게]",
-    "[놀라며]", "[걱정스럽게]", "[차분하게]", "[작게]", "[잠깐 멈췄다가]",
+    "[웃으며]",
+    "[작게 웃으며]",
+    "[한숨 쉬며]",
+    "[다정하게]",
+    "[반갑게]",
+    "[놀라며]",
+    "[걱정스럽게]",
+    "[차분하게]",
+    "[작게]",
+    "[잠깐 멈췄다가]",
 )
 # fish_plain_text 가 남기는 표시(두 방식의 표시 전부)
 _KEPT_CUES = frozenset(FISH_INLINE_CUES) | {cue for cue in FISH_CUES.values() if cue}
 
 
 def cue_key(raw: str) -> str:
-    """"[ 작게  웃으며 ]" → "[작게 웃으며]". 대괄호 안 띄어쓰기만 고른다."""
+    """ "[ 작게  웃으며 ]" → "[작게 웃으며]". 대괄호 안 띄어쓰기만 고른다."""
     return "[" + " ".join(raw[1:-1].split()) + "]"
 
 
@@ -145,7 +153,9 @@ def _fail(response: httpx.Response, what: str) -> AppError:
     status = response.status_code
     code = _CODES.get(status) or (VOICE_PROVIDER_UNAVAILABLE if status >= 500 else None)
     if code:
-        logger.warning("fish %s rejected status=%s code=%s body=%s", what, status, code, response.text[:200])
+        logger.warning(
+            "fish %s rejected status=%s code=%s body=%s", what, status, code, response.text[:200]
+        )
         return VoiceProviderError(code, f"Fish Audio {what} 오류 {status}")
     return TTSProviderError(f"Fish Audio {what} 오류 {status}: {response.text[:200]}")
 
@@ -182,13 +192,21 @@ class FishAudioTTSProvider:
         # FISH_EMOTION. off 면 지금처럼 표시를 다 지우고 감정을 쓰지 않는다(켰다 끄면 저장된 표시도 바로 안 읽는다).
         self.emotion_mode = emotion_mode
         # 기쁜 대답만 표현 흔들림을 낮춘다(FISH_HAPPY_TEMPERATURE). None·0 이하면 Fish 기본값 그대로
-        self.happy_temperature = happy_temperature if happy_temperature and happy_temperature > 0 else None
+        self.happy_temperature = (
+            happy_temperature if happy_temperature and happy_temperature > 0 else None
+        )
         self.timeout_seconds = timeout_seconds
         self.clone_timeout_seconds = clone_timeout_seconds
 
     def _send(
-        self, method: str, path: str, what: str, *, timeout: float,
-        headers: dict[str, str] | None = None, **kwargs,
+        self,
+        method: str,
+        path: str,
+        what: str,
+        *,
+        timeout: float,
+        headers: dict[str, str] | None = None,
+        **kwargs,
     ) -> httpx.Response:
         try:
             return httpx.request(
@@ -233,8 +251,14 @@ class FishAudioTTSProvider:
             raise _unavailable("TTS", error) from error
 
     def synthesize(
-        self, text: str, *, voice_id: str, speed: float = 1.0,
-        stability: float = 0.3, similarity_boost: float = 0.75, style: float = 0.0,
+        self,
+        text: str,
+        *,
+        voice_id: str,
+        speed: float = 1.0,
+        stability: float = 0.3,
+        similarity_boost: float = 0.75,
+        style: float = 0.0,
         emotion: str | None = None,
     ) -> TTSResult:
         # speed·stability·similarity_boost·style 은 ElevenLabs 값이라 쓰지 않는다.
@@ -292,8 +316,12 @@ class FishAudioTTSProvider:
         content_type = mimetypes.guess_type(audio_path.name)[0] or "application/octet-stream"
         with audio_path.open("rb") as audio_file:
             response = self._send(
-                "POST", "/model", "목소리 만들기", timeout=self.clone_timeout_seconds,
-                data=data, files=[("voices", (audio_path.name, audio_file, content_type))],
+                "POST",
+                "/model",
+                "목소리 만들기",
+                timeout=self.clone_timeout_seconds,
+                data=data,
+                files=[("voices", (audio_path.name, audio_file, content_type))],
             )
         if response.status_code not in (200, 201):
             raise _fail(response, "목소리 만들기")
@@ -324,7 +352,10 @@ class FishAudioTTSProvider:
             time.sleep(_POLL_SECONDS)
             try:
                 response = self._send(
-                    "GET", f"/model/{_path_id(voice_id)}", "목소리 상태", timeout=_POLL_TIMEOUT_SECONDS
+                    "GET",
+                    f"/model/{_path_id(voice_id)}",
+                    "목소리 상태",
+                    timeout=_POLL_TIMEOUT_SECONDS,
                 )
                 if response.status_code == 200:
                     state = (response.json() or {}).get("state")

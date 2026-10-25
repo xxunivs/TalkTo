@@ -7,6 +7,7 @@
     L4 개인 말투       말투 서술, 말투 카드, 실제로 하던 말, 실제 주고받기
 기억은 넣지 않는다. 기억 블록은 대화할 때 따로 붙는다.
 """
+
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable
@@ -17,8 +18,10 @@ from pipeline.s3_synthesis.common_rules import family_guide, render_rules
 
 # 주제 등급 → 지시. 금지 문구는 상대에 따라 다르다(가족 / 공개 방문자).
 GRADE_TEXT = {
-    "금지": ("**말하지 않는다.** 물어도 내용을 말하지 말고 \"그런 얘기는 하지 말자\" 하고 화제를 돌린다",
-             "**말하지 않는다.** 물어도 내용을 말하지 말고 \"그 부분은 말씀드리기 어려워요\" 하고 화제를 돌린다"),
+    "금지": (
+        '**말하지 않는다.** 물어도 내용을 말하지 말고 "그런 얘기는 하지 말자" 하고 화제를 돌린다',
+        '**말하지 않는다.** 물어도 내용을 말하지 말고 "그 부분은 말씀드리기 어려워요" 하고 화제를 돌린다',
+    ),
     "짧게 넘김": ("**한두 마디로 받고 넘어간다.** 물어도 길게 풀지 않는다",) * 2,
     "물으면만": ("**먼저 꺼내지 않는다.** 물으면 답한다",) * 2,
     "자유": ("**먼저 꺼내도 된다**",) * 2,
@@ -65,14 +68,14 @@ def relation_bits(r: Relation, *, listener_view: bool = True) -> list[str]:
     elif r.is_owner and not r.is_listener:
         bits.append("이 대화 상대를 만든 가족")
     if r.calls_them:
-        bits.append(f"부르는 말 \"{r.calls_them}\"")
+        bits.append(f'부르는 말 "{r.calls_them}"')
     if r.self_ref:
-        bits.append(f"이 사람 앞에서 나는 \"{r.self_ref}\"")
+        bits.append(f'이 사람 앞에서 나는 "{r.self_ref}"')
     if r.they_call:
-        bits.append(f"이 사람은 나를 \"{r.they_call}\"라고 부름")
+        bits.append(f'이 사람은 나를 "{r.they_call}"라고 부름')
     if r.listener_calls and not r.is_listener and listener_view:
         said = particle(r.listener_calls, "이라고", "라고")
-        bits.append(f"사용자는 \"{r.listener_calls}\"{said} 부름")
+        bits.append(f'사용자는 "{r.listener_calls}"{said} 부름')
     if r.speech_level:
         bits.append(r.speech_level)
     if r.tone:
@@ -88,28 +91,41 @@ def relation_bits(r: Relation, *, listener_view: bool = True) -> list[str]:
 
 # ---------------------------------------------------------------- L1
 
+
 def common_rules(spec: PersonaSpec) -> str:
-    return render_rules("layered", public=spec.public, deceased=spec.deceased, has_family=bool(spec.relations),
-                        death_policy=spec.death_policy if spec.deceased else "deny",
-                        vars={"death_answer": spec.death_answer or "그렇게 됐지", "family_list": "아래 가족 표"},
-                        minor=spec.minor)
+    return render_rules(
+        "layered",
+        public=spec.public,
+        deceased=spec.deceased,
+        has_family=bool(spec.relations),
+        death_policy=spec.death_policy if spec.deceased else "deny",
+        vars={"death_answer": spec.death_answer or "그렇게 됐지", "family_list": "아래 가족 표"},
+        minor=spec.minor,
+    )
 
 
 # ---------------------------------------------------------------- L2
+
 
 def opening(spec: PersonaSpec) -> str:
     n = spec.name
     ga = particle(n, "이", "가")
     if spec.public and spec.deceased:
-        return (f"당신은 {n}의 페르소나다. 이 서비스는 {n}{ga} 남긴 이야기를 {n}의 말투로 방문자에게 전하는 서비스다. "
-                f"당신은 {n} 본인이 아니며, {n}처럼 자연스럽게 말하되 정체를 직접 물어도 본인이라고 우기지도, "
-                f"AI라고 밝히지도 않고 자연스럽게 흘린다.")
+        return (
+            f"당신은 {n}의 페르소나다. 이 서비스는 {n}{ga} 남긴 이야기를 {n}의 말투로 방문자에게 전하는 서비스다. "
+            f"당신은 {n} 본인이 아니며, {n}처럼 자연스럽게 말하되 정체를 직접 물어도 본인이라고 우기지도, "
+            f"AI라고 밝히지도 않고 자연스럽게 흘린다."
+        )
     if not spec.public:
-        return (f"당신은 {n}의 페르소나다. 이 서비스는 \"{n}{ga} 하실 만한 이야기를 가족에게 대신 전달하는\" 서비스다. "
-                f"당신은 {n} 본인이 아니며, {n}{ga} 했을 법한 이야기를 {n}의 말투로 전달한다. 대화에서는 {n}처럼 "
-                f"자연스럽게 말하고, 정체를 직접 물어도 본인이라고 우기지도, 본인이 아니라거나 AI라고 밝히지도 않고 자연스럽게 흘린다.")
-    return (f"당신은 {n} 본인의 말투로 말하는 페르소나다. {n}{ga} 직접 답한 내용과 실제 녹음으로 만들었고, "
-            f"그를 대신해 방문자와 이야기한다. 1인칭으로 말한다.")
+        return (
+            f'당신은 {n}의 페르소나다. 이 서비스는 "{n}{ga} 하실 만한 이야기를 가족에게 대신 전달하는" 서비스다. '
+            f"당신은 {n} 본인이 아니며, {n}{ga} 했을 법한 이야기를 {n}의 말투로 전달한다. 대화에서는 {n}처럼 "
+            f"자연스럽게 말하고, 정체를 직접 물어도 본인이라고 우기지도, 본인이 아니라거나 AI라고 밝히지도 않고 자연스럽게 흘린다."
+        )
+    return (
+        f"당신은 {n} 본인의 말투로 말하는 페르소나다. {n}{ga} 직접 답한 내용과 실제 녹음으로 만들었고, "
+        f"그를 대신해 방문자와 이야기한다. 1인칭으로 말한다."
+    )
 
 
 def _listener(spec: PersonaSpec) -> Relation | None:
@@ -126,19 +142,32 @@ def basic_info(spec: PersonaSpec) -> str:
         "# 기본 정보",
         f"- 이름: {spec.name}" + (f" — {c.one_line}" if c.one_line else ""),
         f"- 가족이 부르는 말: {spec.family_calls_subject}" if spec.family_calls_subject else None,
-        f"- 지금 대화하는 사람({lr.name})이 부르는 말: {lr.they_call}" if lr and lr.they_call else None,
-        f"- 방문자를 부르는 말: {spec.visitor_address}" if spec.public and spec.visitor_address else None,
+        f"- 지금 대화하는 사람({lr.name})이 부르는 말: {lr.they_call}"
+        if lr and lr.they_call
+        else None,
+        f"- 방문자를 부르는 말: {spec.visitor_address}"
+        if spec.public and spec.visitor_address
+        else None,
         f"- 어느 때의 모습인가: {spec.period}" if spec.period else None,
-        f"- 이 페르소나가 여기 있는 이유: {spec.visitor_context}" if spec.public and spec.visitor_context else None,
+        f"- 이 페르소나가 여기 있는 이유: {spec.visitor_context}"
+        if spec.public and spec.visitor_context
+        else None,
     )
 
 
 def character(spec: PersonaSpec) -> str:
     c = spec.character
-    rows = [_line("본인 소개", c.introduction), _line("성격", c.traits), _line("중요하게 여기는 것", c.values),
-            _line("애정 표현", c.affection_style), _line("힘들어하는 사람을 만나면", c.comfort_style),
-            _line("고민을 들으면", c.advice_style), _line("갈등이 생기면", c.conflict_style),
-            _line("기억되고 싶은 모습", c.remembered_as), _line("듣는 사람이 느꼈으면 하는 것", c.wish_listener_feels)]
+    rows = [
+        _line("본인 소개", c.introduction),
+        _line("성격", c.traits),
+        _line("중요하게 여기는 것", c.values),
+        _line("애정 표현", c.affection_style),
+        _line("힘들어하는 사람을 만나면", c.comfort_style),
+        _line("고민을 들으면", c.advice_style),
+        _line("갈등이 생기면", c.conflict_style),
+        _line("기억되고 싶은 모습", c.remembered_as),
+        _line("듣는 사람이 느꼈으면 하는 것", c.wish_listener_feels),
+    ]
     rows = [r for r in rows if r]
     return _block("# 성격·가치관", *rows) if rows else ""
 
@@ -148,7 +177,9 @@ def situations(spec: PersonaSpec) -> str:
         return ""
     lines = ["# 상황별로 이렇게 (말은 그대로 읽지 말고 이 방향으로)"]
     for s in spec.situations:
-        lines.append(f"- {s.situation} → \"{s.response}\"" + (f" (피할 것: {s.avoid})" if s.avoid else ""))
+        lines.append(
+            f'- {s.situation} → "{s.response}"' + (f" (피할 것: {s.avoid})" if s.avoid else "")
+        )
     return "\n".join(lines)
 
 
@@ -170,9 +201,11 @@ def topics(spec: PersonaSpec) -> str:
 
 # ---------------------------------------------------------------- L3
 
-FAMILY_HEAD = ("# 가족 (이 표에 있는 사람만 안다. 상대가 누군지 밝히면 그 사람 줄을 따른다)\n"
-               "자기를 가리키는 말이 비어 있으면 \"내가\" 정도로 짧게 말한다. 반말로 적힌 사람에게는 예시 문장이 존대로 "
-               "적혀 있어도 어미를 반말로 바꿔 말한다.")
+FAMILY_HEAD = (
+    "# 가족 (이 표에 있는 사람만 안다. 상대가 누군지 밝히면 그 사람 줄을 따른다)\n"
+    '자기를 가리키는 말이 비어 있으면 "내가" 정도로 짧게 말한다. 반말로 적힌 사람에게는 예시 문장이 존대로 '
+    "적혀 있어도 어미를 반말로 바꿔 말한다."
+)
 
 
 def family_table(spec: PersonaSpec) -> str:
@@ -187,8 +220,11 @@ def family_table(spec: PersonaSpec) -> str:
 
 
 def visitors(spec: PersonaSpec) -> str:
-    lines = ["# 방문자 (누가 올지 모른다)", "- 처음 보는 사람으로 대한다. 방문자가 누구인지 넘겨짚지 않는다.",
-             "- 처음 보는 사람에게 하듯 존댓말로 말한다. '~요'로 끝나는 편안한 구어체가 기본이다."]
+    lines = [
+        "# 방문자 (누가 올지 모른다)",
+        "- 처음 보는 사람으로 대한다. 방문자가 누구인지 넘겨짚지 않는다.",
+        "- 처음 보는 사람에게 하듯 존댓말로 말한다. '~요'로 끝나는 편안한 구어체가 기본이다.",
+    ]
     if spec.visitor_tone:
         lines.append(f"- 방문자를 대하는 느낌: {spec.visitor_tone}")
     if spec.relations:
@@ -198,19 +234,30 @@ def visitors(spec: PersonaSpec) -> str:
 
 # ---------------------------------------------------------------- L4
 
+
 def style(spec: PersonaSpec) -> str:
     s = spec.style
-    rows = [_line("말의 길이", s.length), _line("이야기하는 방식", s.manner), _line("자주 쓰는 감탄사", s.interjections),
-            _line("자주 쓰는 말끝", s.sentence_endings), _line("사투리·억양", s.dialect),
-            _line("사투리 예시", s.dialect_example), _line("실제로 쓰던 어휘", s.words), _line("화가 나면", s.when_angry),
-            _line("전화 첫마디", s.call_open),
-            _line("통화를 끝낼 때만 (대화 중간에는 쓰지 않는다)", s.call_close),
-            _line("쓰지 않는 말투", s.avoid_styles), _line("통화에서 보인 문장 특징", s.summary)]
+    rows = [
+        _line("말의 길이", s.length),
+        _line("이야기하는 방식", s.manner),
+        _line("자주 쓰는 감탄사", s.interjections),
+        _line("자주 쓰는 말끝", s.sentence_endings),
+        _line("사투리·억양", s.dialect),
+        _line("사투리 예시", s.dialect_example),
+        _line("실제로 쓰던 어휘", s.words),
+        _line("화가 나면", s.when_angry),
+        _line("전화 첫마디", s.call_open),
+        _line("통화를 끝낼 때만 (대화 중간에는 쓰지 않는다)", s.call_close),
+        _line("쓰지 않는 말투", s.avoid_styles),
+        _line("통화에서 보인 문장 특징", s.summary),
+    ]
     if s.length and "길게" in s.length:
         rule = "- 끊어서 짧게 답하지 않는다. 예를 들어가며 자세히 말하되 훈계하지 않고, 매 턴 되묻지 않는다."
     else:
-        rule = ("- 기본은 1~2문장으로 짧게. 상담사처럼 풀어 설명하지 않고, 매 턴 되묻지 않는다. "
-                "요리법·옛 추억만은 콤마로 이어지는 만연체로 길게 풀어도 자연스럽다.")
+        rule = (
+            "- 기본은 1~2문장으로 짧게. 상담사처럼 풀어 설명하지 않고, 매 턴 되묻지 않는다. "
+            "요리법·옛 추억만은 콤마로 이어지는 만연체로 길게 풀어도 자연스럽다."
+        )
     return _block("# 말투", *rows, rule)
 
 
@@ -224,7 +271,7 @@ def quotes(spec: PersonaSpec) -> str:
     lines = ["# 실제로 하던 말 (가족이 적어 준 것 — 어휘·어투 참고, 매번 그대로 쓰지 않는다)"]
     for q in spec.style.quotes:
         where = " / ".join(x for x in (q.situation, q.listener) if x)
-        lines.append(f"- \"{q.text}\"" + (f" ({where})" if where else ""))
+        lines.append(f'- "{q.text}"' + (f" ({where})" if where else ""))
     return "\n".join(lines)
 
 
@@ -238,14 +285,28 @@ def shots(spec: PersonaSpec) -> str:
 
 
 MODULES: dict[str, Callable[[PersonaSpec], str]] = {
-    "common_rules": common_rules, "opening": opening, "basic_info": basic_info, "character": character,
-    "situations": situations, "topics": topics, "family_table": family_table, "visitors": visitors,
-    "style": style, "style_card": style_card, "quotes": quotes, "shots": shots,
+    "common_rules": common_rules,
+    "opening": opening,
+    "basic_info": basic_info,
+    "character": character,
+    "situations": situations,
+    "topics": topics,
+    "family_table": family_table,
+    "visitors": visitors,
+    "style": style,
+    "style_card": style_card,
+    "quotes": quotes,
+    "shots": shots,
 }
 
 
-def render_layered_prompt(spec: PersonaSpec, *, include_common: bool = True, shots_mode: ShotsMode = "system",
-                          drop: Iterable[str] = ()) -> str:
+def render_layered_prompt(
+    spec: PersonaSpec,
+    *,
+    include_common: bool = True,
+    shots_mode: ShotsMode = "system",
+    drop: Iterable[str] = (),
+) -> str:
     """정적 층(L1~L4)을 한 글로.
 
     include_common=False  L1 을 뺀다(중간계층이 공통 규칙을 따로 붙일 때).

@@ -120,23 +120,32 @@ def _texts(a: Answer) -> list[str]:
 def to_memories(answers: dict[str, Answer]) -> list[dict]:
     rows: list[dict] = []
 
-    def add(qid: str, text: str, *, tag: str, a: Answer,
-            period: str | None = None, emotion: str | None = None) -> None:
+    def add(
+        qid: str,
+        text: str,
+        *,
+        tag: str,
+        a: Answer,
+        period: str | None = None,
+        emotion: str | None = None,
+    ) -> None:
         text = text.strip()
         if not text:
             return
-        rows.append({
-            "id": f"{qid}-{len([r for r in rows if r['sourceQuestion'] == qid]) + 1}",
-            "memoryText": text,
-            "tags": [tag],
-            "importanceScore": 5,
-            "relatedPeople": [],
-            "confidence": "inferred" if "__추정__" in a.values else "confirmed",
-            "sourceQuestion": qid,
-            "period": period,
-            "emotion": emotion,
-            "usageScope": _scope(a),
-        })
+        rows.append(
+            {
+                "id": f"{qid}-{len([r for r in rows if r['sourceQuestion'] == qid]) + 1}",
+                "memoryText": text,
+                "tags": [tag],
+                "importanceScore": 5,
+                "relatedPeople": [],
+                "confidence": "inferred" if "__추정__" in a.values else "confirmed",
+                "sourceQuestion": qid,
+                "period": period,
+                "emotion": emotion,
+                "usageScope": _scope(a),
+            }
+        )
 
     for qid, lead in MEMORY_LEAD.items():
         a = answers.get(qid)
@@ -163,34 +172,46 @@ def to_memories(answers: dict[str, Answer]) -> list[dict]:
             text = f"{title}: {body}" if title and body else (body or title)
             if not text:
                 continue
-            rows.append({
-                "id": f"M7-01-{len([r for r in rows if r['sourceQuestion'] == 'M7-01']) + 1}",
-                "memoryText": text, "tags": ["기억 카드"], "importanceScore": 5,
-                "relatedPeople": [p for p in [people] if p],
-                "confidence": "inferred" if inferred == "■" else "confirmed",
-                "sourceQuestion": "M7-01", "period": when or None,
-                "emotion": feel or None,
-                "usageScope": scope if scope in SCOPES else "자유",
-            })
+            rows.append(
+                {
+                    "id": f"M7-01-{len([r for r in rows if r['sourceQuestion'] == 'M7-01']) + 1}",
+                    "memoryText": text,
+                    "tags": ["기억 카드"],
+                    "importanceScore": 5,
+                    "relatedPeople": [p for p in [people] if p],
+                    "confidence": "inferred" if inferred == "■" else "confirmed",
+                    "sourceQuestion": "M7-01",
+                    "period": when or None,
+                    "emotion": feel or None,
+                    "usageScope": scope if scope in SCOPES else "자유",
+                }
+            )
 
     thing = answers.get("M6-08")
     if thing and not thing.skipped:
-        pairs = [(_plain(c[0]) if c else None, _plain(c[1]) if len(c) > 1 else None)
-                 for c in thing.rows]
+        pairs = [
+            (_plain(c[0]) if c else None, _plain(c[1]) if len(c) > 1 else None) for c in thing.rows
+        ]
         if not thing.rows:  # 표가 아니라 빈칸에 적었으면 첫 값이 떠오르는 것, 둘째가 까닭
             values = [v for v in thing.values if v != "__추정__"]
             pairs = [(values[0] if values else None, values[1] if len(values) > 1 else None)]
         for what, why in pairs:
             if what:
-                add("M6-08", f"{M6_08_LEAD}: {what}" + (f" — {why}" if why else ""),
-                    tag=M6_08_TAG, a=thing)
+                add(
+                    "M6-08",
+                    f"{M6_08_LEAD}: {what}" + (f" — {why}" if why else ""),
+                    tag=M6_08_TAG,
+                    a=thing,
+                )
 
     for qid, tag in MEMORY_TABLES.items():
         a = answers.get(qid)
         if qid == "M7-01" or not a or a.skipped or not a.rows:
             continue
         for cells in a.rows:
-            cells = [UNKNOWN_CELL_MARK.sub("", c).strip() for c in cells]  # '■ 모름' 같은 표시는 기억이 아니다
+            cells = [
+                UNKNOWN_CELL_MARK.sub("", c).strip() for c in cells
+            ]  # '■ 모름' 같은 표시는 기억이 아니다
             parts = [c for c in cells if c and c not in ("□", "■") and not c.startswith("_")]
             if not parts:
                 continue
@@ -221,16 +242,18 @@ def to_intake(answers: dict[str, Answer], *, name: str | None = None) -> dict:
             cells = cells + [""] * (8 - len(cells))
             if not cells[0]:
                 continue
-            family.append({
-                "name": cells[0],
-                "relation": cells[1] or None,
-                "addressTermTo": _plain(cells[2]),
-                "selfReference": _plain(cells[3]),
-                "addressTermFrom": _plain(cells[4]),
-                "tone": cells[5] or None,
-                "speechLevel": cells[6] or None,
-                "talksWithPersona": cells[7].startswith("예") if cells[7] else None,
-            })
+            family.append(
+                {
+                    "name": cells[0],
+                    "relation": cells[1] or None,
+                    "addressTermTo": _plain(cells[2]),
+                    "selfReference": _plain(cells[3]),
+                    "addressTermFrom": _plain(cells[4]),
+                    "tone": cells[5] or None,
+                    "speechLevel": cells[6] or None,
+                    "talksWithPersona": cells[7].startswith("예") if cells[7] else None,
+                }
+            )
     worries = answers.get("M2-02")
     if worries and worries.rows:
         by_name = {f["name"]: f for f in family}
@@ -247,11 +270,15 @@ def to_intake(answers: dict[str, Answer], *, name: str | None = None) -> dict:
             cells = cells + [""] * 4
             if not cells[0]:
                 continue
-            examples.append({
-                "text": cells[0], "situation": cells[1] or None,
-                "listener": cells[2] or None, "inferred": cells[3] == "■",
-                "sourceQuestion": qid,
-            })
+            examples.append(
+                {
+                    "text": cells[0],
+                    "situation": cells[1] or None,
+                    "listener": cells[2] or None,
+                    "inferred": cells[3] == "■",
+                    "sourceQuestion": qid,
+                }
+            )
         if not a.rows:
             for text in _texts(a):
                 examples.append({"text": text, "sourceQuestion": qid, "inferred": False})
@@ -265,20 +292,26 @@ def to_intake(answers: dict[str, Answer], *, name: str | None = None) -> dict:
             cells = cells + [""] * 3
             topic, grade = _plain(cells[0]), _plain(cells[1])
             if topic and grade:
-                taboo.append({
-                    "topic": topic, "grade": grade,
-                    "note": _plain(cells[2]), "sourceQuestion": "M9-01",
-                })
+                taboo.append(
+                    {
+                        "topic": topic,
+                        "grade": grade,
+                        "note": _plain(cells[2]),
+                        "sourceQuestion": "M9-01",
+                    }
+                )
     hide = answers.get("M9-03")
     if hide and hide.rows:
         for cells in hide.rows:
             topic = _plain(cells[0]) if cells else None
             if topic:
-                taboo.append({
-                    "topic": topic,
-                    "grade": (_plain(cells[1]) if len(cells) > 1 else None) or "물으면만",
-                    "sourceQuestion": "M9-03",
-                })
+                taboo.append(
+                    {
+                        "topic": topic,
+                        "grade": (_plain(cells[1]) if len(cells) > 1 else None) or "물으면만",
+                        "sourceQuestion": "M9-03",
+                    }
+                )
     for topic in many("T2-02"):
         taboo.append({"topic": topic, "grade": "금지", "sourceQuestion": "T2-02"})
 
@@ -291,27 +324,34 @@ def to_intake(answers: dict[str, Answer], *, name: str | None = None) -> dict:
         if qid == "M8-11":
             for cells in a.rows:
                 if cells and cells[0]:
-                    situational.append({
-                        "situation": f"먼저 말을 걸 때 ({cells[1] if len(cells) > 1 else '대화 중'})",
-                        "response": cells[0],
-                    })
+                    situational.append(
+                        {
+                            "situation": f"먼저 말을 걸 때 ({cells[1] if len(cells) > 1 else '대화 중'})",
+                            "response": cells[0],
+                        }
+                    )
             continue
         attitude = a.choice
         said = next((v for v in a.values if v != "__추정__"), None)
         if attitude or said:
-            situational.append({
-                "situation": a.question,
-                "response": said or attitude or "",
-                "avoid": None if said else None,
-            })
+            situational.append(
+                {
+                    "situation": a.question,
+                    "response": said or attitude or "",
+                    "avoid": None if said else None,
+                }
+            )
 
     return {
         "_comment": "Persona Intake 작성본에서 자동 변환 (pipeline.s0_intake).",
         "subjectContext": {
             "subject": {"name": subject_name, "addressTerm": address},
             "familyMembers": [
-                {"name": f["name"], "relationToSubject": f.get("relation"),
-                 "addressTerms": [t for t in (f.get("addressTermFrom"),) if t]}
+                {
+                    "name": f["name"],
+                    "relationToSubject": f.get("relation"),
+                    "addressTerms": [t for t in (f.get("addressTermFrom"),) if t],
+                }
                 for f in family
             ],
             "glossaryTerms": sorted({f["name"] for f in family if f["name"]}),
@@ -334,10 +374,15 @@ def to_intake(answers: dict[str, Answer], *, name: str | None = None) -> dict:
                 "whenAngry": one("M3-03"),
                 "interjections": [t for t in re.split(r"\s*/\s*", one("M3-04") or "") if t],
                 "dialect": one("M3-05"),
-                "dialectExample": (answers.get("M3-05").values[0]
-                                   if answers.get("M3-05") and answers["M3-05"].values else None),
+                "dialectExample": (
+                    answers.get("M3-05").values[0]
+                    if answers.get("M3-05") and answers["M3-05"].values
+                    else None
+                ),
                 "avoidStyles": many("M3-06"),
-                "sentenceEndings": [c[0] for c in (answers.get("M3-07").rows if answers.get("M3-07") else [])],
+                "sentenceEndings": [
+                    c[0] for c in (answers.get("M3-07").rows if answers.get("M3-07") else [])
+                ],
                 "callOpen": one("M3-01"),
                 "callClose": one("M3-02"),
             },
@@ -390,18 +435,22 @@ if __name__ == "__main__":
     memories = to_memories(answers)
 
     ic = intake["intakeContext"]
-    print(f"{sheet.name}\n"
-          f"  말투 칸 {sum(1 for v in ic['speechStyle'].values() if v)}개 채움\n"
-          f"  발화 예시 {len(ic['speechExamples'])}건\n"
-          f"  성격 칸 {sum(1 for v in ic['personality'].values() if v)}개 채움\n"
-          f"  가족 {len(ic['familyMap'])}명 / 상황 {len(ic['situationalReactions'])}건 / "
-          f"금기 {len(ic['tabooTopics'])}건\n"
-          f"  기억 {len(memories)}건")
+    print(
+        f"{sheet.name}\n"
+        f"  말투 칸 {sum(1 for v in ic['speechStyle'].values() if v)}개 채움\n"
+        f"  발화 예시 {len(ic['speechExamples'])}건\n"
+        f"  성격 칸 {sum(1 for v in ic['personality'].values() if v)}개 채움\n"
+        f"  가족 {len(ic['familyMap'])}명 / 상황 {len(ic['situationalReactions'])}건 / "
+        f"금기 {len(ic['tabooTopics'])}건\n"
+        f"  기억 {len(memories)}건"
+    )
     if args.write:
         out = Path(args.out_root) / args.subject_out / "s2_extraction"
         out.mkdir(parents=True, exist_ok=True)
         (out / "b_intake_prompt.json").write_text(
-            json.dumps(intake, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            json.dumps(intake, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+        )
         (out / "b_intake_memory.json").write_text(
-            json.dumps(memories, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            json.dumps(memories, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+        )
         print(f"\n저장: {out}/b_intake_prompt.json, {out}/b_intake_memory.json")

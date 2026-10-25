@@ -61,7 +61,9 @@ def reset_scratch_dir(settings) -> int:
                     entry.unlink()
                 removed += 1
             except OSError as error:
-                logger.warning("scratch cleanup could not remove an entry: %s", type(error).__name__)
+                logger.warning(
+                    "scratch cleanup could not remove an entry: %s", type(error).__name__
+                )
     root.mkdir(mode=0o700, parents=True, exist_ok=True)
     if removed:
         logger.warning("scratch cleanup removed %d leftover temp entries", removed)

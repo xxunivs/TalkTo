@@ -10,9 +10,7 @@ import logging
 from collections import Counter
 
 from infra.error import EmptyReplyError
-from infra.setting import Settings
 from infra.external_api.openai_client import chat_client, create_openai_client
-from infra.schema.subject import FamilyNote, IntakeContext, SubjectContext
 from infra.schema.persona import (
     MemoryCandidate,
     MemoryCandidateRequest,
@@ -23,7 +21,9 @@ from infra.schema.persona import (
     PersonaResponseRequest,
     PersonaResponseResult,
 )
+from infra.schema.subject import FamilyNote, IntakeContext, SubjectContext
 from infra.schema.transcript import TranscriptSegment
+from infra.setting import Settings
 from orchestrator.guard import ASK_BACK, CRISIS_LINE, drop_forgetting, says_forgot
 from orchestrator.persona import infer_profile
 from orchestrator.precheck import is_safety_turn
@@ -32,7 +32,13 @@ from pipeline.s3_synthesis.common_rules import family_guide, render_common_rules
 from pipeline.s3_synthesis.e_memory_gap import extra_system, split_gap, turn_gap
 from pipeline.s4_voice.b_emotion import split_voice, voice_instruction, voice_mode
 from pipeline.safety.minor_guard import (
-    MINOR_NOTE, blocked_result, filter_reply, input_blocked, is_minor, is_polite, safe_history,
+    MINOR_NOTE,
+    blocked_result,
+    filter_reply,
+    input_blocked,
+    is_minor,
+    is_polite,
+    safe_history,
 )
 
 logger = logging.getLogger(__name__)
@@ -58,8 +64,11 @@ def _speech_segments(examples: list[str]) -> list[TranscriptSegment]:
     """말투 few-shot용 예시 발화를 대상자(화자 S) 세그먼트로 감싼다."""
     return [
         TranscriptSegment(
-            segment_index=i, start_ms=i * 1000, end_ms=i * 1000 + 500,
-            speaker_label="S", transcript_text=text,
+            segment_index=i,
+            start_ms=i * 1000,
+            end_ms=i * 1000 + 500,
+            speaker_label="S",
+            transcript_text=text,
         )
         for i, text in enumerate(examples)
         if text.strip()
@@ -67,7 +76,8 @@ def _speech_segments(examples: list[str]) -> list[TranscriptSegment]:
 
 
 def assemble_persona_instructions(
-    request: PersonaAssemblyRequest, settings: Settings | None = None,
+    request: PersonaAssemblyRequest,
+    settings: Settings | None = None,
 ) -> PersonaAssemblyResponse:
     """subjectContext + intakeContext + 발화 예시 → 페르소나 system 프롬프트.
 
@@ -77,7 +87,10 @@ def assemble_persona_instructions(
     """
     if settings is not None and settings.persona_prompt_builder == "layered":
         from pipeline.persona_prompt import build
-        spec = build.for_assembly(request, settings.persona_death_talk, settings.style_card_min_utts)
+
+        spec = build.for_assembly(
+            request, settings.persona_death_talk, settings.style_card_min_utts
+        )
         return PersonaAssemblyResponse(instructions=build.prompt(spec), subject_name=spec.name)
     segments = _speech_segments(request.speech_examples)
     instructions = assemble_persona_prompt(
@@ -90,7 +103,7 @@ def assemble_persona_instructions(
         persona_insights=request.persona_insights,
     )
     subject = request.subject_context.subject
-    name = (subject.name if subject and subject.name else "대상자")
+    name = subject.name if subject and subject.name else "대상자"
     return PersonaAssemblyResponse(instructions=instructions, subject_name=name)
 
 
@@ -131,7 +144,9 @@ STYLE_LATE_NOTE = """# 말투 덧붙임 (실제 통화 말버릇. 위 말투 규
 - 잘 못 알아들었거나 놀라면 "어?", "뭐?" 하고 한마디로 되묻는다.
 - 가끔은 묻는 말도 한다. 위의 "매 턴 되묻지 않는다"는 매번 묻지 말라는 뜻이지 묻지 말라는 뜻이 아니다."""
 _CARD_HEAD = "# 말투 카드"  # pipeline/persona_prompt/from_transcript.py 가 붙이는 제목
-_SHORT_RULE = "- 기본은 1~2문장으로 짧게."  # pipeline/persona_prompt/render.py style() 의 짧은 말투 규칙
+_SHORT_RULE = (
+    "- 기본은 1~2문장으로 짧게."  # pipeline/persona_prompt/render.py style() 의 짧은 말투 규칙
+)
 _VISITORS_HEAD = "# 방문자"  # 공개 본인 페르소나(render.visitors): 처음 보는 방문자에게 존댓말
 
 
@@ -155,8 +170,11 @@ def warn_if_over_full_max(n_memories: int, settings: Settings) -> bool:
     넘으면 검색으로 바꾸는 것은 BE 가 한다. 여기서는 경고만 남긴다."""
     if n_memories <= settings.memory_full_max:
         return False
-    logger.warning("memories %d > MEMORY_FULL_MAX %d: BE should send search results instead of all memories",
-                   n_memories, settings.memory_full_max)
+    logger.warning(
+        "memories %d > MEMORY_FULL_MAX %d: BE should send search results instead of all memories",
+        n_memories,
+        settings.memory_full_max,
+    )
     return True
 
 
@@ -167,6 +185,7 @@ def low_memory_section(request: PersonaResponseRequest, settings: Settings) -> s
     없으면 지시문 추정) — 비공개 고인은 잊은 듯 말하지 않는 문구(잠금 2).
     """
     from pipeline.persona_prompt.low_memory import low_memory_note, memory_count
+
     if settings.low_memory_note != "on" or request.persona.fixed_prompt:
         return ""
     n = memory_count(len(request.memories), request.memory_total)
@@ -174,8 +193,12 @@ def low_memory_section(request: PersonaResponseRequest, settings: Settings) -> s
         return ""
     prof = infer_profile(request.persona.instructions)
     deceased = prof.deceased if request.persona.deceased is None else request.persona.deceased
-    return low_memory_note(n, public=prof.public, deceased=bool(deceased),
-                           polite=listener_speech_level(request.persona.instructions) == "존댓말")
+    return low_memory_note(
+        n,
+        public=prof.public,
+        deceased=bool(deceased),
+        polite=listener_speech_level(request.persona.instructions) == "존댓말",
+    )
 
 
 def generate_persona_response(
@@ -236,8 +259,10 @@ def generate_persona_response(
     voice = split_voice(content, mode, deceased=request.persona.deceased)
     if not voice.text.strip():
         # 빈 대답(내용 걸러짐·감정 표시만 옴)을 돌려주면 BE 가 저장하고, 그 대화의 다음 턴이 모두 422 로 막혔다
-        logger.warning("persona reply was empty (finish_reason=%s)",
-                       getattr(response.choices[0], "finish_reason", None))
+        logger.warning(
+            "persona reply was empty (finish_reason=%s)",
+            getattr(response.choices[0], "finish_reason", None),
+        )
         raise EmptyReplyError()
     text, emotion, speech_text = voice.text, voice.emotion, voice.speech_text()
     # 고인은 잊은 듯 말하지 않는다(잠금 2). 가드가 없는 이 경로(가져온 지침 fixedPrompt 등)도 같은 문장을 지운다.
@@ -255,8 +280,11 @@ def generate_persona_response(
     # 미성년 대답 검사: 성적·비밀 만남·위험한 내용이면 대답 전체를 대체 글로(위기 대응 턴·상담 번호는 그대로).
     # 바뀌면 감정·목소리 글과 기억 빈틈 후보도 버린다(그 화제로 가족에게 묻지 않게).
     if minor:
-        safe, replaced = filter_reply(text, polite=is_polite(request.persona.instructions),
-                                      safety_turn=is_safety_turn(request.message))
+        safe, replaced = filter_reply(
+            text,
+            polite=is_polite(request.persona.instructions),
+            safety_turn=is_safety_turn(request.message),
+        )
         if replaced:
             text, emotion, speech_text, gap_topic = safe, None, None, None
             logger.warning("minor guard replaced reply for subject %s", request.persona.subject_id)
@@ -393,6 +421,7 @@ def collect_speech_examples(
 # 임종 회피가 본문에 박혀 있었다. 본인이 살아서 방문자를 맞는 공개 본인 페르소나
 # 에는 하나도 맞지 않는다. 갈리는 문장만 여기로 뺀다.
 
+
 def _is_public(intake_context) -> bool:
     audience = getattr(intake_context, "audience", None) or ""
     return "공개" in audience
@@ -497,16 +526,20 @@ def tone_rules(*, public: bool, long_answers: bool, visitor_tone: str | None) ->
     if long_answers:
         rows.append(
             "**끊어서 짧게 답하지 않는다.** 예를 들어가며 자세히 말한다. 다만 상담사처럼 "
-            "훈계하지 않고, 매 턴 \"어떻게 생각하세요?\"처럼 되묻지 않는다. 페르소나를 "
-            "설명하는 메타 발화(\"나는 ~하는 챗봇이다\" 등)를 하지 않는다.")
+            '훈계하지 않고, 매 턴 "어떻게 생각하세요?"처럼 되묻지 않는다. 페르소나를 '
+            '설명하는 메타 발화("나는 ~하는 챗봇이다" 등)를 하지 않는다.'
+        )
     else:
         rows.append(
             "**짧게 말한다.** 기본은 1~2문장. 상담사처럼 풀어 설명하지 않고, 매 턴 "
-            "\"어떻게 생각해?\"처럼 되묻지 않는다(가끔이면 자연스럽지만 습관처럼 반복하지 "
-            "않는다). 페르소나를 설명하는 메타 발화(\"나는 ~하는 챗봇이다\" 등)를 하지 않는다.")
+            '"어떻게 생각해?"처럼 되묻지 않는다(가끔이면 자연스럽지만 습관처럼 반복하지 '
+            '않는다). 페르소나를 설명하는 메타 발화("나는 ~하는 챗봇이다" 등)를 하지 않는다.'
+        )
     if public:
-        line = ("**처음 보는 사람에게 하듯 존댓말로.** 반말하지 않는다. '~요'로 끝나는 편안한 "
-                "구어체가 기본이고, 발표 톤이나 문어체로 굳지 않는다.")
+        line = (
+            "**처음 보는 사람에게 하듯 존댓말로.** 반말하지 않는다. '~요'로 끝나는 편안한 "
+            "구어체가 기본이고, 발표 톤이나 문어체로 굳지 않는다."
+        )
         if visitor_tone:
             line += f" 방문자를 대하는 느낌은 이렇다: {visitor_tone}"
         rows.append(line)
@@ -517,23 +550,26 @@ def tone_rules(*, public: bool, long_answers: bool, visitor_tone: str | None) ->
             "'~요')로 굳지 않고, 짧고 살가운 반말·구어체로 말한다. **아래 발화 예시나 성격 "
             "서술의 종결어미가 존대('~요', '~드라구요')로 되어 있어도, 가족과 말할 땐 어미를 "
             "반말('~지', '~다', '~드라', '~어')로 바꿔 말한다** — 사투리·어휘는 살리되 어미만 "
-            "반말로.")
+            "반말로."
+        )
         rows.append(
             "답변은 실제 말하듯이, 줄바꿈·목록·마크다운 없이 이어지는 구어체로. 요리법·옛 "
-            "추억만은 콤마로 이어지는 만연체로 길게 풀어도 자연스럽다.")
+            "추억만은 콤마로 이어지는 만연체로 길게 풀어도 자연스럽다."
+        )
     return "\n".join(rows)
 
 
 def examples_lead(*, public: bool) -> str:
     if public:
-        return ("아래는 실제로 하신 말이다. 어휘와 말버릇을 참고하되 그대로 옮겨 읽지 않는다:")
-    return ("아래는 어휘·사투리 참고용 실제 발화다(형식적 억양이 섞였더라도, 가족과의 "
-            "대화에서는 위처럼 짧고 편하게 말한다):")
+        return "아래는 실제로 하신 말이다. 어휘와 말버릇을 참고하되 그대로 옮겨 읽지 않는다:"
+    return (
+        "아래는 어휘·사투리 참고용 실제 발화다(형식적 억양이 섞였더라도, 가족과의 "
+        "대화에서는 위처럼 짧고 편하게 말한다):"
+    )
 
 
 def audience_heading(*, public: bool) -> str:
-    return ("# 방문자 (누가 올지 모른다)" if public
-            else "# 가족 (사용자에 따라 아래 톤으로 응답)")
+    return "# 방문자 (누가 올지 모른다)" if public else "# 가족 (사용자에 따라 아래 톤으로 응답)"
 
 
 def fixed_rules(*, public: bool, deceased: bool, has_family: bool, minor: bool = False) -> str:
@@ -596,8 +632,11 @@ def render_speech_style(style) -> str:
 
 # 등급 → 그 등급이면 어떻게 하라는 말인지. 등급 이름만 적어두면 지시가 안 된다.
 TABOO_GRADES = [
-    ("금지", "**답하지 않는다.** 물어도 내용을 말하지 말고 \"그 부분은 말씀드리기 "
-             "어렵다\"고 짧게 안내하고 화제를 돌린다"),
+    (
+        "금지",
+        '**답하지 않는다.** 물어도 내용을 말하지 말고 "그 부분은 말씀드리기 '
+        '어렵다"고 짧게 안내하고 화제를 돌린다',
+    ),
     ("짧게 넘김", "**한두 마디로 받고 넘어간다.** 물어도 길게 풀지 않는다"),
     ("물으면만", "**먼저 꺼내지 않는다.** 물으면 답한다"),
     ("자유", "**먼저 꺼내도 된다**"),
@@ -628,7 +667,8 @@ def render_taboo_block(topics) -> str:
     for grade, text in items:
         head = text.split(" (")[0]
         looser = [
-            k for k in kept
+            k
+            for k in kept
             if (head in k[1] or k[1].split(" (")[0] in text)
             and strictness.get(k[0], 9) > strictness.get(grade, 9)
         ]
@@ -671,9 +711,7 @@ def assemble_persona_prompt(
     retrieved_memories: list[str] | None = None,
     persona_insights: list[str] | None = None,
 ) -> str:
-    subject_name = (
-        subject_context.subject.name if subject_context.subject else "대상자"
-    )
+    subject_name = subject_context.subject.name if subject_context.subject else "대상자"
     address = subject_context.subject.address_term if subject_context.subject else None
 
     public = _is_public(intake_context)
@@ -687,8 +725,11 @@ def assemble_persona_prompt(
     elif address:
         # 공개 페르소나에서 이 값은 P1-07B, 방문자를 부르는 말이다
         ra = _subject_particle(address, "이라고", "라고")
-        identity += (f". 방문자는 '{address}'{ra} 부른다." if public
-                     else f". 가족들은 '{address}'{ra} 부른다.")
+        identity += (
+            f". 방문자는 '{address}'{ra} 부른다."
+            if public
+            else f". 가족들은 '{address}'{ra} 부른다."
+        )
     if intake_context is not None:
         bp = intake_context.basic_profile or {}
         if bp.get("oneLine"):
@@ -711,16 +752,18 @@ def assemble_persona_prompt(
             note_by_name[note.name] = note
     merged = {p["name"]: p["relation"] for p in merge_persons(persons_results)}
     ordered_names = list(note_by_name) + [n for n in merged if n not in note_by_name]
-    family_lines = [family_line(name, note_by_name.get(name), merged.get(name))
-                    for name in ordered_names]
+    family_lines = [
+        family_line(name, note_by_name.get(name), merged.get(name)) for name in ordered_names
+    ]
     if family_lines:
         family = "\n".join(family_lines)
         guide = family_guide(note_by_name.values())
         if guide:  # 목록은 사람 줄만 남게 안내는 제목 바로 아래 따로 둔다
             family = f"{guide}\n{family}"
     elif _is_public(intake_context):
-        family = ("- 누가 올지 모른다. 처음 보는 사람으로 대한다.\n"
-                  "- 방문자가 누구인지 넘겨짚지 않는다.")
+        family = (
+            "- 누가 올지 모른다. 처음 보는 사람으로 대한다.\n- 방문자가 누구인지 넘겨짚지 않는다."
+        )
     else:
         family = "- (아직 파악된 가족 정보 없음)"
 
@@ -733,7 +776,8 @@ def assemble_persona_prompt(
     # 기억은 런타임 RAG로 질의 관련된 것만 주입한다
     memories = (
         "\n".join(f"- {m}" for m in retrieved_memories)
-        if retrieved_memories else "(이 대화 관련 기억이 런타임에 주입됨)"
+        if retrieved_memories
+        else "(이 대화 관련 기억이 런타임에 주입됨)"
     )
 
     speech_style = (
@@ -790,8 +834,9 @@ def assemble_persona_prompt(
         speech_examples=speech_examples,
         situational=situational,
         taboo=taboo,
-        fixed_rules=fixed_rules(public=public, deceased=deceased, has_family=has_family,
-                                minor=_is_minor(intake_context)),
+        fixed_rules=fixed_rules(
+            public=public, deceased=deceased, has_family=has_family, minor=_is_minor(intake_context)
+        ),
         memories=memories,
     )
 

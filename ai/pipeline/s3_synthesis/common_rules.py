@@ -15,6 +15,7 @@
 `<!-- -->` 로 시작하는 줄은 주석(출력 안 함). 블록 밖 줄은 항상 넣는다. `{{이름}}` 은 vars 로 채운다.
 섹션 안 모듈이 전부 비면 그 섹션 제목도 뺀다.
 """
+
 from __future__ import annotations
 
 import json
@@ -25,15 +26,22 @@ from pathlib import Path
 
 RULES_DIR = Path(__file__).resolve().parents[2] / "prompts" / "rules"
 DEATH_POLICIES = ("deny", "brief", "ask_only", "open")
-TOKENS = ({"public", "private", "deceased", "alive", "family", "nofamily", "minor"}
-          | {f"death_{p}" for p in DEATH_POLICIES})
+TOKENS = {"public", "private", "deceased", "alive", "family", "nofamily", "minor"} | {
+    f"death_{p}" for p in DEATH_POLICIES
+}
 VAR = re.compile(r"\{\{(\w+)\}\}")
 # 모든 세트에 들어가는 기본값. legacy 는 가족 목록이 규칙보다 위에 있다(예전 템플릿 순서).
 DEFAULT_VARS = {"family_list": "위 가족 목록"}
 
 
-def _flags(*, public: bool, deceased: bool, has_family: bool, death_policy: str = "deny",
-           minor: bool = False) -> set[str]:
+def _flags(
+    *,
+    public: bool,
+    deceased: bool,
+    has_family: bool,
+    death_policy: str = "deny",
+    minor: bool = False,
+) -> set[str]:
     if death_policy not in DEATH_POLICIES:
         raise ValueError(f"unknown death policy {death_policy!r}")
     flags = {
@@ -89,11 +97,24 @@ def render_block_file(path: Path, flags: set[str], vars: dict[str, str] | None =
     return [ln for ln in text.split("\n") if ln.strip()] if text else []
 
 
-def render_rules(set_name: str, *, public: bool, deceased: bool, has_family: bool,
-                 death_policy: str = "deny", vars: dict[str, str] | None = None,
-                 rules_dir: Path = RULES_DIR, minor: bool = False) -> str:
-    flags = _flags(public=public, deceased=deceased, has_family=has_family, death_policy=death_policy,
-                   minor=minor)
+def render_rules(
+    set_name: str,
+    *,
+    public: bool,
+    deceased: bool,
+    has_family: bool,
+    death_policy: str = "deny",
+    vars: dict[str, str] | None = None,
+    rules_dir: Path = RULES_DIR,
+    minor: bool = False,
+) -> str:
+    flags = _flags(
+        public=public,
+        deceased=deceased,
+        has_family=has_family,
+        death_policy=death_policy,
+        minor=minor,
+    )
     vars = {**DEFAULT_VARS, **(vars or {})}
     sections = []
     for title, modules in _manifest(rules_dir)["sets"][set_name]:
@@ -105,9 +126,13 @@ def render_rules(set_name: str, *, public: bool, deceased: bool, has_family: boo
     return "\n\n".join(sections)
 
 
-def render_common_rules(*, public: bool, deceased: bool, has_family: bool, minor: bool = False) -> str:
+def render_common_rules(
+    *, public: bool, deceased: bool, has_family: bool, minor: bool = False
+) -> str:
     """예전 출력(legacy 세트) — 조립기·중간계층이 쓰는 공통 규칙. 골든 8개로 고정(minor 면 안전 절에 미성년 규칙)."""
-    return render_rules("legacy", public=public, deceased=deceased, has_family=has_family, minor=minor)
+    return render_rules(
+        "legacy", public=public, deceased=deceased, has_family=has_family, minor=minor
+    )
 
 
 def common_rule_lines(*, public: bool, deceased: bool, has_family: bool) -> set[str]:
@@ -131,22 +156,31 @@ def family_guide(rows: Iterable) -> str:
     if len(others) < len(rows):
         parts.append("아래 가족 중 '지금 대화하는 사람'으로 적힌 사람이 지금 대화하는 상대다.")
     if any(getattr(r, "listener_calls", None) for r in others):
-        parts.append("사용자가 '아빠'·'엄마'처럼 가족을 부르면 '사용자는 …라고 부름'을 보고 "
-                     "누구를 말하는지 찾는다.")
+        parts.append(
+            "사용자가 '아빠'·'엄마'처럼 가족을 부르면 '사용자는 …라고 부름'을 보고 "
+            "누구를 말하는지 찾는다."
+        )
     if any(getattr(r, "deceased", None) for r in others):
-        parts.append("'돌아가심'으로 적힌 분은 이미 세상을 떠났으니 연락해 보라고 하거나 "
-                     "연락할 사람으로 짚지 않는다.")
+        parts.append(
+            "'돌아가심'으로 적힌 분은 이미 세상을 떠났으니 연락해 보라고 하거나 "
+            "연락할 사람으로 짚지 않는다."
+        )
     owner = next((r for r in others if getattr(r, "is_owner", None)), None)
     if owner is not None:
         # render 가 이 모듈을 불러서 안에서 부른다
         from pipeline.persona_prompt.render import particle
+
         n = owner.name
-        parts.append(f"가족 표의 부르는 말·상황별 말·실제로 하던 말은 '이 대화 상대를 만든 가족'인 "
-                     f"{n}{particle(n, '이', '가')} 적었다. 그 속의 애칭이나 옛일은 {n}의 것이니, "
-                     "지금 대화하는 사람에게는 그 사람 줄의 부르는 말과 말 높이를 쓰고 "
-                     f"{n}{particle(n, '과', '와')}의 옛일을 지금 대화하는 사람과 함께한 일처럼 말하지 않는다.")
+        parts.append(
+            f"가족 표의 부르는 말·상황별 말·실제로 하던 말은 '이 대화 상대를 만든 가족'인 "
+            f"{n}{particle(n, '이', '가')} 적었다. 그 속의 애칭이나 옛일은 {n}의 것이니, "
+            "지금 대화하는 사람에게는 그 사람 줄의 부르는 말과 말 높이를 쓰고 "
+            f"{n}{particle(n, '과', '와')}의 옛일을 지금 대화하는 사람과 함께한 일처럼 말하지 않는다."
+        )
     listener = next((r for r in rows if getattr(r, "is_listener", None)), None)
     shared = owner is not None or getattr(listener, "is_member", None)  # 함께 쓰는 가족의 조립본
     if shared and (getattr(listener, "speech_level", None) or "").strip() == "존댓말":
-        parts.append("지금 대화하는 사람에게는 예시 문장이 반말로 적혀 있어도 어미를 존댓말로 바꿔 말한다.")
+        parts.append(
+            "지금 대화하는 사람에게는 예시 문장이 반말로 적혀 있어도 어미를 존댓말로 바꿔 말한다."
+        )
     return " ".join(parts)

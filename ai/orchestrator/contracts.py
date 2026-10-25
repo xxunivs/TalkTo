@@ -6,6 +6,7 @@
 - 모든 구현은 `impl` 이름을 가진다(추적 로그·실험 조건 이름으로 씀).
 - 계약 필드를 바꾸면 CONTRACT.md 와 test/orchestrator 를 같이 고친다.
 """
+
 from __future__ import annotations
 
 from typing import Literal, Protocol
@@ -20,6 +21,7 @@ class Contract(BaseModel):
 
 
 # ---------------------------------------------------------------- 공통 데이터
+
 
 class Turn(Contract):
     role: Literal["user", "assistant"]
@@ -48,12 +50,14 @@ class MemoryItem(Contract):
 
 class StyleFix(Contract):
     """가족이 고쳐 준 말투 한 쌍(BE styleExamples). 조립기가 '말투를 이렇게 고쳐 달라고 했어요' 절로 넣는다."""
+
     original: str
     corrected: str
 
 
 class TurnInput(Contract):
     """BE 요청을 중간계층 형식으로 옮긴 것. 한 턴의 입력 전부."""
+
     subject_id: str
     message: str
     persona_instructions: str
@@ -85,6 +89,7 @@ class Replacement(Contract):
 
 class RestrictedFacts(Contract):
     """제한 정보(사인·임종 경위 등). 설명: orchestrator/restricted.py"""
+
     # deny | brief | ask_only | open. intake(M9-01·T1-02)에 답이 있으면 그 값으로 덮인다(orchestrator/intake_policy.py).
     policy: Literal["deny", "brief", "ask_only", "open"] = "deny"
     brief_answer: str | None = None
@@ -99,6 +104,7 @@ class RestrictedFacts(Contract):
 
 class Shot(Contract):
     """말투 few-shot 한 쌍(실제 통화). user = 가족 말, persona = 대상자 말."""
+
     user: str
     persona: str
 
@@ -108,6 +114,7 @@ class PersonaProfile(Contract):
 
     source: registry(prompts/personas 에 등록) | inferred(지시문에서 추정) | default
     """
+
     subject_name: str | None = None
     public: bool = False
     deceased: bool = False
@@ -127,6 +134,7 @@ class PersonaProfile(Contract):
 
 
 # ---------------------------------------------------------------- 단계 출력
+
 
 class SessionState(Contract):
     session_id: str | None
@@ -209,6 +217,7 @@ class TurnResult(Contract):
 
 # ---------------------------------------------------------------- 단계 Protocol
 
+
 class SessionStore(Protocol):
     impl: str
 
@@ -219,6 +228,7 @@ class SessionStore(Protocol):
 
 class MemoryStore(Protocol):
     """대상자 기억 원본. BE 요청·파일·DB 어디서 읽든 같은 모양으로 준다."""
+
     impl: str
 
     def list_for_subject(self, turn: TurnInput) -> list[MemoryItem]: ...
@@ -227,13 +237,17 @@ class MemoryStore(Protocol):
 class MemorySelector(Protocol):
     impl: str
 
-    def select(self, turn: TurnInput, state: SessionState, store: MemoryStore) -> MemorySelection: ...
+    def select(
+        self, turn: TurnInput, state: SessionState, store: MemoryStore
+    ) -> MemorySelection: ...
 
 
 class Precheck(Protocol):
     impl: str
 
-    def check(self, turn: TurnInput, state: SessionState, selection: MemorySelection) -> PrecheckResult: ...
+    def check(
+        self, turn: TurnInput, state: SessionState, selection: MemorySelection
+    ) -> PrecheckResult: ...
 
 
 class PersonaProfileStore(Protocol):
@@ -246,7 +260,11 @@ class Assembler(Protocol):
     impl: str
 
     def assemble(
-        self, turn: TurnInput, state: SessionState, selection: MemorySelection, precheck: PrecheckResult
+        self,
+        turn: TurnInput,
+        state: SessionState,
+        selection: MemorySelection,
+        precheck: PrecheckResult,
     ) -> PromptBundle: ...
 
 
@@ -260,12 +278,17 @@ class Guard(Protocol):
     impl: str
 
     def apply(
-        self, generation: Generation, turn: TurnInput, state: SessionState, selection: MemorySelection
+        self,
+        generation: Generation,
+        turn: TurnInput,
+        state: SessionState,
+        selection: MemorySelection,
     ) -> GuardResult: ...
 
 
 class PostTurn(Protocol):
     """턴 뒤 처리. 응답 전에 도는 부분은 빨라야 한다(세션 갱신 정도). 무거운 추출은 비동기로."""
+
     impl: str
 
     def after(self, turn: TurnInput, state: SessionState, guard: GuardResult) -> SessionState: ...

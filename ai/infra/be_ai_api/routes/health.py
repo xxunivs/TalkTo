@@ -4,7 +4,6 @@ from fastapi import APIRouter
 
 from infra.schema.health import HealthResponse
 
-
 router = APIRouter(tags=["system"])
 
 

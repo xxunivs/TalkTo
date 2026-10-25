@@ -8,19 +8,16 @@ import logging
 import re
 
 from infra.external_api.openai_client import analysis_client, analysis_completion, json_reply
-
+from infra.schema.transcript import TranscriptSegment
 from infra.setting import Settings
 from pipeline.s2_extraction.e_extract_memory import _ALLOWED_TAGS
-from infra.schema.transcript import TranscriptSegment
 
 logger = logging.getLogger(__name__)
 
 _SENTENCE_SPLIT = re.compile(r"[.!?]+\s*")
 
 
-def summarize_recording(
-    segments: list[TranscriptSegment], *, settings: Settings
-) -> str:
+def summarize_recording(segments: list[TranscriptSegment], *, settings: Settings) -> str:
     client = analysis_client(settings, "summary")
     response = analysis_completion(
         client,

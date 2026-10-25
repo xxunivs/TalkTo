@@ -4,9 +4,7 @@ from fastapi import APIRouter, Depends
 
 from infra.be_ai_api.dependencies import SettingsDependency, require_internal_request
 from infra.be_ai_api.recording_analysis import run_recording_analysis
-from pipeline.s1_transcription.a_transcript import transcribe_recording
-from pipeline.s1_transcription.b_speaker_id import identify_subject_by_content
-from pipeline.s1_transcription.d_voice_groups import group_voices
+from infra.external_api.stt import create_stt_provider
 from infra.schema.recording_analysis import (
     RecordingAnalysisRequest,
     RecordingAnalysisResponse,
@@ -17,10 +15,10 @@ from infra.schema.recording_analysis import (
     VoiceGroupRequest,
     VoiceGroupResponse,
 )
-from infra.schema.transcript import TranscriptSegment
-from infra.schema.transcript import TranscriptionRequest, TranscriptionResponse
-from infra.external_api.stt import create_stt_provider
-
+from infra.schema.transcript import TranscriptionRequest, TranscriptionResponse, TranscriptSegment
+from pipeline.s1_transcription.a_transcript import transcribe_recording
+from pipeline.s1_transcription.b_speaker_id import identify_subject_by_content
+from pipeline.s1_transcription.d_voice_groups import group_voices
 
 router = APIRouter(tags=["analysis"])
 InternalRequest = Annotated[None, Depends(require_internal_request)]
@@ -67,8 +65,10 @@ def create_voice_groups(
 ) -> VoiceGroupResponse:
     """녹음 여러 개에 걸쳐 같은 사람의 목소리를 묶는다(ECAPA 지문). 사람은 묶음 하나를 고른다."""
     clusters, method = group_voices(
-        [(r.recording_id, str(r.audio_url), _segments(r.transcript_segments))
-         for r in request.recordings],
+        [
+            (r.recording_id, str(r.audio_url), _segments(r.transcript_segments))
+            for r in request.recordings
+        ],
         settings=settings,
     )
     return VoiceGroupResponse(
@@ -79,7 +79,8 @@ def create_voice_groups(
                 speech_ms=cluster.speech_ms,
                 members=[
                     VoiceGroupMember(
-                        recording_id=m.recording_id, speaker_label=m.speaker_label,
+                        recording_id=m.recording_id,
+                        speaker_label=m.speaker_label,
                         speech_ms=m.speech_ms,
                     )
                     for m in cluster.members

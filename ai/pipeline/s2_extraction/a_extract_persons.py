@@ -7,10 +7,9 @@ LLM 산출은 그대로 믿지 않는다: 근거 세그먼트 실존, confidence
 import logging
 
 from infra.external_api.openai_client import analysis_client, analysis_completion, json_reply
-
-from infra.setting import Settings
 from infra.schema.subject import SubjectContext
 from infra.schema.transcript import TranscriptSegment
+from infra.setting import Settings
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +36,9 @@ def run_persons_analysis(
             {
                 "role": "user",
                 "content": build_persons_user_prompt(
-                    segments, subject_context, subject_speaker_label,
+                    segments,
+                    subject_context,
+                    subject_speaker_label,
                     conversation_partner_name,
                 ),
             },
@@ -56,10 +57,30 @@ def run_persons_analysis(
 _SELF_RELATIONS = {"본인", "self", "대상자", "자기 자신"}
 # 1·2인칭 대명사와 호응 — 지칭 근거가 될 수 없다 (3인칭 지칭 해소 "걔" 등은 허용)
 _PRONOUN_MENTIONS = {
-    "나", "내", "내가", "나도", "저", "저희", "우리",
-    "너", "네", "네가", "니가", "너도", "널", "당신", "나야", "저야",
-    "너네", "너네들", "너희", "너희들",
-    "어", "응", "예", "그래",
+    "나",
+    "내",
+    "내가",
+    "나도",
+    "저",
+    "저희",
+    "우리",
+    "너",
+    "네",
+    "네가",
+    "니가",
+    "너도",
+    "널",
+    "당신",
+    "나야",
+    "저야",
+    "너네",
+    "너네들",
+    "너희",
+    "너희들",
+    "어",
+    "응",
+    "예",
+    "그래",
 }
 # 특정 개인을 가리키지 않는 일반 표현 — unresolved 자격 없음
 _GENERIC_MENTIONS = {"사람", "사람들", "애들", "친구", "친구들", "가족", "식구"}
@@ -75,8 +96,7 @@ def validate_persons_payload(
     """코드 검증: 근거 실존·mention 실존·본인 제외·enum·구조. 위반은 제거하고 기록한다."""
     valid_ids = {segment.segment_index for segment in segments}
     transcript_text = " ".join(
-        segment.transcript_text + " " + (segment.corrected_text or "")
-        for segment in segments
+        segment.transcript_text + " " + (segment.corrected_text or "") for segment in segments
     )
     dropped = {"persons": 0, "relations": 0, "facts": 0, "unresolved": 0, "mentions": 0}
 
@@ -126,9 +146,7 @@ def validate_persons_payload(
         facts = []
         for fact in person.get("facts") or []:
             fact_ids = (
-                clean_source_ids(fact.get("sourceSegmentIds"))
-                if isinstance(fact, dict)
-                else None
+                clean_source_ids(fact.get("sourceSegmentIds")) if isinstance(fact, dict) else None
             )
             if (
                 fact_ids is None
@@ -197,11 +215,13 @@ def validate_persons_payload(
     unresolved = []
     for mention in payload.get("unresolvedMentions") or []:
         mention_ids = (
-            clean_source_ids(mention.get("sourceSegmentIds"))
-            if isinstance(mention, dict)
-            else None
+            clean_source_ids(mention.get("sourceSegmentIds")) if isinstance(mention, dict) else None
         )
-        text = str(mention.get("mention") or "").strip().rstrip("?.!,~") if isinstance(mention, dict) else ""
+        text = (
+            str(mention.get("mention") or "").strip().rstrip("?.!,~")
+            if isinstance(mention, dict)
+            else ""
+        )
         if (
             mention_ids is None
             or not text
@@ -299,10 +319,16 @@ def build_persons_user_prompt(
     if subject_context is not None and subject_context.family_members:
         lines = [
             f"- {member.name} ({member.relation_to_subject or '관계 미상'})"
-            + (f", 대상자가 부르는 호칭: {', '.join(member.address_terms)}" if member.address_terms else "")
+            + (
+                f", 대상자가 부르는 호칭: {', '.join(member.address_terms)}"
+                if member.address_terms
+                else ""
+            )
             for member in subject_context.family_members
         ]
-        parts.append("가족 정보 (지칭 해소 힌트 — 언급 안 된 사람은 추출 금지):\n" + "\n".join(lines))
+        parts.append(
+            "가족 정보 (지칭 해소 힌트 — 언급 안 된 사람은 추출 금지):\n" + "\n".join(lines)
+        )
 
     transcript = "\n".join(
         f"{segment.segment_index} [{segment.speaker_label}]: "

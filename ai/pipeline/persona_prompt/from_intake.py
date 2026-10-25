@@ -14,6 +14,7 @@
   - basicProfile.minor(BE 가 bool 만 보냄 — 생년월은 오지 않는다)가 true 이고 살아 계신 분이면 spec.minor.
     떠나신 자녀는 고인 규칙만 쓴다.
 """
+
 from __future__ import annotations
 
 import re
@@ -23,7 +24,14 @@ from infra.schema.subject import IntakeContext, SubjectContext
 from orchestrator.guard import says_forgot
 from orchestrator.intake_policy import death_policy
 from pipeline.persona_prompt.spec import (
-    Character, PersonaSpec, Quote, Relation, Situation, Style, Topic, is_death_topic,
+    Character,
+    PersonaSpec,
+    Quote,
+    Relation,
+    Situation,
+    Style,
+    Topic,
+    is_death_topic,
 )
 from pipeline.persona_prompt.textnorm import is_address_term, same_topic
 
@@ -68,16 +76,32 @@ def split_c10(topic: str) -> tuple[str, str]:
 def _relations(ic: IntakeContext) -> list[Relation]:
     out = []
     for f in ic.family_map:
-        out.append(Relation(
-            name=f.name, relation=f.relation, calls_them=f.address_term_to, self_ref=f.self_reference,
-            they_call=f.address_term_from, speech_level=f.speech_level, tone=f.tone,
-            worries=list(f.worries), talks_with_persona=f.talks_with_persona,
-            is_listener=f.is_listener, is_owner=f.is_owner, is_member=f.is_member,
-            listener_calls=f.listener_calls, deceased=f.deceased, note=f.note, source="intake:M2-01"))
+        out.append(
+            Relation(
+                name=f.name,
+                relation=f.relation,
+                calls_them=f.address_term_to,
+                self_ref=f.self_reference,
+                they_call=f.address_term_from,
+                speech_level=f.speech_level,
+                tone=f.tone,
+                worries=list(f.worries),
+                talks_with_persona=f.talks_with_persona,
+                is_listener=f.is_listener,
+                is_owner=f.is_owner,
+                is_member=f.is_member,
+                listener_calls=f.listener_calls,
+                deceased=f.deceased,
+                note=f.note,
+                source="intake:M2-01",
+            )
+        )
     return out
 
 
-def _family_calls_subject(sc: SubjectContext, rels: list[Relation], public: bool) -> tuple[str | None, list[str]]:
+def _family_calls_subject(
+    sc: SubjectContext, rels: list[Relation], public: bool
+) -> tuple[str | None, list[str]]:
     notes = []
     term = sc.subject.address_term if sc.subject else None
     if public:
@@ -85,13 +109,17 @@ def _family_calls_subject(sc: SubjectContext, rels: list[Relation], public: bool
     # 대화하는 사람이 그분을 부르는 말을 알면 그 말이 앞선다(기본 정보에 그 사람 몫으로 따로 나간다)
     listener = next((r for r in rels if r.is_listener and r.they_call), None)
     if listener is not None:
-        notes.append(f"호칭: 지금 대화하는 사람({listener.name})이 그분을 부르는 말 '{listener.they_call}' 을 씀"
-                     " — 가족 모두가 부르는 말로는 두지 않음")
+        notes.append(
+            f"호칭: 지금 대화하는 사람({listener.name})이 그분을 부르는 말 '{listener.they_call}' 을 씀"
+            " — 가족 모두가 부르는 말로는 두지 않음"
+        )
         return None, notes
     if not term:
         return None, notes
     if any(term == r.calls_them for r in rels):
-        notes.append(f"호칭: subject.addressTerm '{term}' 은 가족 표에서 그분이 부르는 말과 같아(설문 P1-07A) 그분을 부르는 말로 쓰지 않음")
+        notes.append(
+            f"호칭: subject.addressTerm '{term}' 은 가족 표에서 그분이 부르는 말과 같아(설문 P1-07A) 그분을 부르는 말로 쓰지 않음"
+        )
         return None, notes
     called = Counter(r.they_call for r in rels if r.they_call)
     if len(called) > 1:  # 사람마다 다르게 부르면(할머니 / 엄마) 가족 표에 맡긴다
@@ -110,11 +138,18 @@ def spec_from_intake(subject_context: SubjectContext, intake: IntakeContext | No
     rels = _relations(ic)
     calls, notes = _family_calls_subject(sc, rels, public)
     spec = PersonaSpec(
-        name=name, public=public, deceased=deceased, minor=bp.get("minor") is True and not deceased,
+        name=name,
+        public=public,
+        deceased=deceased,
+        minor=bp.get("minor") is True and not deceased,
         period=_period(bp.get("period")),
         family_calls_subject=calls,
         visitor_address=(sc.subject.address_term if public and sc.subject else None),
-        visitor_tone=ic.visitor_tone, visitor_context=ic.visitor_context, relations=rels, notes=notes)
+        visitor_tone=ic.visitor_tone,
+        visitor_context=ic.visitor_context,
+        relations=rels,
+        notes=notes,
+    )
     if intake is not None:
         spec.add_material("intake")
 
@@ -136,22 +171,38 @@ def spec_from_intake(subject_context: SubjectContext, intake: IntakeContext | No
         spec.character = Character(introduction=p)
     elif p is not None:
         spec.character = Character(
-            one_line=p.one_line or bp.get("oneLine"), introduction=p.introduction or bp.get("introduction"),
-            traits=list(p.traits), values=list(p.values), affection_style=list(p.affection_style),
-            comfort_style=p.comfort_style, advice_style=list(p.advice_style), conflict_style=p.conflict_style,
-            remembered_as=p.remembered_as, wish_listener_feels=p.wish_listener_feels)
+            one_line=p.one_line or bp.get("oneLine"),
+            introduction=p.introduction or bp.get("introduction"),
+            traits=list(p.traits),
+            values=list(p.values),
+            affection_style=list(p.affection_style),
+            comfort_style=p.comfort_style,
+            advice_style=list(p.advice_style),
+            conflict_style=p.conflict_style,
+            remembered_as=p.remembered_as,
+            wish_listener_feels=p.wish_listener_feels,
+        )
     elif bp.get("oneLine") or bp.get("introduction"):
         spec.character = Character(one_line=bp.get("oneLine"), introduction=bp.get("introduction"))
 
-    spec.situations = [Situation(situation=r.situation.strip(), response=_clean_quote(r.response),
-                                 avoid=r.avoid, source="intake:M8") for r in ic.situational_reactions]
+    spec.situations = [
+        Situation(
+            situation=r.situation.strip(),
+            response=_clean_quote(r.response),
+            avoid=r.avoid,
+            source="intake:M8",
+        )
+        for r in ic.situational_reactions
+    ]
     if deceased and not public:
         # 고인은 잊은 듯 말하지 않는다(잠금 2). '기억이 잘 안 나네' 같은 답(M8-08 '모르는 걸 물으면' 등)은
         # '늘 이 말투로' 지침이 되므로 상황째 뺀다. 저장된 설문으로 다시 만들어도 같게 걸러진다.
         kept = []
         for s in spec.situations:
             if says_forgot(s.response):
-                spec.notes.append(f"상황별 반응: '{s.situation[:20]}' 의 답은 잊은 듯한 말이라 고인 페르소나에서 뺌")
+                spec.notes.append(
+                    f"상황별 반응: '{s.situation[:20]}' 의 답은 잊은 듯한 말이라 고인 페르소나에서 뺌"
+                )
             else:
                 kept.append(s)
         spec.situations = kept
@@ -167,19 +218,35 @@ def spec_from_intake(subject_context: SubjectContext, intake: IntakeContext | No
         if dropped:
             spec.notes.append(f"말끝: '사랑' 이 든 말끝 {dropped} 은 말끝 칸에서 뺌(끝인사로만)")
         style = Style(
-            length=s.length, manner=s.manner, when_angry=s.when_angry, interjections=list(s.interjections),
-            dialect=s.dialect, dialect_example=s.dialect_example, avoid_styles=list(s.avoid_styles),
-            sentence_endings=[e for e in endings if "사랑" not in e], call_open=_clean_quote(s.call_open or "") or None,
-            call_close=_clean_quote(s.call_close or "") or None, summary=s.summary)
+            length=s.length,
+            manner=s.manner,
+            when_angry=s.when_angry,
+            interjections=list(s.interjections),
+            dialect=s.dialect,
+            dialect_example=s.dialect_example,
+            avoid_styles=list(s.avoid_styles),
+            sentence_endings=[e for e in endings if "사랑" not in e],
+            call_open=_clean_quote(s.call_open or "") or None,
+            call_close=_clean_quote(s.call_close or "") or None,
+            summary=s.summary,
+        )
     for e in ic.speech_examples:
         text = _clean_quote(e.text)
         if not text or e.inferred:
             continue
         if len(text) > QUOTE_MAX:  # 실제 표현이 아니라 서술(M4-06 등)이면 말투 예시로 쓰지 않는다
-            spec.notes.append(f"말투 예시: 설문 표현 '{text[:20]}…' 은 {len(text)}자 서술이라 말투 예시에서 뺌")
+            spec.notes.append(
+                f"말투 예시: 설문 표현 '{text[:20]}…' 은 {len(text)}자 서술이라 말투 예시에서 뺌"
+            )
             continue
-        style.quotes.append(Quote(text=text, situation=_cell(e.situation), listener=_cell(e.listener),
-                                  source=f"intake:{e.source_question or '?'}"))
+        style.quotes.append(
+            Quote(
+                text=text,
+                situation=_cell(e.situation),
+                listener=_cell(e.listener),
+                source=f"intake:{e.source_question or '?'}",
+            )
+        )
     spec.style = style
 
     # 주제 등급
@@ -188,7 +255,12 @@ def spec_from_intake(subject_context: SubjectContext, intake: IntakeContext | No
         if isinstance(t, str):
             topic, grade, note, src = t, "금지", None, None
         else:
-            topic, grade, note, src = t.topic, (t.grade or "금지").strip(), t.note, t.source_question
+            topic, grade, note, src = (
+                t.topic,
+                (t.grade or "금지").strip(),
+                t.note,
+                t.source_question,
+            )
         if src == "C-10":
             kind, value = split_c10(topic)
             if kind == "style":
@@ -199,18 +271,26 @@ def spec_from_intake(subject_context: SubjectContext, intake: IntakeContext | No
                 spec.notes.append(f"C-10: '{topic}' → 물으면만")
                 topic, grade = value, "물으면만"
         if is_death_topic(topic):
-            spec.notes.append(f"사망 정책: 주제 '{topic}'({grade}) 는 사망 정책({spec.death_policy}) 모듈이 맡아 목록에서 뺌")
+            spec.notes.append(
+                f"사망 정책: 주제 '{topic}'({grade}) 는 사망 정책({spec.death_policy}) 모듈이 맡아 목록에서 뺌"
+            )
             continue
         dup = next((t for t in topics if t.topic == topic), None)
         if dup is not None:
-            stricter = grade in GRADES and dup.grade in GRADES and GRADES.index(grade) < GRADES.index(dup.grade)
+            stricter = (
+                grade in GRADES
+                and dup.grade in GRADES
+                and GRADES.index(grade) < GRADES.index(dup.grade)
+            )
             if stricter:
                 dup.grade = grade
             dup.note = dup.note or note
             dup.source = f"{dup.source},{src}" if src else dup.source
             spec.notes.append(f"주제 '{topic}' 이 여러 문항에 있어 하나로 합침(등급 {dup.grade})")
             continue
-        topics.append(Topic(topic=topic, grade=grade, note=note, source=f"intake:{src}" if src else "intake"))
+        topics.append(
+            Topic(topic=topic, grade=grade, note=note, source=f"intake:{src}" if src else "intake")
+        )
     spec.topics = topics
     return spec
 
@@ -227,11 +307,17 @@ def merge_recording(spec: PersonaSpec, recording: dict | None) -> PersonaSpec:
         term = term if term and is_address_term(term) else None
         r = spec.relation_for(name)
         if r is None:
-            spec.relations.append(Relation(name=name, relation=row.get("relation"), calls_them=term, source="transcript"))
+            spec.relations.append(
+                Relation(
+                    name=name, relation=row.get("relation"), calls_them=term, source="transcript"
+                )
+            )
         elif not r.calls_them and term:
             r.calls_them = term
     st = recording.get("speechStyle") or {}
-    spec.style.interjections += [w for w in st.get("interjections") or [] if w not in spec.style.interjections]
+    spec.style.interjections += [
+        w for w in st.get("interjections") or [] if w not in spec.style.interjections
+    ]
     spec.style.summary = spec.style.summary or st.get("summary")
     for row in recording.get("tabooTopics") or []:
         topic = (row.get("topic") or "").strip()
@@ -239,12 +325,16 @@ def merge_recording(spec: PersonaSpec, recording: dict | None) -> PersonaSpec:
             continue
         if any(same_topic(topic, t.topic, {spec.name}) for t in spec.topics):
             continue  # 설문에 같은 주제가 있으면 설문 등급을 따른다
-        spec.topics.append(Topic(topic=topic, grade=row.get("grade") or "물으면만", note=None, source="transcript"))
+        spec.topics.append(
+            Topic(topic=topic, grade=row.get("grade") or "물으면만", note=None, source="transcript")
+        )
     spec.add_material("transcript")
     return spec
 
 
-def apply_death_toggle(spec: PersonaSpec, death_talk: bool | None, source: str = "setting") -> PersonaSpec:
+def apply_death_toggle(
+    spec: PersonaSpec, death_talk: bool | None, source: str = "setting"
+) -> PersonaSpec:
     """사인·임종 질문 켜기/끄기(설정). None 이면 설문(M9-01·T1-02) 그대로.
     False(끔) → deny: 물어도 말하지 않는다. True(켬) → 설문 등급이 brief·ask_only·open 이면 그대로, 아니면 ask_only."""
     if not spec.deceased or death_talk is None:

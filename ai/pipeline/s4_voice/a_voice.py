@@ -12,7 +12,6 @@ from pathlib import Path
 
 from pydantic import HttpUrl
 
-from infra.setting import Settings
 from infra.error import (
     InvalidVoiceSampleError,
     MissingVoiceError,
@@ -20,11 +19,8 @@ from infra.error import (
 )
 from infra.external_api.audio import download_audio
 from infra.external_api.openai_client import create_openai_client
-from infra.scratch import scratch_dir
 from infra.external_api.tts import TTSResult, create_clone_provider, create_tts_provider
 from infra.external_api.tts.fish import strip_fish_cues
-from pipeline.s4_voice import c_sample_quality as quality
-from pipeline.s4_voice.b_emotion import strip_emotion_tags
 from infra.schema.memory import PersistedTranscriptSegment
 from infra.schema.voice import (
     SpeechSynthesisRequest,
@@ -34,6 +30,10 @@ from infra.schema.voice import (
     VoiceSampleSegment,
     VoiceTranscriptionResponse,
 )
+from infra.scratch import scratch_dir
+from infra.setting import Settings
+from pipeline.s4_voice import c_sample_quality as quality
+from pipeline.s4_voice.b_emotion import strip_emotion_tags
 
 # 다구간 클론 샘플 튜닝값
 # 이어붙인 샘플 총 길이 상한. Fish 즉시 복제는 깨끗한 1분 안팎이면 충분했다(대표님 청취 비교에 쓴 길이).
@@ -84,9 +84,7 @@ def transcribe_voice_message(
     )
 
 
-def synthesize_speech(
-    request: SpeechSynthesisRequest, *, settings: Settings
-) -> TTSResult:
+def synthesize_speech(request: SpeechSynthesisRequest, *, settings: Settings) -> TTSResult:
     requested = (request.voice_id or "").strip()
     if requested in _PLACEHOLDER_VOICE_IDS:
         requested = ""
@@ -95,6 +93,7 @@ def synthesize_speech(
         raise MissingVoiceError(
             "voiceId가 필요합니다 (요청의 voiceId 또는 ELEVENLABS_DEFAULT_VOICE_ID)."
         )
+
     def pick(asked: float | None, fallback: float) -> float:
         return fallback if asked is None else asked
 
@@ -127,19 +126,36 @@ def _ffmpeg_normalize(
     """
     filters = ["-af", "loudnorm=I=-20:TP=-2:LRA=11"] if loudnorm else []
     subprocess.run(
-        ["ffmpeg", "-nostdin", "-y", "-ss", str(start_ms / 1000), "-to", str(end_ms / 1000),
-         "-i", str(src), *filters, "-ac", "1", "-ar", str(_CLONE_SAMPLE_RATE), "-c:a", "pcm_s16le",
-         str(dst)],
-        check=True, capture_output=True,
+        [
+            "ffmpeg",
+            "-nostdin",
+            "-y",
+            "-ss",
+            str(start_ms / 1000),
+            "-to",
+            str(end_ms / 1000),
+            "-i",
+            str(src),
+            *filters,
+            "-ac",
+            "1",
+            "-ar",
+            str(_CLONE_SAMPLE_RATE),
+            "-c:a",
+            "pcm_s16le",
+            str(dst),
+        ],
+        check=True,
+        capture_output=True,
     )
 
 
 def _audio_seconds(path: Path) -> float:
     """자른 뒤 실제 길이. 구간이 오디오 밖이면 ffmpeg가 0초 파일을 만들므로 여기서 걸러낸다."""
     out = subprocess.run(
-        ["ffprobe", "-v", "quiet", "-show_entries", "format=duration", "-of", "csv=p=0",
-         str(path)],
-        capture_output=True, text=True,
+        ["ffprobe", "-v", "quiet", "-show_entries", "format=duration", "-of", "csv=p=0", str(path)],
+        capture_output=True,
+        text=True,
     ).stdout.strip()
     try:
         return float(out)
@@ -207,10 +223,22 @@ def _build_multi_sample(segments: list[VoiceSampleSegment], *, settings: Setting
 
         gap = workdir / "gap.wav"
         subprocess.run(
-            ["ffmpeg", "-nostdin", "-y", "-f", "lavfi",
-             "-i", f"anullsrc=r={_CLONE_SAMPLE_RATE}:cl=mono",
-             "-t", str(_CLONE_GAP_SECONDS), "-c:a", "pcm_s16le", str(gap)],
-            check=True, capture_output=True,
+            [
+                "ffmpeg",
+                "-nostdin",
+                "-y",
+                "-f",
+                "lavfi",
+                "-i",
+                f"anullsrc=r={_CLONE_SAMPLE_RATE}:cl=mono",
+                "-t",
+                str(_CLONE_GAP_SECONDS),
+                "-c:a",
+                "pcm_s16le",
+                str(gap),
+            ],
+            check=True,
+            capture_output=True,
         )
         parts: list[Path] = []
         for n, i in enumerate(sorted(use)):
@@ -223,9 +251,22 @@ def _build_multi_sample(segments: list[VoiceSampleSegment], *, settings: Setting
         listfile.write_text("".join(f"file '{p}'\n" for p in parts[:-1]), encoding="utf-8")
         out = workdir / "sample.wav"
         subprocess.run(
-            ["ffmpeg", "-nostdin", "-y", "-f", "concat", "-safe", "0",
-             "-i", str(listfile), "-c", "copy", str(out)],
-            check=True, capture_output=True,
+            [
+                "ffmpeg",
+                "-nostdin",
+                "-y",
+                "-f",
+                "concat",
+                "-safe",
+                "0",
+                "-i",
+                str(listfile),
+                "-c",
+                "copy",
+                str(out),
+            ],
+            check=True,
+            capture_output=True,
         )
         for src in sources.values():
             src.unlink(missing_ok=True)
@@ -257,9 +298,7 @@ def collect_subject_samples(
         if seg.end_ms <= seg.start_ms:  # 무효 구간 방어
             continue
         samples.append(
-            VoiceSampleSegment(
-                audio_url=audio_url, start_ms=seg.start_ms, end_ms=seg.end_ms
-            )
+            VoiceSampleSegment(audio_url=audio_url, start_ms=seg.start_ms, end_ms=seg.end_ms)
         )
     return samples
 
@@ -333,9 +372,7 @@ def clone_voice_from_sample(
     provider = create_clone_provider(settings)
     if request.samples:
         # 품질을 재 볼 후보를 통화마다 고르게 추린다. 실제로 담을 60초는 품질을 재서 고른다.
-        selected = select_clone_samples(
-            request.samples, max_seconds=_CLONE_CANDIDATE_SECONDS
-        )
+        selected = select_clone_samples(request.samples, max_seconds=_CLONE_CANDIDATE_SECONDS)
         sample_path = _build_multi_sample(selected, settings=settings)
         workdir = sample_path.parent
         try:

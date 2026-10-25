@@ -61,13 +61,28 @@ FISH_INLINE_INSTRUCTION = f"""[목소리 연기 표시]
 - 표시를 넣어도 대답 글자·말투·높임말은 하나도 바꾸지 않는다.
 이 표시는 목소리에만 쓰이고 상대 화면에는 보이지 않는다."""
 
-_INSTRUCTIONS = {"minimax": EMOTION_INSTRUCTION, "cue": FISH_CUE_INSTRUCTION, "inline": FISH_INLINE_INSTRUCTION}
+_INSTRUCTIONS = {
+    "minimax": EMOTION_INSTRUCTION,
+    "cue": FISH_CUE_INSTRUCTION,
+    "inline": FISH_INLINE_INSTRUCTION,
+}
 
 # 모델이 형식을 조금씩 바꿔 낸다: [감정:sad], [sad], (감정: 슬픔), [emotion: happy] ...
 # 감정 이름이거나 "감정/emotion" 이 붙은 괄호만 표시로 본다. 다른 괄호(예: (웃음))는 둔다.
-_KOREAN = {"보통": "neutral", "평범": "neutral", "차분": "calm", "차분함": "calm", "평온": "calm",
-           "다정": "warm", "다정함": "warm", "기쁨": "happy", "행복": "happy", "슬픔": "sad",
-           "놀람": "surprised", "걱정": "worried"}
+_KOREAN = {
+    "보통": "neutral",
+    "평범": "neutral",
+    "차분": "calm",
+    "차분함": "calm",
+    "평온": "calm",
+    "다정": "warm",
+    "다정함": "warm",
+    "기쁨": "happy",
+    "행복": "happy",
+    "슬픔": "sad",
+    "놀람": "surprised",
+    "걱정": "worried",
+}
 _NAMES = "|".join(sorted({*FISH_EMOTIONS, *_KOREAN}, key=len, reverse=True))
 _TAG = re.compile(
     r"[\[(（【]\s*(?:(?:감정|emotion)\s*[:：]?\s*([A-Za-z가-힣]+)|(" + _NAMES + r"))\s*[\])）】]",
@@ -77,7 +92,9 @@ _SQUARE = re.compile(r"\[[^\[\]\n]*\]")
 _WORD = re.compile(r"\w")
 _PUNCT = ".,!?…~"
 # 표시 앞 글이 낱말·문장부호로 끝나면(빈칸 없이 붙어 있으면) 표시를 뗀 자리에 빈칸 하나를 둔다
-_GLUE_BEFORE = re.compile(r"[\w.,!?…~]\Z")  # \Z: 줄바꿈으로 끝나면 붙은 것이 아니다($ 는 끝 줄바꿈 앞에도 맞는다)
+_GLUE_BEFORE = re.compile(
+    r"[\w.,!?…~]\Z"
+)  # \Z: 줄바꿈으로 끝나면 붙은 것이 아니다($ 는 끝 줄바꿈 앞에도 맞는다)
 
 
 def voice_mode(settings, voice_id: str | None) -> str:
@@ -137,14 +154,18 @@ def split_cues(text: str) -> tuple[str, list[tuple[int, str]]]:
     cues: list[tuple[int, str]] = []
     size, last = 0, 0
     for m in _SQUARE.finditer(text):
-        piece = text[last:m.start()]
+        piece = text[last : m.start()]
         last = m.end()
         while last < len(text) and text[last] in " \t":
             last += 1
         nxt = text[last] if last < len(text) else ""
         if nxt and nxt in _PUNCT:
-            piece = piece.rstrip(" \t")  # "그래 [미소]." → "그래." (문장부호 앞 빈칸을 남기지 않는다)
-        elif _WORD.match(nxt) and _GLUE_BEFORE.search(piece or next((p for p in reversed(parts) if p), "")):
+            piece = piece.rstrip(
+                " \t"
+            )  # "그래 [미소]." → "그래." (문장부호 앞 빈칸을 남기지 않는다)
+        elif _WORD.match(nxt) and _GLUE_BEFORE.search(
+            piece or next((p for p in reversed(parts) if p), "")
+        ):
             # 앞말에 붙은 표시: "아이고[한숨 쉬며] 그랬구나" → "아이고 그랬구나" (두 낱말을 붙이지 않는다)
             piece += " "
         parts.append(piece)
@@ -193,6 +214,7 @@ def place_cues(clean: str, cues: list[tuple[int, str]], final: str) -> str | Non
 @dataclass
 class VoiceSplit:
     """대답 글에서 떼어 낸 음성 표시. text 는 표시를 뗀 글(화면·가드용)."""
+
     text: str
     mode: str = "off"
     emotion: str | None = None

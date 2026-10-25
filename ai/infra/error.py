@@ -26,8 +26,6 @@ class AppError(Exception):
         self.details = details
 
 
-
-
 class ProviderNotConfiguredError(AppError):
     def __init__(self, detail: str) -> None:
         super().__init__(
@@ -154,7 +152,9 @@ class EmptyReplyError(AppError):
     막혔다(대화 기록의 빈 줄). 502 로 답해 BE 가 이번 턴을 되돌리게 한다."""
 
     def __init__(self) -> None:
-        super().__init__(code="EMPTY_REPLY", message="The persona reply was empty.", status_code=502)
+        super().__init__(
+            code="EMPTY_REPLY", message="The persona reply was empty.", status_code=502
+        )
 
 
 class AnalysisTooLongError(AppError):
@@ -216,7 +216,11 @@ def provider_error_code(error: Exception) -> str:
     body = getattr(error, "body", None)
     detail = body.get("error", body) if isinstance(body, dict) else {}
     detail = detail if isinstance(detail, dict) else {}
-    marks = {str(getattr(error, "code", "") or ""), str(detail.get("code") or ""), str(detail.get("type") or "")}
+    marks = {
+        str(getattr(error, "code", "") or ""),
+        str(detail.get("code") or ""),
+        str(detail.get("type") or ""),
+    }
     if marks & {"insufficient_quota", "credit_balance_exhausted", "billing_hard_limit_reached"}:
         return PROVIDER_QUOTA
     if getattr(error, "status_code", None) in (401, 403):
@@ -271,16 +275,16 @@ async def internal_validation_error_handler(request: Request, error: Exception) 
     종류와 위치만 남긴다.
     """
     errors = error.errors() if hasattr(error, "errors") else []
-    where = [
-        {"type": item.get("type"), "loc": list(item.get("loc") or ())}
-        for item in errors[:10]
-    ]
+    where = [{"type": item.get("type"), "loc": list(item.get("loc") or ())} for item in errors[:10]]
     logger.error(
         "internal data failed validation on %s: %s %s",
-        request.url.path, getattr(error, "title", type(error).__name__), where,
+        request.url.path,
+        getattr(error, "title", type(error).__name__),
+        where,
     )
     return JSONResponse(
         status_code=422,
-        content={"error": {"code": "AI_DATA_INVALID", "message": "AI server produced invalid data"}},
+        content={
+            "error": {"code": "AI_DATA_INVALID", "message": "AI server produced invalid data"}
+        },
     )
-

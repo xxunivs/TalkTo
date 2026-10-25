@@ -6,15 +6,14 @@
 녹음 여러 건 누적이 필요해 이 응답에 포함하지 않는다.
 """
 
-from uuid import UUID
-
 from typing import Literal
+from uuid import UUID
 
 from pydantic import Field, HttpUrl
 
 from infra.schema.field_rule import ApiModel
-from infra.schema.subject import SubjectContext
 from infra.schema.memory import MemorySegment, PersistedTranscriptSegment
+from infra.schema.subject import SubjectContext
 
 
 class RecordingAnalysisRequest(ApiModel):

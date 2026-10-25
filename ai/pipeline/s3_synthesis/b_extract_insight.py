@@ -7,13 +7,13 @@ Generative Agents 방식: 개별 관찰(기억)을 가로질러 대상자를 설
 
 import logging
 
-from infra.setting import Settings
 from infra.external_api.openai_client import analysis_client, analysis_completion, json_reply
 from infra.schema.insight import (
     Reflection,
     ReflectionRequest,
     ReflectionResponse,
 )
+from infra.setting import Settings
 
 logger = logging.getLogger(__name__)
 
@@ -54,9 +54,7 @@ def _build_user_prompt(request: ReflectionRequest) -> str:
     return "\n\n".join(parts)
 
 
-def run_reflection(
-    request: ReflectionRequest, *, settings: Settings
-) -> ReflectionResponse:
+def run_reflection(request: ReflectionRequest, *, settings: Settings) -> ReflectionResponse:
     client = analysis_client(settings, "persona reflection")
     response = analysis_completion(
         client,
@@ -90,9 +88,7 @@ def run_reflection(
             continue
         raw_importance = item.get("importance")
         importance = (
-            min(10, max(1, int(raw_importance)))
-            if isinstance(raw_importance, (int, float))
-            else 5
+            min(10, max(1, int(raw_importance))) if isinstance(raw_importance, (int, float)) else 5
         )
         reflections.append(
             Reflection(

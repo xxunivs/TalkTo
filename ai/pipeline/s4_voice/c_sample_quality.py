@@ -9,9 +9,9 @@ IVC(즉시 복제)는 넣는 소리를 그대로 따라 하므로 재료 품질�
 을 재서 기준에 못 미치는 구간을 빼고, 점수 높은 순으로 녹음마다 번갈아 담는다.
 """
 
+import wave
 from dataclasses import dataclass
 from pathlib import Path
-import wave
 
 import numpy as np
 
