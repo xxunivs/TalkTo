@@ -1,0 +1,119 @@
+name: talkto
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-talkto}
+      POSTGRES_USER: ${POSTGRES_USER:-talkto}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-talkto-local-password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - backend
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      APP_NAME: ${APP_NAME:-TalkTo API}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-talkto}:${POSTGRES_PASSWORD:-talkto-local-password}@db:5432/${POSTGRES_DB:-talkto}
+      JWT_SECRET: ${JWT_SECRET:-local-docker-secret-change-before-deployment}
+      ACCESS_TOKEN_TTL_MINUTES: ${ACCESS_TOKEN_TTL_MINUTES:-30}
+      REFRESH_TOKEN_TTL_DAYS: ${REFRESH_TOKEN_TTL_DAYS:-14}
+      AI_SERVER_URL: ${AI_SERVER_URL:-}
+      AI_SERVER_TOKEN: ${AI_SERVER_TOKEN:-}
+      AI_SERVER_TIMEOUT_SECONDS: ${AI_SERVER_TIMEOUT_SECONDS:-45}
+      LOCAL_MEDIA_DIR: /data/media
+      LOCAL_MEDIA_PUBLIC_PATH: /media
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:8000}
+      CORS_ORIGINS: ${CORS_ORIGINS:-[]}
+      # 카카오·구글 로그인. 비워 두면 그 버튼은 "준비 중"으로 보인다.
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:8090}
+      KAKAO_CLIENT_ID: ${KAKAO_CLIENT_ID:-}
+      KAKAO_CLIENT_SECRET: ${KAKAO_CLIENT_SECRET:-}
+      # 카카오 로그인 때 더 묻는 동의(account_email). 콘솔 동의항목에서 켠 것만(아니면 KOE205)
+      KAKAO_EXTRA_SCOPE: ${KAKAO_EXTRA_SCOPE:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      # 결제(토스페이먼츠). 비워 두면 결제를 열지 않는다(로컬 주소일 때만 시험 결제).
+      TOSS_CLIENT_KEY: ${TOSS_CLIENT_KEY:-}
+      TOSS_SECRET_KEY: ${TOSS_SECRET_KEY:-}
+      # 요금제·체험·대화 횟수(.env 의 값을 그대로 넘긴다. 초기 요금은 비우면 없음)
+      TRIAL_DAYS: ${TRIAL_DAYS:-7}
+      TRIAL_CONVERSATIONS: ${TRIAL_CONVERSATIONS:-30}
+      TRIAL_PERSONAS_PER_ACCOUNT: ${TRIAL_PERSONAS_PER_ACCOUNT:-1}
+      PLAN_MEMORIES_PRICE: ${PLAN_MEMORIES_PRICE:-9900}
+      PLAN_MEMORIES_BETA_PRICE: ${PLAN_MEMORIES_BETA_PRICE-4900}
+      PLAN_MEMORIES_CONVERSATIONS: ${PLAN_MEMORIES_CONVERSATIONS:-50}
+      PLAN_FAMILY_PRICE: ${PLAN_FAMILY_PRICE:-29900}
+      PLAN_FAMILY_BETA_PRICE: ${PLAN_FAMILY_BETA_PRICE-14900}
+      PLAN_FAMILY_CONVERSATIONS: ${PLAN_FAMILY_CONVERSATIONS:-300}
+      BETA_PRICING_OPEN: ${BETA_PRICING_OPEN:-true}
+      BETA_FAMILIES: ${BETA_FAMILIES:-100}
+      BETA_MONTHS: ${BETA_MONTHS:-12}
+      # 결제 전 모드(false = 구독 신청만, 무료 체험 한도 없음). 결제를 열 때 true + 다시 켜기
+      PAYMENTS_OPEN: ${PAYMENTS_OPEN:-false}
+      PRELAUNCH_CONVERSATIONS: ${PRELAUNCH_CONVERSATIONS:-}
+      # 가족 공유(함께할 가족 수·링크 시간). SHARE_OPEN=false 면 새 초대만 멈춘다
+      SHARE_MEMBERS_PER_PERSONA: ${SHARE_MEMBERS_PER_PERSONA:-5}
+      SHARE_LINK_HOURS: ${SHARE_LINK_HOURS:-168}
+      SHARE_OPEN: ${SHARE_OPEN:-true}
+      # '더 알려 주실 기억'(AI 서버를 먼저 올린 뒤 켠다)
+      GAP_QUESTIONS_ENABLED: ${GAP_QUESTIONS_ENABLED:-true}
+      VOICE_RETRAIN_ENABLED: ${VOICE_RETRAIN_ENABLED:-false}
+      # 운영 알림 메일(운영에서 둘 다 있을 때만 보낸다)
+      OPS_EMAIL_TO: ${OPS_EMAIL_TO:-}
+      MAIL_FROM: ${MAIL_FROM:-}
+      # 사업자 정보·동의문 자리표시(비우면 동의문에 '(준비 중)'·'(확인 중)')
+      BUSINESS_NAME: ${BUSINESS_NAME:-}
+      BUSINESS_OWNER: ${BUSINESS_OWNER:-}
+      BUSINESS_EMAIL: ${BUSINESS_EMAIL:-}
+      BUSINESS_PHONE: ${BUSINESS_PHONE:-}
+      BUSINESS_REG_NO: ${BUSINESS_REG_NO:-}
+      BUSINESS_ADDRESS: ${BUSINESS_ADDRESS:-}
+      MAIL_ORDER_NO: ${MAIL_ORDER_NO:-}
+      LEGAL_DATA_REGION: ${LEGAL_DATA_REGION:-}
+      # 고객센터(카카오톡 채널. .env 에 빈 값으로 두면 단추를 숨긴다)
+      KAKAO_CHANNEL_CHAT_URL: ${KAKAO_CHANNEL_CHAT_URL-https://pf.kakao.com/_nNwwX/chat}
+      SUPPORT_HOURS: ${SUPPORT_HOURS:-평일 10시~18시}
+      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-admin@talkto.dev}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-Admin1234!}
+    ports:
+      - "${API_PORT:-8000}:8000"
+    volumes:
+      - media_data:/data/media
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - backend
+
+volumes:
+  postgres_data:
+  media_data:
+
+networks:
+  backend:
+    driver: bridge
+

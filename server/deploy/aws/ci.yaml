@@ -1,0 +1,147 @@
+AWSTemplateFormatVersion: "2010-09-09"
+# GitHub 배포 버튼(talkto-deploy 레포)이 쓰는 역할. 대표님 컴퓨터에서 'deploy.py ci' 로 만든다.
+# 코드만 올린다: 소스 묶음 올리기·웹 파일 올리기·CloudFront 새로고침·서버에 명령 보내기.
+# 운영 설정·비밀값(Parameter Store·Secrets Manager·KMS)을 직접 읽지 못하고, 인프라도 못 바꾼다.
+# 다만 서버에 명령을 보낼 수 있어서(배포가 그렇게 돈다) 서버가 닿는 모든 것(운영 설정·DB 비밀번호·
+# 녹음)에 닿을 수 있다. 서버를 통째로 맡기는 것과 같다.
+# 믿을 수 있는 사람만 talkto-deploy 에 쓰기 권한을 준다(deploy/aws/ci/README.md).
+Description: TalkTo GitHub Actions deploy role (code only, no secrets)
+
+Parameters:
+  GitHubOrg:
+    Type: String
+    Default: MediLux-TalkTo
+  GitHubRepo:
+    Type: String
+    Default: talkto-deploy
+  # 이 브랜치의 작업만 받는다. 무료 요금제 비공개 레포에는 환경(environment) 보호 규칙이 없어, 환경 이름보다
+  # 브랜치가 더 좁다(다른 브랜치에서 워크플로를 고쳐 돌려도 역할을 받지 못한다)
+  GitHubBranch:
+    Type: String
+    Default: main
+    AllowedPattern: "^[A-Za-z0-9._/-]+$"
+  # 2026-07-15 뒤에 만든 레포는 OIDC sub 에 조직·레포 번호가 붙는다. deploy.py 가 gh 로 읽어 넣는다.
+  GitHubOrgId:
+    Type: String
+    AllowedPattern: "^[0-9]+$"
+    ConstraintDescription: GitHub 조직 번호(숫자)
+  GitHubRepoId:
+    Type: String
+    AllowedPattern: "^[0-9]+$"
+    ConstraintDescription: talkto-deploy 레포 번호(숫자)
+  # 계정에 GitHub OIDC 공급자가 없을 때만 true(계정에 하나만 둘 수 있다). deploy.py 가 정한다.
+  CreateOidcProvider:
+    Type: String
+    AllowedValues: ["true", "false"]
+    Default: "false"
+  MainStackName:
+    Type: String
+    Default: talkto-prod
+  ArtifactBucket:
+    Type: String
+  WebBucket:
+    Type: String
+  DistributionId:
+    Type: String
+  InstanceId:
+    Type: String
+
+Conditions:
+  MakeOidc: !Equals [!Ref CreateOidcProvider, "true"]
+
+Resources:
+  # 지문(ThumbprintList)은 넣지 않는다: IAM 이 GitHub 인증서를 스스로 확인한다.
+  GitHubOidc:
+    Type: AWS::IAM::OIDCProvider
+    Condition: MakeOidc
+    Properties:
+      Url: https://token.actions.githubusercontent.com
+      ClientIdList: [sts.amazonaws.com]
+
+  DeployRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: talkto-github-deploy
+      Description: TalkTo GitHub Actions deploy (code only)
+      MaxSessionDuration: 3600
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !If
+                - MakeOidc
+                - !Ref GitHubOidc
+                - !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com"
+            Action: sts:AssumeRoleWithWebIdentity
+            # 이 레포(번호까지)의 main 브랜치에서 돈 작업만. 다른 레포·포크·브랜치, 같은 이름으로
+            # 다시 만든 레포·조직은 못 받는다(와일드카드 없이 글자 그대로). 워크플로에 environment 를
+            # 두면 sub 가 환경 꼴로 바뀌어 받지 못하니 두지 않는다.
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+                token.actions.githubusercontent.com:sub: !Sub "repo:${GitHubOrg}@${GitHubOrgId}/${GitHubRepo}@${GitHubRepoId}:ref:refs/heads/${GitHubBranch}"
+      Policies:
+        - PolicyName: talkto-deploy-code-only
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              # 운영 스택의 출력(버킷·서버·배포 이름)만 읽는다
+              - Sid: ReadMainStackOutputs
+                Effect: Allow
+                Action: cloudformation:DescribeStacks
+                Resource: !Sub "arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${MainStackName}/*"
+              # 소스 묶음(be·ai.tar.gz) 올리기. 읽기·지우기는 못 한다.
+              - Sid: UploadSourceBundles
+                Effect: Allow
+                Action: s3:PutObject
+                Resource: !Sub "arn:${AWS::Partition}:s3:::${ArtifactBucket}/*"
+              # 웹·랜딩 파일 올리기·옛 파일 지우기(큰 파일은 나눠 올려서 중단 권한도)
+              - Sid: WebFiles
+                Effect: Allow
+                Action: [s3:PutObject, s3:DeleteObject, s3:AbortMultipartUpload]
+                Resource: !Sub "arn:${AWS::Partition}:s3:::${WebBucket}/*"
+              - Sid: WebList
+                Effect: Allow
+                Action: s3:ListBucket
+                Resource: !Sub "arn:${AWS::Partition}:s3:::${WebBucket}"
+              - Sid: RefreshCdn
+                Effect: Allow
+                Action: cloudfront:CreateInvalidation
+                Resource: !Sub "arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${DistributionId}"
+              # 운영 서버 한 대에만, 셸 명령 문서로만(빌드·교체·작업 확인)
+              - Sid: RunOnServer
+                Effect: Allow
+                Action: ssm:SendCommand
+                Resource:
+                  - !Sub "arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:instance/${InstanceId}"
+                  - !Sub "arn:${AWS::Partition}:ssm:${AWS::Region}::document/AWS-RunShellScript"
+              # 명령 결과·서버 연결 상태 보기(리소스를 좁힐 수 없는 API)
+              - Sid: ReadCommandResults
+                Effect: Allow
+                Action: [ssm:GetCommandInvocation, ssm:DescribeInstanceInformation]
+                Resource: "*"
+              # 혹시 다른 정책이 붙어도 비밀값·권한·인프라는 못 건드리게
+              - Sid: NeverSecretsOrInfra
+                Effect: Deny
+                Action:
+                  - ssm:GetParameter*
+                  - ssm:PutParameter
+                  - ssm:DeleteParameter*
+                  - ssm:StartSession
+                  - secretsmanager:*
+                  - kms:*
+                  - iam:*
+                  - sts:AssumeRole
+                  - cloudformation:Create*
+                  - cloudformation:Update*
+                  - cloudformation:Delete*
+                  - cloudformation:Execute*
+                  - ec2:*
+                  - rds:*
+                Resource: "*"
+
+Outputs:
+  RoleArn:
+    Description: talkto-deploy 의 변수 AWS_DEPLOY_ROLE_ARN 에 넣는다
+    Value: !GetAtt DeployRole.Arn

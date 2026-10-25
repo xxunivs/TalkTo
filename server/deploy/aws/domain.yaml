@@ -1,0 +1,54 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  TalkTo 도메인(us-east-1). Route 53 호스팅 영역과 CloudFront 용 https 인증서(ACM, 무료).
+  CloudFront 인증서는 us-east-1 에만 둘 수 있어서 서울 스택과 따로 둔다.
+  1단계(CreateCertificate=false): 호스팅 영역만 만든다 → 가비아에서 네임서버를 바꾼다.
+  2단계(true): 네임서버가 바뀐 뒤 인증서를 만든다. 확인용 DNS 기록은 CloudFormation 이 넣는다.
+
+Parameters:
+  DomainName:
+    Type: String
+    AllowedPattern: "^[a-z0-9.-]+$"
+  CreateCertificate:
+    Type: String
+    AllowedValues: ["true", "false"]
+    Default: "false"
+
+Conditions:
+  WantCertificate: !Equals [!Ref CreateCertificate, "true"]
+
+Resources:
+  # 도메인 DNS(한 달 $0.50). 지우면 네임서버가 바뀌어 사이트가 끊기므로 남긴다.
+  HostedZone:
+    Type: AWS::Route53::HostedZone
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      Name: !Ref DomainName
+      HostedZoneConfig:
+        Comment: TalkTo (deploy/aws/domain.yaml)
+  # talkto.co.kr(랜딩)·www, app.talkto.co.kr(앱)·www.app. 무료이고 만료 전에 AWS 가 알아서 갱신한다.
+  Certificate:
+    Type: AWS::CertificateManager::Certificate
+    Condition: WantCertificate
+    Properties:
+      DomainName: !Ref DomainName
+      SubjectAlternativeNames:
+        - !Sub "www.${DomainName}"
+        - !Sub "app.${DomainName}"
+        - !Sub "www.app.${DomainName}"
+      ValidationMethod: DNS
+      DomainValidationOptions:
+        - { DomainName: !Ref DomainName, HostedZoneId: !Ref HostedZone }
+        - { DomainName: !Sub "www.${DomainName}", HostedZoneId: !Ref HostedZone }
+        - { DomainName: !Sub "app.${DomainName}", HostedZoneId: !Ref HostedZone }
+        - { DomainName: !Sub "www.app.${DomainName}", HostedZoneId: !Ref HostedZone }
+
+Outputs:
+  HostedZoneId:
+    Value: !Ref HostedZone
+  NameServers:
+    Value: !Join [",", !GetAtt HostedZone.NameServers]
+  CertificateArn:
+    Condition: WantCertificate
+    Value: !Ref Certificate

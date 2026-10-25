@@ -1,0 +1,17 @@
+.env
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+*.py[cod]
+*.db
+*.egg-info/
+storage/
+
+# 로컬 설정은 올리지 않는다(예시 파일만 올린다)
+.env.*
+!.env.example
+!.env.docker.example
+
+# 사인한 원본이 섞이지 않게 확인 전까지는 올리지 않는다(빈 양식은 대표 확인 후 따로 올린다)
+app/static/posthumous_consent_form.pdf

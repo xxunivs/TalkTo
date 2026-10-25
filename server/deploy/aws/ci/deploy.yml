@@ -1,0 +1,167 @@
+# talkto-deploy 레포의 .github/workflows/deploy.yml 로 둔다(원본은 talkto_api_server/deploy/aws/ci/).
+# GitHub → talkto-deploy → Actions → 배포 → Run workflow. 쓰는 법은 같은 폴더 README.md.
+# 코드만 올린다. 운영 설정(.env)·인프라는 대표님 컴퓨터에서만 바꾼다.
+name: 배포
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "무엇을 올릴까요 (server=백엔드·AI 서버, web=웹 화면, landing=랜딩페이지, app=셋 다)"
+        type: choice
+        options: [server, web, landing, app]
+        default: server
+      ref:
+        description: "세 앱 레포(백엔드·AI·FE)에서 올릴 브랜치"
+        type: string
+        default: feat/persona-builder
+      force:
+        description: "돌고 있는 만들기 작업이 있어도 올리기(ignore running jobs, 그 작업은 끊겨요)"
+        type: boolean
+        default: false
+
+# 한 번에 하나만. 앞의 배포를 끊지 않고 기다린다.
+concurrency:
+  group: talkto-prod-deploy
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # main 에서 돈 작업만 AWS 역할을 받는다(ci.yaml). environment 를 두면 OIDC sub 가 바뀌어 받지 못한다
+    if: github.ref == 'refs/heads/main'
+    timeout-minutes: 60
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      # 입력은 환경 변수로만 넘긴다(스크립트에 그대로 끼워 넣지 않는다)
+      - name: 입력 확인
+        id: check
+        env:
+          TARGET: ${{ inputs.target }}
+          REF: ${{ inputs.ref }}
+        run: |
+          case "$TARGET" in
+            server|web|landing|app) ;;
+            *) echo "::error::무엇을 올릴지(target)는 server·web·landing·app 중 하나예요"; exit 1 ;;
+          esac
+          re='^[A-Za-z0-9][A-Za-z0-9._/-]{0,99}$'
+          if [[ ! "$REF" =~ $re ]] || [[ "$REF" == *..* ]] || [[ "$REF" == *//* ]] \
+            || [[ "$REF" == */ ]] || [[ "$REF" == *.lock ]] || [[ "$REF" == *. ]]; then
+            echo "::error::브랜치 이름이 올바르지 않아요(영문·숫자·. _ / - 만)"
+            exit 1
+          fi
+
+      - name: 백엔드 코드 받기
+        uses: actions/checkout@v4
+        with:
+          repository: MediLux-TalkTo/talkto_api_server
+          ref: ${{ inputs.ref }}
+          path: talkto_api_server
+          ssh-key: ${{ secrets.BE_DEPLOY_KEY }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      # AI 레포는 서버에 올리는 파일(deploy.py 의 AI_INCLUDE)만 받는다. 가족 녹음 등은 내용을 받지 않는다.
+      - name: AI 코드 받기(필요한 파일만)
+        uses: actions/checkout@v4
+        with:
+          repository: MediLux-TalkTo/TalkTo_PersonaAI_AI
+          ref: ${{ inputs.ref }}
+          path: TalkTo_PersonaAI_AI
+          ssh-key: ${{ secrets.AI_DEPLOY_KEY }}
+          fetch-depth: 1
+          persist-credentials: false
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /Dockerfile
+            /.dockerignore
+            /pyproject.toml
+            /README.md
+            /requirements.lock
+            /main.py
+            /infra/
+            /pipeline/
+            /orchestrator/
+            /prompts/
+
+      - name: FE 코드 받기
+        if: inputs.target != 'server'
+        uses: actions/checkout@v4
+        with:
+          repository: MediLux-TalkTo/TalkTo_PersonaAI_FE
+          ref: ${{ inputs.ref }}
+          path: TalkTo_PersonaAI_FE
+          ssh-key: ${{ secrets.FE_DEPLOY_KEY }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: boto3 설치
+        run: python -m pip install --disable-pip-version-check --quiet "boto3>=1.35,<2"
+
+      # 남이 만든 액션이라 커밋으로 고정한다(v2.23.0)
+      - name: Flutter 준비
+        if: inputs.target == 'web' || inputs.target == 'app'
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
+        with:
+          flutter-version: 3.29.3
+          channel: stable
+          cache: true
+
+      # AWS 열쇠는 저장해 두지 않는다. 이 작업만 1시간짜리 임시 권한(talkto-github-deploy 역할)을 받는다.
+      - name: AWS 권한 받기
+        id: aws
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          role-session-name: talkto-deploy-${{ github.run_id }}
+          role-duration-seconds: 3600
+          aws-region: ap-northeast-2
+
+      # 권한 받기가 실패하면 GitHub 가 보낸 sub(이 작업의 이름표)만 보여 준다. 토큰은 찍지 않는다.
+      # 'deploy.py ci' 가 찍은 '받는 작업' 과 글자 하나까지 같아야 한다.
+      - name: 권한 받기 실패 원인 보기
+        if: failure() && steps.aws.outcome == 'failure'
+        run: |
+          python - <<'PY'
+          import base64, json, os, urllib.request
+          url = os.environ["ACTIONS_ID_TOKEN_REQUEST_URL"] + "&audience=sts.amazonaws.com"
+          auth = {"Authorization": "Bearer " + os.environ["ACTIONS_ID_TOKEN_REQUEST_TOKEN"]}
+          with urllib.request.urlopen(urllib.request.Request(url, headers=auth), timeout=20) as r:
+              body = json.load(r)["value"].split(".")[1]
+          claims = json.loads(base64.urlsafe_b64decode(body + "=" * (-len(body) % 4)))
+          print("::error::GitHub 가 보낸 sub: " + str(claims.get("sub")))
+          print("talkto-ci 역할의 '받는 작업'과 같아야 해요. 이 줄을 대표님에게 보여 주세요.")
+          PY
+
+      - name: 배포
+        env:
+          TALKTO_CI: "1"
+          TARGET: ${{ inputs.target }}
+          TALKTO_FORCE: ${{ inputs.force && '1' || '0' }}
+          PYTHONIOENCODING: utf-8
+          PYTHONUNBUFFERED: "1"
+          GIT_NO_LAZY_FETCH: "1"
+          DISCORD_DEPLOY_WEBHOOK_URL: ${{ secrets.DISCORD_DEPLOY_WEBHOOK_URL }}
+        run: python talkto_api_server/deploy/aws/deploy.py "$TARGET"
+
+      - name: 요약
+        if: always() && steps.check.outcome == 'success'
+        env:
+          TARGET: ${{ inputs.target }}
+          REF: ${{ inputs.ref }}
+          FORCE: ${{ inputs.force && 'force' || '' }}
+          RESULT: ${{ job.status }}
+        run: |
+          case "$RESULT" in success) mark="✅ 완료" ;; cancelled) mark="⏹ 취소" ;; *) mark="❌ 실패" ;; esac
+          # 다시 돌리기는 GITHUB_ACTOR 가 처음 누른 사람으로 남는다
+          who="${GITHUB_TRIGGERING_ACTOR:-$GITHUB_ACTOR}"
+          echo "### 배포 ${mark}: \`${TARGET}\` · 브랜치 \`${REF}\` · ${who} ${FORCE}" >> "$GITHUB_STEP_SUMMARY"

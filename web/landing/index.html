@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TalkTo · 가장 듣고 싶은 목소리, 그 사람다움 그대로</title>
+  <meta name="description" content="그리운 가족이 남긴 통화 녹음과 몇 가지 질문이면 충분해요. 그분 목소리와 말투, 기억을 담은 AI 대화 상대와 다시 이야기 나눠 보세요. 지금은 베타라 무료로 써 보실 수 있어요." />
+  <link rel="canonical" href="https://talkto.co.kr/" />
+  <meta name="theme-color" content="#F4F1EA" />
+  <!-- 네이버 서치어드바이저 사이트 소유 확인 -->
+  <meta name="naver-site-verification" content="2abd2ed95de1bd1edd910bb6b38984f0641dd5d2" />
+  <!-- 구글 검색 결과 아이콘은 48의 배수 크기라야 쓴다 -->
+  <link rel="icon" href="/favicon.ico" sizes="any" />
+  <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48.png" />
+  <link rel="icon" type="image/png" sizes="96x96" href="/favicon-96.png" />
+  <link rel="icon" type="image/png" sizes="192x192" href="/img/icon-192.png" />
+  <link rel="apple-touch-icon" href="/img/icon-192.png" />
+
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="TalkTo" />
+  <meta property="og:title" content="TalkTo · 가장 듣고 싶은 목소리, 그 사람다움 그대로" />
+  <meta property="og:description" content="그리운 가족이 남긴 통화 녹음과 몇 가지 질문이면 충분해요. 그분 목소리와 말투, 기억을 담은 AI 대화 상대와 다시 이야기 나눠 보세요. 지금은 베타라 무료로 써 보실 수 있어요." />
+  <meta property="og:url" content="https://talkto.co.kr/" />
+  <meta property="og:image" content="https://talkto.co.kr/img/og.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+
+  <link rel="preload" href="/fonts/gowun-batang-bold.woff" as="font" type="font/woff" crossorigin />
+  <link rel="preload" href="/fonts/noto-sans-kr-regular.woff" as="font" type="font/woff" crossorigin />
+  <link rel="stylesheet" href="/style.css" />
+  <!-- 구글 검색 결과의 사이트 이름(talkto.co.kr 대신 TalkTo)과 로고 -->
+  <script type="application/ld+json">
+  {"@context": "https://schema.org", "@type": "WebSite", "name": "TalkTo", "alternateName": ["톡투", "TalkTo 톡투"], "url": "https://talkto.co.kr/"}
+  </script>
+  <script type="application/ld+json">
+  {"@context": "https://schema.org", "@type": "Organization", "name": "톡투", "alternateName": "TalkTo", "url": "https://talkto.co.kr/", "logo": "https://talkto.co.kr/img/icon-512.png", "email": "asktalktoteam@gmail.com"}
+  </script>
+  <!-- 스크립트가 돌 때만 천천히 나타나게 한다. 스크립트가 2.5초 안에 돌지 않으면 그냥 다 보인다. -->
+  <script>
+    document.documentElement.classList.add("js");
+    setTimeout(function () { if (!window.__ttReveal) document.documentElement.classList.remove("js"); }, 2500);
+  </script>
+</head>
+<body>
+  <a class="skip" href="#main">본문으로 건너뛰기</a>
+
+  <header class="top">
+    <div class="wrap top__inner">
+      <a class="brand" href="/" aria-label="TalkTo 처음으로">
+        <img src="/img/logo.svg" alt="TalkTo" width="112" height="27" />
+      </a>
+      <nav class="nav" aria-label="주요 메뉴">
+        <a href="#how">만드는 법</a>
+        <a href="#soul">그분다움</a>
+        <a href="#safe">안심</a>
+        <a href="#price">요금</a>
+        <a href="#faq">자주 묻는 질문</a>
+      </nav>
+      <a class="btn btn--small" href="https://app.talkto.co.kr/">시작하기</a>
+    </div>
+  </header>
+
+  <main id="main">
+    <!-- 첫 화면 -->
+    <section class="hero">
+      <div class="wrap hero__inner">
+        <div class="hero__text">
+          <p class="eyebrow">그리운 가족의 목소리로, 다시 나누는 대화</p>
+          <h1 class="display">가장 듣고 싶은 목소리,<br />그 사람다움 그대로</h1>
+          <p class="lead">
+            가지고 계신 통화 녹음과 몇 가지 질문이면 충분해요.
+            목소리도, 말투도, 기억도 담아 <span class="nw">그분과 다시 이야기 나눠 보세요.</span>
+          </p>
+          <div class="actions">
+            <a class="btn" href="https://app.talkto.co.kr/">무료로 시작하기</a>
+            <a class="btn btn--ghost" href="#how">어떻게 만드나요?</a>
+          </div>
+          <p class="note">지금은 베타예요 · 결제가 열리기 전까지 무료로 써 보실 수 있어요</p>
+          <p class="note"><a href="/privacy.html">개인정보 처리방침</a></p>
+        </div>
+
+        <figure class="hero__visual">
+          <div class="phone phone--hero">
+            <img src="/img/chat.webp" width="390" height="880" fetchpriority="high" alt="예시: 할머니와 나눈 대화 화면. 손녀가 승진했다고 하자 할머니가 '장하다 우리 지우'라고 대답하고, 아빠가 김치찌개를 먹고 싶어 한다는 말에 '정우가? 그 녀석 어릴 때부터 그거 참 좋아했제'라고 답한다." />
+          </div>
+          <div class="float float--a" aria-hidden="true">
+            <span class="float__icon"><svg viewBox="0 0 24 24"><path d="M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4" /></svg></span>
+            <span><b>그분 목소리로</b><br />대답을 들려 드려요</span>
+          </div>
+          <div class="float float--b" aria-hidden="true">
+            <span class="float__icon float__icon--clay"><svg viewBox="0 0 24 24"><circle cx="8" cy="8" r="3" /><circle cx="16" cy="9" r="2.5" /><path d="M3 20c0-3 2.5-5.5 5-5.5s5 2.5 5 5.5M13 20c0-2.5 1.5-4.5 3-4.5s4 2 4 4.5" /></svg></span>
+            <span><b>“아빠”는 큰아들 정우</b><br />가족 관계까지 알아들어요</span>
+          </div>
+          <figcaption class="caption">예시 화면이에요. 이름과 대화는 설명을 위해 지어 넣었고, 실제 대답은 녹음과 답에 따라 달라요.</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <!-- 마음 -->
+    <section class="quiet">
+      <div class="wrap quiet__inner reveal">
+        <p class="serif quote">
+          휴대폰 속에 남은 통화 녹음,<br />
+          다시 들어 볼 용기는 없어도<br />
+          지울 수는 없었던 목소리.
+        </p>
+        <p class="lead">TalkTo는 그 녹음 속 목소리와 말투, 가족만 아는 이야기를 모아
+          <span class="nw">그분이 하실 법한 말로</span> 다시 대답하는 대화 상대를 만들어 드려요.</p>
+      </div>
+    </section>
+
+    <!-- 만드는 법 -->
+    <section class="section" id="how">
+      <div class="wrap">
+        <header class="section__head reveal">
+          <p class="eyebrow">만드는 법</p>
+          <h2 class="title">세 단계면 그분과<br />다시 이야기할 수 있어요</h2>
+        </header>
+        <ol class="steps">
+          <li class="step reveal">
+            <div class="phone phone--step"><img src="/img/build.webp" width="390" height="844" loading="lazy" alt="예시: 녹음 속 말투와 이야기를 익히는 중이라는 안내와 63% 진행 막대가 보이는 화면" /></div>
+            <div class="step__text">
+              <span class="step__no">1</span>
+              <h3 class="heading">녹음을 올리면<br />바로 익히기 시작해요</h3>
+              <p>통화 녹음, 영상, 음성 메시지 모두 돼요. 그분 목소리가 또렷하게 1분 이상 담긴 녹음이 좋고, 다 합쳐 10초 이상이면 만들 수 있어요. 다른 사람 목소리가 섞여 있어도 괜찮아요. 사람별로 나눠 들려 드리면 그분 목소리를 골라 주세요.</p>
+            </div>
+          </li>
+          <li class="step reveal">
+            <div class="phone phone--step"><img src="/img/family.webp" width="390" height="844" loading="lazy" alt="예시: 그분이 알아야 할 가족을 적는 화면. 큰아들 김정우는 나에게 아빠, 딸 김정희는 고모, 남편 김만수는 돌아가셨다고 적혀 있다." /></div>
+            <div class="step__text">
+              <span class="step__no">2</span>
+              <h3 class="heading">질문에 답하며<br />그분을 알려 주세요</h3>
+              <p>가족 관계와 말투·입버릇, 성격, 고향과 하시던 일, 이럴 땐 뭐라고 하셨을지까지 여쭤봐요. 꼭 답할 건 몇 가지뿐이고, 나머지는 아는 것만 적어도 괜찮아요. 대화하다가 “아빠”, “고모”라고 해도 그분이 누구인지 알아들어요.</p>
+            </div>
+          </li>
+          <li class="step reveal">
+            <div class="phone phone--step"><img src="/img/home.webp" width="390" height="844" loading="lazy" alt="예시: 오늘은 누구와 이야기할까요? 라는 첫 화면에 할아버지, 엄마, 할머니가 대화 상대로 보인다." /></div>
+            <div class="step__text">
+              <span class="step__no">3</span>
+              <h3 class="heading">이야기 나눌 분을<br />골라 대화해요</h3>
+              <p>인사를 건네면 그분 말투로 대답하고, 원하시면 그분 목소리로 들려 드려요. 질문에 더 답하거나 녹음을 더할수록 더 그분다워져요.</p>
+            </div>
+          </li>
+        </ol>
+        <p class="caption">화면은 모두 예시예요 · 이름은 지어낸 거예요</p>
+      </div>
+    </section>
+
+    <!-- 그분다움 -->
+    <section class="section section--sunk" id="soul">
+      <div class="wrap">
+        <header class="section__head reveal">
+          <p class="eyebrow">그분다움</p>
+          <h2 class="title">목소리만 닮은 게 아니라,<br />그분다운 대답을 해요</h2>
+        </header>
+        <div class="cards">
+          <article class="card reveal">
+            <span class="card__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4" /></svg></span>
+            <h3 class="heading">목소리</h3>
+            <p>녹음 속 그분 목소리로 대답을 들려 드려요. 통화 녹음으로도 만들 수 있고, 녹음 음질에 따라 닮은 정도는 달라질 수 있어요.</p>
+          </article>
+          <article class="card reveal">
+            <span class="card__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 6h16v10H9l-5 4z" /><path d="M8 10h8M8 13h5" /></svg></span>
+            <h3 class="heading">말투</h3>
+            <p>자주 하시던 말, 사투리와 억양, 말끝을 맺는 버릇까지. “밥은 먹었나” 같은 그분의 말로 대답해요.</p>
+          </article>
+          <article class="card reveal">
+            <span class="card__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 4h12v16l-6-4-6 4z" /></svg></span>
+            <h3 class="heading">기억</h3>
+            <p>녹음과 답에 담긴 이야기와 추억을 기억해요. 모르는 일은 아는 척하지 않도록 만들었지만, 틀릴 때도 있어요.</p>
+          </article>
+          <article class="card reveal">
+            <span class="card__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="8" cy="8" r="3" /><circle cx="16" cy="9" r="2.5" /><path d="M3 20c0-3 2.5-5.5 5-5.5s5 2.5 5 5.5M13 20c0-2.5 1.5-4.5 3-4.5s4 2 4 4.5" /></svg></span>
+            <h3 class="heading">가족</h3>
+            <p>누가 누구인지, 그분이 각자를 어떻게 부르셨는지 알아요. 지금 대화하는 사람이 누구인지도 알고 대답해요.</p>
+          </article>
+        </div>
+
+        <figure class="browser reveal">
+          <div class="browser__bar" aria-hidden="true"><i></i><i></i><i></i><span>app.talkto.co.kr</span></div>
+          <img src="/img/chat_pc.webp" width="1440" height="900" loading="lazy" alt="예시: 컴퓨터 화면의 TalkTo. 왼쪽에 대화 상대 목록이, 오른쪽에 할머니와의 대화가 보인다." />
+          <figcaption>휴대폰에서도, 컴퓨터에서도 같은 대화를 이어 갈 수 있어요 <span class="fine">(예시 화면)</span></figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <!-- 안심 -->
+    <section class="section" id="safe">
+      <div class="wrap">
+        <header class="section__head reveal">
+          <p class="eyebrow">안심</p>
+          <h2 class="title">소중한 목소리라서,<br />더 조심스럽게 다뤄요</h2>
+        </header>
+        <ul class="safe">
+          <li class="reveal"><h3 class="heading">먼저 여쭙고 시작해요</h3><p>녹음을 올리기 전, 목소리를 만들기 전마다 무엇을 하는지 알려 드리고 동의를 받아요. 살아 계신 분은 그분이 직접 말씀하시는 동의 녹음을 TalkTo가 확인한 뒤에 만들어요.</p></li>
+          <li class="reveal"><h3 class="heading">AI라는 걸 늘 알려 드려요</h3><p>대답과 목소리는 AI가 만든 거예요. 대화 화면에 늘 적어 두고, 그분을 되살리거나 대신하는 게 아니라는 것도 분명히 알려 드려요.</p></li>
+          <li class="reveal"><h3 class="heading">녹음은 서울 서버에<br />암호화해 보관해요</h3><p>글로 옮기고 목소리를 만드는 동안에는 해외 AI 회사로 보내 처리하고(대답을 그분 목소리로 읽을 때는 대답할 글을 보내요), 시작하기 전에 따로 알려 드리고 확인과 동의를 받아요. 대화 상대를 지우시면 TalkTo에 있는 녹음과 대화는 바로 지우고, 서버 백업에 남은 것도 최대 7일 뒤 저절로 지워져요.</p></li>
+          <li class="reveal"><h3 class="heading">가족의 사생활은 지켜요</h3><p>살아 계신 가족의 주소·직장·학교·건강 같은 이야기는 먼저 꺼내거나 지어내지 않아요. 조심할 이야기는 직접 정할 수 있어요.</p></li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- 요금 -->
+    <section class="section section--sunk" id="price">
+      <div class="wrap">
+        <header class="section__head reveal">
+          <p class="eyebrow">요금</p>
+          <h2 class="title">지금은 무료로 <span class="nw">써 보실 수 있어요</span></h2>
+          <p class="lead">결제가 열리기 전까지는 계정 하나에 대화 상대 3명까지, 대화 상대마다 다 만든 날부터 30일마다 대화 200번까지 무료예요. 다 쓰면 목소리 대신 글로 대답해요. 결제가 열리면 무료 사용은 끝나고, 대화 상대 1명을 7일 동안 무료로 써 보신 뒤 요금제를 고르시면 돼요. 지금 미리 신청해 두시면 결제가 열릴 때 알려 드려요. 신청만으로는 돈이 나가지 않아요.</p>
+        </header>
+        <div class="plans">
+          <article class="plan reveal" data-plan="memories">
+            <h3 class="heading">추억</h3>
+            <p class="plan__chip" data-beta>첫 100가족 · 12개월 할인가</p>
+            <p class="plan__price"><b data-price>4,900원</b> / 월</p>
+            <p class="plan__was" data-was>정식 요금 월 9,900원</p>
+            <ul><li data-count>한 달 대화 50번</li><li>그분 목소리로 대답해요</li><li>질문 답·녹음·남긴 글을 더할수록 더 그분다워져요</li></ul>
+            <a class="btn btn--ghost btn--small plan__cta" href="https://app.talkto.co.kr/#/plans">미리 신청하기</a>
+          </article>
+          <article class="plan reveal" data-plan="family">
+            <h3 class="heading">가족</h3>
+            <p class="plan__chip" data-beta>첫 100가족 · 12개월 할인가</p>
+            <p class="plan__price"><b data-price>14,900원</b> / 월</p>
+            <p class="plan__was" data-was>정식 요금 월 29,900원</p>
+            <ul><li data-count>한 달 대화 300번</li><li>추억 요금제의 모든 것</li><li>가족을 초대해 함께 대화하기</li></ul>
+            <a class="btn btn--ghost btn--small plan__cta" href="https://app.talkto.co.kr/#/plans">미리 신청하기</a>
+          </article>
+        </div>
+        <p class="fine center">대화 상대 1명 기준 월 요금이에요. 할인가는 처음 100가족이 할인가로 처음 결제한 날부터 12개월 동안 받아요. 끝나기 30일 전에 알려 드리고, 동의하시면 정식 요금으로 이어지며 동의하지 않으시면 할인이 끝난 뒤 처음 돌아오는 결제일에 구독이 끝나요. 출시 때 가격이라 바뀔 수 있어요. 해지와 결제 취소는 <a href="/refund.html">환불 정책</a>을 따라요.</p>
+      </div>
+    </section>
+
+    <!-- 자주 묻는 질문 -->
+    <section class="section" id="faq">
+      <div class="wrap faq-wrap">
+        <header class="section__head faq-head reveal">
+          <p class="eyebrow">자주 묻는 질문</p>
+          <h2 class="title">궁금하신 것들</h2>
+        </header>
+        <div class="faq">
+          <details class="reveal"><summary>녹음은 얼마나 있어야 하나요?</summary><p>그분 목소리가 또렷하게 1분 이상 담긴 녹음이 좋아요. 녹음이 짧아도 다 합쳐 그분 목소리가 10초 이상이면 만들 수 있어요. 녹음이 많을수록 말투와 이야기를 더 잘 익혀요.</p></details>
+          <details class="reveal"><summary>오래된 통화 녹음도 되나요?</summary><p>네. 휴대폰 통화 녹음, 영상, 음성 메시지 모두 올리실 수 있어요. 여러 사람 목소리가 섞여 있으면 사람별로 나눠 드리고, 고르신 그분 목소리로만 목소리를 만들어요. 다른 분 말씀도 이야기를 익히는 데는 쓰여요. 영상은 소리만 뽑아 쓰고 원본 영상은 지워요.</p></details>
+          <details class="reveal"><summary>실제 그분인가요?</summary><p>아니요. 녹음과 적어 주신 답을 바탕으로 AI가 그분이 하실 법한 대답을 만들어요. 그분을 되살리거나 대신하는 게 아니에요. 대화 화면에 늘 ‘대답과 목소리는 AI가 만들어요’라고 적어 두고, 대답은 사실과 다를 수 있어요.</p></details>
+          <details class="reveal"><summary>모르는 이야기를 지어내지는 않나요?</summary><p>녹음과 답에 없는 일은 아는 척하지 않도록 만들었어요. 그래도 틀린 대답이 나올 수 있어요. 대답 아래 작은 단추(⋯)에서 ‘말투가 달라요’·‘내용이 틀려요’를 고르고 그분이라면 어떻게 말하셨을지 한 줄 적어 주시거나, ‘정보 고치기’와 ‘기억 더 채우기’로 바로잡을 수 있어요.</p></details>
+          <details class="reveal"><summary>살아 계신 분도 만들 수 있나요?</summary><p>네, 부모님이나 나 자신의 대화 상대도 만들 수 있어요. 다만 살아 계신 분은 그분 본인이 직접 듣고 허락하셔야 해요. 앱이 보여 주는 대본대로 그분이 직접 말씀하시는 '동의 녹음'을 받고, TalkTo가 확인한 뒤에야 그분 녹음을 처리해요. 가족이 대신 허락할 수 없어요. 만 19세 미만 자녀는 그 아이의 부모님만 요건을 갖춰 만들 수 있어요. 지금은 준비 중이라 만 14세 미만 대화 상대는 만들 수 없어요.</p></details>
+          <details class="reveal"><summary>올린 녹음은 어떻게 되나요?</summary><p>서울 서버에 암호화해 보관해요(글로 옮기고 목소리를 만들 때는 해외 AI 회사로 보내 처리해요). 대화 상대를 지우거나 탈퇴하시면 TalkTo에 있는 녹음과 대화 기록은 바로 지우고, 목소리를 만든 회사에도 지워 달라고 요청해요. TalkTo에는 법으로 보관해야 하는 결제 기록과, 이름·이메일을 지운 동의·이용 기록만 남아요. 다만 녹음을 보낸 해외 회사에는 그 회사 정책에 따라 보낸 녹음과 그분 목소리로 이미 만든 음성이 백업 등에 얼마 동안 남을 수 있고, 그 회사가 받은 자료를 서비스와 AI 모델을 나아지게 하는 데 쓸 수도 있어요(자세한 내용은 <a href="/privacy.html">개인정보 처리방침</a>). TalkTo에서 지운 자료도 서버 백업에는 최대 7일 남았다가 지워져요.</p></details>
+          <details class="reveal"><summary>마음이 많이 힘들 때 써도 될까요?</summary><p>TalkTo는 치료나 상담 서비스가 아니에요. 그리움을 나누는 데 작은 도움이 되길 바라지만, 마음이 많이 힘드시면 가까운 분이나 전문가에게 꼭 도움을 청해 주세요(자살예방상담전화 109).</p></details>
+        </div>
+      </div>
+    </section>
+
+    <!-- 마지막 -->
+    <section class="cta">
+      <div class="wrap cta__inner reveal">
+        <img class="cta__mark" src="/img/mark.svg" alt="" width="34" height="48" />
+        <h2 class="display display--small">오늘, 그분께 먼저<br />인사를 건네 보세요</h2>
+        <p class="lead">카카오·구글·이메일로 바로 시작할 수 있어요.</p>
+        <a class="btn btn--large" href="https://app.talkto.co.kr/">무료로 시작하기</a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <div class="wrap foot__inner">
+      <div>
+        <img src="/img/logo.svg" alt="TalkTo" width="96" height="23" />
+        <p class="foot__biz" data-business>상호 톡투 · 대표 이준혁 · 사업자등록번호 295-63-00957 · 통신판매업 신고번호 제2026-서울용산-1112호<br />이메일 asktalktoteam@gmail.com · 호스팅 제공 Amazon Web Services(AWS)</p>
+      </div>
+      <nav class="foot__links" aria-label="약관과 안내">
+        <a href="/terms.html">이용약관</a>
+        <a href="/refund.html">환불 정책</a>
+        <a href="/privacy.html"><strong>개인정보 처리방침</strong></a>
+        <a href="https://app.talkto.co.kr/">앱 열기</a>
+      </nav>
+    </div>
+    <p class="wrap foot__copy">© <span data-year>2026</span> TalkTo · 대답과 목소리는 AI가 만들어요 · 치료나 상담 서비스가 아니에요.</p>
+  </footer>
+
+  <script src="/main.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,608 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  TalkTo 운영(서울). CloudFront 한 주소 아래 웹(S3)과 API(EC2 한 대의 도커: 백엔드 + AI 서버),
+  RDS PostgreSQL, 녹음 S3. 서버는 우리 CloudFront 에서 오는 요청만 받고 SSH 는 열지 않는다(SSM 으로 관리).
+
+Parameters:
+  Project:
+    Type: String
+    Default: talkto
+    AllowedPattern: "^[a-z][a-z0-9-]{1,20}$"
+  InstanceType:
+    Type: String
+    Default: t4g.medium
+    Description: >
+      백엔드 + AI 서버. 평소 1.1GB, 목소리 묶기 때 1GB 가까이 더 쓴다. 4GB + 스왑 4GB 면 넉넉하다.
+      t4g(ARM)가 같은 4GB 중 가장 싸다. 바꾸면 deploy.py 가 아키텍처에 맞는 OS 이미지를 고른다.
+  DBInstanceClass:
+    Type: String
+    Default: db.t4g.micro
+  DBPassword:
+    Type: String
+    NoEcho: true
+    MinLength: 20
+    Description: deploy.py 가 만들어 Parameter Store(/<Project>/prod/generated)에 둔다.
+  CloudFrontPrefixListId:
+    Type: String
+    Description: com.amazonaws.global.cloudfront.origin-facing 관리형 목록 id(deploy.py 가 찾는다).
+  ServerAmiId:
+    Type: AWS::EC2::Image::Id
+    Description: >
+      서버 OS 이미지. deploy.py 가 처음엔 최신 Amazon Linux 2023 을, 그 뒤로는 지금 서버의 것을 그대로 넣는다
+      (최신을 매번 찾으면 새 이미지가 나올 때마다 서버가 통째로 바뀐다).
+  ApiOriginMode:
+    Type: String
+    Default: vpc
+    AllowedValues: [vpc, public]
+    Description: >
+      vpc 면 CloudFront 가 AWS 안쪽 길(VPC 오리진)로 서버 사설 IP 에 닿는다(추가 요금 없음).
+      public 은 예전 방식(서버 공개 주소, http)으로 되돌릴 때만 쓴다.
+  VpcOriginSecurityGroupId:
+    Type: String
+    Default: none
+    AllowedPattern: "^(none|sg-[0-9a-f]{8,17})$"
+    Description: >
+      CloudFront 가 VPC 오리진을 만들며 이 VPC 에 스스로 만드는 보안 그룹(CloudFront-VPCOrigins-Service-SG)의 id.
+      deploy.py 가 찾아 넣는다. none 이면 서버 입구를 잠시 CloudFront 관리형 IP 목록으로 연다.
+  # 우리 도메인(talkto.co.kr). 앱은 app.talkto.co.kr. domain.yaml(us-east-1)의 호스팅 영역·인증서를 deploy.py 가 넣는다.
+  # 셋 중 하나라도 비면 CloudFront 기본 주소(xxxx.cloudfront.net)만 쓴다.
+  SiteDomain:
+    Type: String
+    Default: ""
+  SiteHostedZoneId:
+    Type: String
+    Default: ""
+  SiteCertificateArn:
+    Type: String
+    Default: ""
+  LegacyHostRedirect:
+    Type: String
+    Default: "off"
+    AllowedValues: ["off", "on"]
+    Description: >
+      on 이면 옛 주소(xxxx.cloudfront.net)로 온 웹 화면도 앱 주소로 넘긴다. 새 DNS 가 국내 통신사까지
+      다 퍼진 뒤(하루 이틀) 켠다. 그 전엔 옛 주소도 앱을 그대로 보여 준다.
+
+Conditions:
+  UseVpcOrigin: !Equals [!Ref ApiOriginMode, vpc]
+  LockToVpcOrigin: !And
+    - !Condition UseVpcOrigin
+    - !Not [!Equals [!Ref VpcOriginSecurityGroupId, none]]
+  HasDomain: !And
+    - !Not [!Equals [!Ref SiteDomain, ""]]
+    - !Not [!Equals [!Ref SiteHostedZoneId, ""]]
+    - !Not [!Equals [!Ref SiteCertificateArn, ""]]
+
+Resources:
+  # ── 네트워크 ─────────────────────────────────────────────
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.20.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags: [{ Key: Name, Value: !Sub "${Project}-vpc" }]
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+  GatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties: { VpcId: !Ref Vpc, InternetGatewayId: !Ref InternetGateway }
+  SubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: 10.20.1.0/24
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      MapPublicIpOnLaunch: true
+      Tags: [{ Key: Name, Value: !Sub "${Project}-a" }]
+  SubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: 10.20.2.0/24
+      AvailabilityZone: !Select [2, !GetAZs ""]
+      MapPublicIpOnLaunch: true
+      Tags: [{ Key: Name, Value: !Sub "${Project}-c" }]
+  RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties: { VpcId: !Ref Vpc }
+  DefaultRoute:
+    Type: AWS::EC2::Route
+    DependsOn: GatewayAttachment
+    Properties: { RouteTableId: !Ref RouteTable, DestinationCidrBlock: 0.0.0.0/0, GatewayId: !Ref InternetGateway }
+  SubnetARoute:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: { SubnetId: !Ref SubnetA, RouteTableId: !Ref RouteTable }
+  SubnetBRoute:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: { SubnetId: !Ref SubnetB, RouteTableId: !Ref RouteTable }
+  # 서버 ↔ S3 를 AWS 안쪽 길로(게이트웨이 엔드포인트는 무료)
+  S3Endpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref Vpc
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.s3"
+      VpcEndpointType: Gateway
+      RouteTableIds: [!Ref RouteTable]
+
+  # 서버: 80번만, 우리 CloudFront(VPC 오리진)에서 오는 것만. 나가는 것(OpenAI·ElevenLabs·MiniMax·S3)은 연다.
+  ServerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: TalkTo API (CloudFront only)
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - !If
+          - LockToVpcOrigin
+          - { IpProtocol: tcp, FromPort: 80, ToPort: 80, SourceSecurityGroupId: !Ref VpcOriginSecurityGroupId }
+          - { IpProtocol: tcp, FromPort: 80, ToPort: 80, SourcePrefixListId: !Ref CloudFrontPrefixListId }
+  DatabaseSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: TalkTo DB (server only)
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, SourceSecurityGroupId: !Ref ServerSecurityGroup }
+
+  # ── 데이터베이스 ─────────────────────────────────────────
+  DatabaseSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: TalkTo DB subnets
+      SubnetIds: [!Ref SubnetA, !Ref SubnetB]
+  Database:
+    Type: AWS::RDS::DBInstance
+    DeletionPolicy: Snapshot
+    UpdateReplacePolicy: Snapshot
+    Properties:
+      DBInstanceIdentifier: !Sub "${Project}-db"
+      Engine: postgres
+      EngineVersion: "16"
+      DBInstanceClass: !Ref DBInstanceClass
+      AllocatedStorage: "20"
+      MaxAllocatedStorage: 100
+      StorageType: gp3
+      StorageEncrypted: true
+      DBName: talkto
+      MasterUsername: talkto
+      MasterUserPassword: !Ref DBPassword
+      DBSubnetGroupName: !Ref DatabaseSubnetGroup
+      VPCSecurityGroups: [!Ref DatabaseSecurityGroup]
+      PubliclyAccessible: false
+      MultiAZ: false
+      BackupRetentionPeriod: 7
+      DeletionProtection: true
+      AutoMinorVersionUpgrade: true
+      CopyTagsToSnapshot: true
+
+  # ── 저장소 ───────────────────────────────────────────────
+  # 녹음·목소리·서류. 공개하지 않고, 서버가 만든 만료 주소로만 열린다.
+  MediaBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: RetainExceptOnCreate   # 처음 만들다 실패하면 빈 버킷은 지운다(다시 만들 때 이름이 겹치지 않게)
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Sub "${Project}-media-${AWS::AccountId}"
+      BucketEncryption:
+        ServerSideEncryptionConfiguration: [{ ServerSideEncryptionByDefault: { SSEAlgorithm: AES256 } }]
+      PublicAccessBlockConfiguration:
+        { BlockPublicAcls: true, BlockPublicPolicy: true, IgnorePublicAcls: true, RestrictPublicBuckets: true }
+      OwnershipControls: { Rules: [{ ObjectOwnership: BucketOwnerEnforced }] }
+      CorsConfiguration:
+        CorsRules:
+          - { AllowedMethods: [GET, HEAD], AllowedOrigins: ["*"], AllowedHeaders: ["*"], MaxAge: 3600 }
+  MediaBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref MediaBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: "*"
+            Action: "s3:*"
+            Resource: [!GetAtt MediaBucket.Arn, !Sub "${MediaBucket.Arn}/*"]
+            Condition: { Bool: { "aws:SecureTransport": "false" } }
+  # 배포할 소스 묶음(서버가 받아 도커로 빌드). 30일 뒤 지운다.
+  ArtifactBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${Project}-deploy-${AWS::AccountId}"
+      BucketEncryption:
+        ServerSideEncryptionConfiguration: [{ ServerSideEncryptionByDefault: { SSEAlgorithm: AES256 } }]
+      PublicAccessBlockConfiguration:
+        { BlockPublicAcls: true, BlockPublicPolicy: true, IgnorePublicAcls: true, RestrictPublicBuckets: true }
+      OwnershipControls: { Rules: [{ ObjectOwnership: BucketOwnerEnforced }] }
+      LifecycleConfiguration:
+        Rules: [{ Id: expire, Status: Enabled, ExpirationInDays: 30 }]
+  ArtifactBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref ArtifactBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: "*"
+            Action: "s3:*"
+            Resource: [!GetAtt ArtifactBucket.Arn, !Sub "${ArtifactBucket.Arn}/*"]
+            Condition: { Bool: { "aws:SecureTransport": "false" } }
+  # 웹 화면(Flutter). CloudFront 만 읽는다.
+  WebBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${Project}-web-${AWS::AccountId}"
+      BucketEncryption:
+        ServerSideEncryptionConfiguration: [{ ServerSideEncryptionByDefault: { SSEAlgorithm: AES256 } }]
+      PublicAccessBlockConfiguration:
+        { BlockPublicAcls: true, BlockPublicPolicy: true, IgnorePublicAcls: true, RestrictPublicBuckets: true }
+      OwnershipControls: { Rules: [{ ObjectOwnership: BucketOwnerEnforced }] }
+  WebBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref WebBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: cloudfront.amazonaws.com }
+            Action: s3:GetObject
+            Resource: !Sub "${WebBucket.Arn}/*"
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${Distribution}"
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: "*"
+            Action: "s3:*"
+            Resource: [!GetAtt WebBucket.Arn, !Sub "${WebBucket.Arn}/*"]
+            Condition: { Bool: { "aws:SecureTransport": "false" } }
+
+  # ── 로그 ─────────────────────────────────────────────────
+  # 2주만 둔다(개인정보는 남기지 않지만, 접속 기록도 오래 둘 이유가 없다)
+  BackendLogs:
+    Type: AWS::Logs::LogGroup
+    Properties: { LogGroupName: !Sub "/${Project}/backend", RetentionInDays: 14 }
+  AiLogs:
+    Type: AWS::Logs::LogGroup
+    Properties: { LogGroupName: !Sub "/${Project}/ai", RetentionInDays: 14 }
+
+  # ── 서버 ─────────────────────────────────────────────────
+  ServerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement: [{ Effect: Allow, Principal: { Service: ec2.amazonaws.com }, Action: sts:AssumeRole }]
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Policies:
+        - PolicyName: talkto-server
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [s3:GetObject, s3:PutObject, s3:DeleteObject]
+                Resource: !Sub "${MediaBucket.Arn}/*"
+              - Effect: Allow
+                Action: s3:ListBucket
+                Resource: !GetAtt MediaBucket.Arn
+              - Effect: Allow
+                Action: s3:GetObject
+                Resource: !Sub "${ArtifactBucket.Arn}/*"
+              # 운영 설정(SecureString). 기본 aws/ssm 키라 KMS 권한은 따로 필요 없다.
+              - Effect: Allow
+                Action: ssm:GetParameter
+                Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${Project}/prod/*"
+              - Effect: Allow
+                Action: [logs:CreateLogStream, logs:PutLogEvents, logs:DescribeLogStreams]
+                Resource: [!GetAtt BackendLogs.Arn, !GetAtt AiLogs.Arn, !Sub "${BackendLogs.Arn}:*", !Sub "${AiLogs.Arn}:*"]
+              # 운영 알림 메일(app/services/mailer.py)을 우리 도메인(noreply@<도메인>)으로만 보낸다.
+              # 보내는 주소를 noreply@ 하나로 묶는다(이 역할을 가진 다른 프로세스가 도메인의 아무
+              # 주소로나 보내지 못하게). SES 시험 모드(샌드박스)에서는 받는 주소의 확인된 identity 에도
+              # 권한을 본다(2026-10-24 asktalktoteam@gmail.com 으로 보낼 때 AccessDenied) — 그래서 이
+              # 계정의 identity 전부를 리소스로 두고, 보내는 주소는 아래 조건으로 묶는다.
+              - !If
+                - HasDomain
+                - Effect: Allow
+                  Action: ses:SendEmail
+                  Resource: !Sub "arn:aws:ses:${AWS::Region}:${AWS::AccountId}:identity/*"
+                  Condition:
+                    StringEquals:
+                      ses:FromAddress: !Sub "noreply@${SiteDomain}"
+                - !Ref AWS::NoValue
+  ServerInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties: { Roles: [!Ref ServerRole] }
+  Server:
+    Type: AWS::EC2::Instance
+    DependsOn: [DefaultRoute, SubnetARoute]   # 처음 켤 때 인터넷이 있어야 도커를 설치한다
+    Properties:
+      ImageId: !Ref ServerAmiId
+      InstanceType: !Ref InstanceType
+      SubnetId: !Ref SubnetA
+      SecurityGroupIds: [!Ref ServerSecurityGroup]
+      IamInstanceProfile: !Ref ServerInstanceProfile
+      MetadataOptions:
+        HttpTokens: required
+        # 백엔드 컨테이너의 boto3 가 IAM 역할을 읽게 2. AI 컨테이너·빌드는 run.sh 가 iptables 로 막는다.
+        HttpPutResponseHopLimit: 2
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs: { VolumeSize: 30, VolumeType: gp3, Encrypted: true, DeleteOnTermination: true }
+      Tags: [{ Key: Name, Value: !Sub "${Project}-server" }]
+      UserData:
+        Fn::Base64: |
+          #!/bin/bash
+          set -euxo pipefail
+          dnf install -y docker
+          systemctl enable --now docker
+          # 목소리 묶기·이미지 빌드 때 메모리가 모자라지 않게 스왑 4GB
+          if [ ! -f /swapfile ]; then
+            fallocate -l 4G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile
+            echo '/swapfile none swap sw 0 0' >> /etc/fstab
+          fi
+          mkdir -p /opt/talkto
+          touch /opt/talkto/.bootstrapped
+  # 나가는 길(외부 API 호출)의 고정 IP. 들어오는 길은 보안 그룹이 막는다.
+  ServerAddress:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      InstanceId: !Ref Server
+
+  # ── CloudFront: 한 주소(https) 아래 웹과 API ─────────────────
+  WebOriginAccess:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub "${Project}-web-oac"
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+  # CloudFront → 서버를 AWS 안쪽 길(서버 사설 IP:80)로. 추가 요금 없음.
+  # 주의: 배포에 붙은 VPC 오리진은 고칠 수 없다(CannotUpdateEntityWhileInUse). 서버가 통째로 바뀌는 변경
+  # (OS 이미지·아키텍처·디스크 크기)을 할 때는 README 의 '서버 통째로 바꾸기'를 따른다.
+  ApiVpcOrigin:
+    Type: AWS::CloudFront::VpcOrigin
+    Condition: UseVpcOrigin
+    Properties:
+      VpcOriginEndpointConfig:
+        Name: !Sub "${Project}-api"
+        Arn: !Sub "arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:instance/${Server}"
+        HTTPPort: 80
+        HTTPSPort: 443
+        OriginProtocolPolicy: http-only
+        OriginSSLProtocols: [TLSv1.2]
+  # 앱은 app.<도메인>, 랜딩은 도메인 자체. 같은 화면의 다른 주소는 대표 주소 하나로 한 번에 301(영구)로 넘긴다
+  # (검색 중복 정리. CloudFront Functions, 매달 200만 번까지 무료).
+  # - 도메인 자체: 랜딩 파일만 보인다. /index.html → /, /terms(/) → /terms.html, 그 밖의 주소는 앱으로
+  # - www: 도메인 자체와 같은 규칙으로 대표 주소에 바로
+  # - 어느 주소든 /_landing/… (S3 안쪽 자리)은 도메인 자체의 깨끗한 주소로
+  # - www.app: 앱으로
+  # - 옛 주소(cloudfront.net): LegacyHostRedirect=on 일 때만
+  # http://www 는 CloudFront 가 함수보다 먼저 https://www 로 넘겨 두 번 거친다(함수는 http 인지 모른다). 검색엔 해가 없다.
+  CanonicalHostRedirect:
+    Type: AWS::CloudFront::Function
+    Condition: HasDomain
+    Properties:
+      Name: !Sub "${Project}-canonical-host"
+      AutoPublish: true
+      FunctionConfig:
+        Comment: 도메인 자체는 랜딩(S3 _landing/), 앱은 app.도메인으로 모은다
+        Runtime: cloudfront-js-2.0
+      FunctionCode: !Sub |
+        function moved(location) {
+          return {
+            statusCode: 301,
+            statusDescription: 'Moved Permanently',
+            headers: { location: { value: location } }
+          };
+        }
+        // 랜딩의 대표 주소. 랜딩 파일이 아니면 ''(앱으로)
+        function landing(path) {
+          var bare = path.length > 1 && path.slice(-1) === '/' ? path.slice(0, -1) : path;
+          if (bare === '' || bare === '/' || bare === '/index.html') {
+            return '/';
+          }
+          // 확장자 없이 친 약관 주소(/terms, /refund, /privacy, 끝에 / 가 붙어도)는 약관 페이지로
+          var legal = { '/terms': '/terms.html', '/refund': '/refund.html', '/privacy': '/privacy.html' };
+          if (legal[bare]) {
+            return legal[bare];
+          }
+          // 랜딩 파일(/style.css, /img/…)만 여기서 보이고, 그 밖의 주소는 앱으로
+          return bare.lastIndexOf('.') > bare.lastIndexOf('/') ? bare : '';
+        }
+        function handler(event) {
+          var request = event.request;
+          var host = request.headers.host ? request.headers.host.value : '';
+          var site = '${SiteDomain}';
+          var app = 'app.' + site;
+          var legacy = host.slice(-15) === '.cloudfront.net';
+          var qs = request.rawQueryString();
+          qs = qs ? '?' + qs : '';
+          var uri = request.uri;
+          var inner = uri === '/_landing' || uri.indexOf('/_landing/') === 0;
+          // S3 안쪽 자리(/_landing/…)는 바깥 주소로 바꿔 판단한다
+          var path = inner ? uri.slice(9) : uri;
+          if (host === site || host === 'www.' + site || inner) {
+            var want = landing(path);
+            if (!want) {
+              return moved('https://' + app + (path || '/') + qs);
+            }
+            if (host !== site || want !== uri) {
+              return moved('https://' + site + want + qs);
+            }
+            request.uri = '/_landing' + (want === '/' ? '/index.html' : want);
+            return request;
+          }
+          if (host === app || (legacy && '${LegacyHostRedirect}' !== 'on')) {
+            return request;
+          }
+          return moved('https://' + app + uri + qs);
+        }
+  # 검색에는 도메인 자체(랜딩)만 싣는다. 앱·www.app·옛 주소의 응답엔 noindex 를 붙인다
+  # (앱 화면, 앱 주소로 본 랜딩 사본이 같은 내용의 중복 페이지로 잡히지 않게).
+  # 캐시는 주소(host)를 가리지 않아 응답마다 여기서 붙인다. 오리진이 4xx·5xx 를 주면 돌지 않는다(어차피 색인 안 됨).
+  # /api/* 에는 붙이지 않는다: 앱이 부르는 JSON·음성이라 검색 대상이 아니고, API 길에 함수를 더하지 않는다.
+  OffSiteNoIndex:
+    Type: AWS::CloudFront::Function
+    Condition: HasDomain
+    Properties:
+      Name: !Sub "${Project}-offsite-noindex"
+      AutoPublish: true
+      FunctionConfig:
+        Comment: 도메인 자체가 아닌 주소의 응답은 검색 제외(x-robots-tag noindex)
+        Runtime: cloudfront-js-2.0
+      FunctionCode: !Sub |
+        function handler(event) {
+          var response = event.response;
+          var host = event.request.headers.host;
+          // host 를 모르면 건드리지 않는다(랜딩이 검색에서 빠지는 쪽보다 낫다)
+          if (host && host.value !== '${SiteDomain}') {
+            response.headers['x-robots-tag'] = { value: 'noindex' };
+          }
+          return response;
+        }
+  Distribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Comment: !Sub "${Project} web + api"
+        # 랜딩페이지(도메인 자체·www)를 따로 올리면 그 두 주소는 여기서 빼고 랜딩 쪽에 붙인다
+        Aliases: !If
+          - HasDomain
+          - [!Sub "app.${SiteDomain}", !Sub "www.app.${SiteDomain}", !Ref SiteDomain, !Sub "www.${SiteDomain}"]
+          - !Ref AWS::NoValue
+        ViewerCertificate: !If
+          - HasDomain
+          - { AcmCertificateArn: !Ref SiteCertificateArn, SslSupportMethod: sni-only, MinimumProtocolVersion: TLSv1.2_2021 }
+          - { CloudFrontDefaultCertificate: true }
+        HttpVersion: http2and3
+        IPV6Enabled: true
+        PriceClass: PriceClass_200
+        DefaultRootObject: index.html
+        Origins:
+          - Id: web
+            DomainName: !GetAtt WebBucket.RegionalDomainName
+            S3OriginConfig: { OriginAccessIdentity: "" }
+            OriginAccessControlId: !GetAtt WebOriginAccess.Id
+          - Id: api
+            DomainName: !If
+              - UseVpcOrigin
+              - !GetAtt Server.PrivateDnsName
+              # 고정 IP 의 공개 DNS 이름(ec2-1-2-3-4.ap-northeast-2.compute.amazonaws.com)
+              - !Join
+                - ""
+                - - "ec2-"
+                  - !Join ["-", !Split [".", !Ref ServerAddress]]
+                  - !Sub ".${AWS::Region}.compute.amazonaws.com"
+            VpcOriginConfig: !If
+              - UseVpcOrigin
+              # 큰 녹음을 받아 S3 에 넣는 동안 60초가 넘을 수 있다. VPC 오리진은 120초까지 기다릴 수 있다.
+              - { VpcOriginId: !GetAtt ApiVpcOrigin.Id, OriginReadTimeout: 120, OriginKeepaliveTimeout: 60 }
+              - !Ref AWS::NoValue
+            CustomOriginConfig: !If
+              - UseVpcOrigin
+              - !Ref AWS::NoValue
+              - { HTTPPort: 80, OriginProtocolPolicy: http-only, OriginReadTimeout: 60, OriginKeepaliveTimeout: 60 }
+        # 보안 헤더(HSTS·nosniff·frame 막기·referrer)는 관리형 SecurityHeadersPolicy 로 붙인다(무료)
+        DefaultCacheBehavior:
+          TargetOriginId: web
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods: [GET, HEAD]
+          CachedMethods: [GET, HEAD]
+          Compress: true
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6          # Managed-CachingOptimized
+          ResponseHeadersPolicyId: 67f7725c-6f97-4210-82d7-5512b31e9d03 # Managed-SecurityHeadersPolicy
+          FunctionAssociations: !If
+            - HasDomain
+            - - { EventType: viewer-request, FunctionARN: !GetAtt CanonicalHostRedirect.FunctionARN }
+              - { EventType: viewer-response, FunctionARN: !GetAtt OffSiteNoIndex.FunctionARN }
+            - !Ref AWS::NoValue
+        CacheBehaviors:
+          - PathPattern: /api/*
+            TargetOriginId: api
+            ViewerProtocolPolicy: https-only
+            AllowedMethods: [GET, HEAD, OPTIONS, PUT, PATCH, POST, DELETE]
+            CachedMethods: [GET, HEAD]
+            Compress: true
+            CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad        # Managed-CachingDisabled
+            OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac # Managed-AllViewerExceptHostHeader
+            ResponseHeadersPolicyId: 67f7725c-6f97-4210-82d7-5512b31e9d03
+          - PathPattern: /health
+            TargetOriginId: api
+            ViewerProtocolPolicy: https-only
+            AllowedMethods: [GET, HEAD]
+            CachedMethods: [GET, HEAD]
+            CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad
+            OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac
+            ResponseHeadersPolicyId: 67f7725c-6f97-4210-82d7-5512b31e9d03
+
+  SiteRecords:
+    Type: AWS::Route53::RecordSetGroup
+    Condition: HasDomain
+    Properties:
+      HostedZoneId: !Ref SiteHostedZoneId
+      RecordSets:
+        # Z2FDTNDATAQYW2 는 CloudFront 별칭에 쓰는 고정 호스팅 영역 id 다
+        - { Name: !Sub "app.${SiteDomain}", Type: A, AliasTarget: { DNSName: !GetAtt Distribution.DomainName, HostedZoneId: Z2FDTNDATAQYW2 } }
+        - { Name: !Sub "app.${SiteDomain}", Type: AAAA, AliasTarget: { DNSName: !GetAtt Distribution.DomainName, HostedZoneId: Z2FDTNDATAQYW2 } }
+        - { Name: !Sub "www.app.${SiteDomain}", Type: A, AliasTarget: { DNSName: !GetAtt Distribution.DomainName, HostedZoneId: Z2FDTNDATAQYW2 } }
+        - { Name: !Sub "www.app.${SiteDomain}", Type: AAAA, AliasTarget: { DNSName: !GetAtt Distribution.DomainName, HostedZoneId: Z2FDTNDATAQYW2 } }
+        - { Name: !Ref SiteDomain, Type: A, AliasTarget: { DNSName: !GetAtt Distribution.DomainName, HostedZoneId: Z2FDTNDATAQYW2 } }
+        - { Name: !Ref SiteDomain, Type: AAAA, AliasTarget: { DNSName: !GetAtt Distribution.DomainName, HostedZoneId: Z2FDTNDATAQYW2 } }
+        - { Name: !Sub "www.${SiteDomain}", Type: A, AliasTarget: { DNSName: !GetAtt Distribution.DomainName, HostedZoneId: Z2FDTNDATAQYW2 } }
+        - { Name: !Sub "www.${SiteDomain}", Type: AAAA, AliasTarget: { DNSName: !GetAtt Distribution.DomainName, HostedZoneId: Z2FDTNDATAQYW2 } }
+
+  # ── 운영 알림 메일(SES, 서울) ─────────────────────────────
+  # noreply@<도메인> 으로 운영 메일함에 알린다(새 기억 인터뷰 신청 등, 개인 정보 없이). 도메인은 DKIM 으로
+  # 확인한다(CNAME 셋을 아래에서 넣으면 몇 분~몇 시간 뒤 SES 가 '확인됨'으로 바꾼다). 받는 메일은 없다.
+  # 처음엔 SES 샌드박스라 확인하지 않은 주소(gmail 등)로는 보내지 못한다: README '운영 알림 메일' 참고.
+  MailIdentity:
+    Type: AWS::SES::EmailIdentity
+    Condition: HasDomain
+    Properties:
+      EmailIdentity: !Ref SiteDomain
+      DkimSigningAttributes: { NextSigningKeyLength: RSA_2048_BIT }
+      DkimAttributes: { SigningEnabled: true }
+  MailDkimRecords:
+    Type: AWS::Route53::RecordSetGroup
+    Condition: HasDomain
+    Properties:
+      HostedZoneId: !Ref SiteHostedZoneId
+      RecordSets:
+        - { Name: !GetAtt MailIdentity.DkimDNSTokenName1, Type: CNAME, TTL: "1800", ResourceRecords: [!GetAtt MailIdentity.DkimDNSTokenValue1] }
+        - { Name: !GetAtt MailIdentity.DkimDNSTokenName2, Type: CNAME, TTL: "1800", ResourceRecords: [!GetAtt MailIdentity.DkimDNSTokenValue2] }
+        - { Name: !GetAtt MailIdentity.DkimDNSTokenName3, Type: CNAME, TTL: "1800", ResourceRecords: [!GetAtt MailIdentity.DkimDNSTokenValue3] }
+
+Outputs:
+  SiteUrl:
+    Value: !If [HasDomain, !Sub "https://app.${SiteDomain}", !Sub "https://${Distribution.DomainName}"]
+  CloudFrontUrl:
+    Value: !Sub "https://${Distribution.DomainName}"
+  DistributionId:
+    Value: !Ref Distribution
+  WebBucket:
+    Value: !Ref WebBucket
+  MediaBucket:
+    Value: !Ref MediaBucket
+  ArtifactBucket:
+    Value: !Ref ArtifactBucket
+  InstanceId:
+    Value: !Ref Server
+  ServerIp:
+    Value: !Ref ServerAddress
+  DatabaseEndpoint:
+    Value: !GetAtt Database.Endpoint.Address
+  VpcId:
+    Value: !Ref Vpc
+  ApiOriginMode:
+    Value: !Ref ApiOriginMode
+  # 운영 알림 메일의 보내는 주소(백엔드 .env 의 MAIL_FROM 에 넣는다)
+  MailFrom:
+    Condition: HasDomain
+    Value: !Sub "noreply@${SiteDomain}"
