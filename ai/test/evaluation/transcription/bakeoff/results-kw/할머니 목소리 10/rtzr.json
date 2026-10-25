@@ -1,0 +1,190 @@
+{
+  "provider": "rtzr",
+  "model": "whisper-diarization(vito)",
+  "segments": [
+    {
+      "segmentIndex": 0,
+      "startMs": 0,
+      "endMs": 3800,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "여보세요? 형 아."
+    },
+    {
+      "segmentIndex": 1,
+      "startMs": 4230,
+      "endMs": 5970,
+      "speakerLabel": "SPK_1",
+      "transcriptText": "할머니."
+    },
+    {
+      "segmentIndex": 2,
+      "startMs": 6660,
+      "endMs": 13100,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "하이브 오늘 생일인데 일에도 해서 먹었어야 되는데."
+    },
+    {
+      "segmentIndex": 3,
+      "startMs": 14073,
+      "endMs": 21553,
+      "speakerLabel": "SPK_2",
+      "transcriptText": "그러게 나 친구랑 맛있는 거 먹긴 했는데 미역국을 못 먹었다, 케이스 먹었는데 미역국을 못 먹었네."
+    },
+    {
+      "segmentIndex": 4,
+      "startMs": 22475,
+      "endMs": 25035,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "그럼 언제 만날래?"
+    },
+    {
+      "segmentIndex": 5,
+      "startMs": 26180,
+      "endMs": 26540,
+      "speakerLabel": "SPK_1",
+      "transcriptText": "글쎄."
+    },
+    {
+      "segmentIndex": 6,
+      "startMs": 27160,
+      "endMs": 28600,
+      "speakerLabel": "SPK_2",
+      "transcriptText": "내가 언제 함 번 들을게."
+    },
+    {
+      "segmentIndex": 7,
+      "startMs": 29718,
+      "endMs": 39550,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "그래 미리 전화해주고 와 예 이래도 조금 해줄려면은 문 할머니가 준비를 해놓지."
+    },
+    {
+      "segmentIndex": 8,
+      "startMs": 40050,
+      "endMs": 49687,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "예, 그래, 친구들하고 있어서 친구가 있어서 좋은 친구 있어서 좋은 음식 먹어서 잘했다."
+    },
+    {
+      "segmentIndex": 9,
+      "startMs": 50207,
+      "endMs": 58927,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "예, 응, 프랑스 일이 형 안 먹어던 거 먹은 거잖아 응, 그래 생일 축하한다."
+    },
+    {
+      "segmentIndex": 10,
+      "startMs": 59811,
+      "endMs": 61341,
+      "speakerLabel": "SPK_1",
+      "transcriptText": "감사해요, 어"
+    },
+    {
+      "segmentIndex": 11,
+      "startMs": 63624,
+      "endMs": 63984,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "네."
+    },
+    {
+      "segmentIndex": 12,
+      "startMs": 65998,
+      "endMs": 68548,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "그래 알았다 할아버지 잠깐 바꿔줄게 예."
+    },
+    {
+      "segmentIndex": 13,
+      "startMs": 74012,
+      "endMs": 76692,
+      "speakerLabel": "SPK_3",
+      "transcriptText": "그래, 형이 오늘 생일 축구한다."
+    },
+    {
+      "segmentIndex": 14,
+      "startMs": 77742,
+      "endMs": 79342,
+      "speakerLabel": "SPK_1",
+      "transcriptText": "할아버지 고마워요."
+    },
+    {
+      "segmentIndex": 15,
+      "startMs": 81563,
+      "endMs": 92881,
+      "speakerLabel": "SPK_3",
+      "transcriptText": "방금 저 사진 보내준 잘 받았는데 불안세유림 먹었타고 친구하고 예, 그랬다."
+    },
+    {
+      "segmentIndex": 16,
+      "startMs": 93935,
+      "endMs": 107423,
+      "speakerLabel": "SPK_3",
+      "transcriptText": "오늘 아침에 형이 생일 지금 우리 여기 집에서는 할머니가 미역국, 그래서 밤하고 잘 먹었어, 너는 이제 못 먹었겠구나."
+    },
+    {
+      "segmentIndex": 17,
+      "startMs": 108120,
+      "endMs": 110730,
+      "speakerLabel": "SPK_1",
+      "transcriptText": "할머니 미역가 끓여서 할아버지 먹었어."
+    },
+    {
+      "segmentIndex": 18,
+      "startMs": 111780,
+      "endMs": 122285,
+      "speakerLabel": "SPK_3",
+      "transcriptText": "응, 집에서 여기서는 여머니가 미국 끓여져서 먹었어, 잘 먹었어."
+    },
+    {
+      "segmentIndex": 19,
+      "startMs": 124848,
+      "endMs": 127388,
+      "speakerLabel": "SPK_1",
+      "transcriptText": "그래요, 알겠어요, 응."
+    },
+    {
+      "segmentIndex": 20,
+      "startMs": 128736,
+      "endMs": 135905,
+      "speakerLabel": "SPK_3",
+      "transcriptText": "응, 그냥 잘 쉬고, 항상 조심하고 해."
+    },
+    {
+      "segmentIndex": 21,
+      "startMs": 136475,
+      "endMs": 138105,
+      "speakerLabel": "SPK_1",
+      "transcriptText": "네, 응."
+    },
+    {
+      "segmentIndex": 22,
+      "startMs": 138969,
+      "endMs": 140599,
+      "speakerLabel": "SPK_3",
+      "transcriptText": "당신 언이 있어."
+    },
+    {
+      "segmentIndex": 23,
+      "startMs": 142741,
+      "endMs": 145161,
+      "speakerLabel": "SPK_3",
+      "transcriptText": "그래, 그럼 다음에 또 보자."
+    },
+    {
+      "segmentIndex": 24,
+      "startMs": 145461,
+      "endMs": 148221,
+      "speakerLabel": "SPK_1",
+      "transcriptText": "네, 빠이 응."
+    },
+    {
+      "segmentIndex": 25,
+      "startMs": 148261,
+      "endMs": 152485,
+      "speakerLabel": "SPK_3",
+      "transcriptText": "빠이 응, 어이 응, 자."
+    }
+  ],
+  "latencySeconds": 7.0,
+  "cer": 1.1209150326797386
+}

@@ -1,0 +1,22 @@
+{
+  "sensitivityFlags": [
+    {
+      "type": "health",
+      "description": "할머니가 허리가 아파서 많이 일을 못 한다는 언급",
+      "sourceSegmentIds": [
+        265
+      ]
+    }
+  ],
+  "judgeDropped": [
+    {
+      "type": "familyConflict",
+      "description": "할아버지가 잡곡을 싫어한다는 언급",
+      "sourceSegmentIds": [
+        273,
+        275
+      ],
+      "judgeReason": "할아버지의 음식 선호를 말하는 내용일 뿐 가족 간 갈등이나 다툼으로 볼 근거가 없다."
+    }
+  ]
+}

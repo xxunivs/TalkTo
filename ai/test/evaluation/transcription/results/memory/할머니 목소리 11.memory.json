@@ -1,0 +1,76 @@
+{
+  "memorySegments": [
+    {
+      "segmentIndex": 0,
+      "sourceSegmentIds": [
+        13,
+        15,
+        17
+      ],
+      "startMs": 40360,
+      "endMs": 66480,
+      "speakerLabel": "SPK_1",
+      "memoryText": "신금자는 저녁으로 밥을 먹었고, 갈치조림과 김치, 나물 남은 반찬도 함께 먹었다.",
+      "relatedPeople": [],
+      "confidence": "confirmed",
+      "sensitivityFlags": []
+    },
+    {
+      "segmentIndex": 1,
+      "sourceSegmentIds": [
+        28,
+        29
+      ],
+      "startMs": 114560,
+      "endMs": 130619,
+      "speakerLabel": "SPK_0",
+      "memoryText": "신금자는 허리가 아프고 잘 펴지지 않으며, 진통제를 계속 먹어도 나아지지 않는다고 말했다.",
+      "relatedPeople": [],
+      "confidence": "confirmed",
+      "sensitivityFlags": [
+        "health"
+      ]
+    },
+    {
+      "segmentIndex": 2,
+      "sourceSegmentIds": [
+        43,
+        45,
+        51,
+        53,
+        55
+      ],
+      "startMs": 194780,
+      "endMs": 283640,
+      "speakerLabel": "SPK_2",
+      "memoryText": "이재산은 신금자와 오랜만에 만나 식사하자고 이야기했다.",
+      "relatedPeople": [
+        "이재산"
+      ],
+      "confidence": "confirmed",
+      "sensitivityFlags": []
+    },
+    {
+      "segmentIndex": 3,
+      "sourceSegmentIds": [
+        46,
+        48,
+        50,
+        52
+      ],
+      "startMs": 230060,
+      "endMs": 260880,
+      "speakerLabel": "SPK_0",
+      "memoryText": "신금자는 이재산에게 돼지갈비를 먹고 싶다고 말했다.",
+      "relatedPeople": [
+        "이재산"
+      ],
+      "confidence": "confirmed",
+      "sensitivityFlags": []
+    }
+  ],
+  "validationDropped": {
+    "memories": 0,
+    "duplicates": 0
+  }
+}

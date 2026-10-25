@@ -1,0 +1,86 @@
+{
+  "memorySegments": [
+    {
+      "segmentIndex": 0,
+      "sourceSegmentIds": [
+        5,
+        7
+      ],
+      "startMs": 14220,
+      "endMs": 22599,
+      "speakerLabel": "SPK_1",
+      "memoryText": "남향은 생일에 친구와 맛있는 음식을 먹었지만 미역국은 못 먹었다.",
+      "relatedPeople": [
+        "남향"
+      ],
+      "confidence": "confirmed",
+      "sensitivityFlags": []
+    },
+    {
+      "segmentIndex": 1,
+      "sourceSegmentIds": [
+        4
+      ],
+      "startMs": 8380,
+      "endMs": 13100,
+      "speakerLabel": "SPK_0",
+      "memoryText": "신금자는 남향의 생일에 직접 만나서 먹어야 한다고 아쉬워했다.",
+      "relatedPeople": [
+        "남향"
+      ],
+      "confidence": "confirmed",
+      "sensitivityFlags": []
+    },
+    {
+      "segmentIndex": 2,
+      "sourceSegmentIds": [
+        14,
+        16,
+        24,
+        26
+      ],
+      "startMs": 41540,
+      "endMs": 108280,
+      "speakerLabel": "SPK_0",
+      "memoryText": "신금자는 남향이 친구들과 만나 좋은 음식과 평소에 잘 안 먹는 프랑스 요리를 먹었다고 보고하고, 그 선택을 잘했다고 말했다.",
+      "relatedPeople": [
+        "남향"
+      ],
+      "confidence": "confirmed",
+      "sensitivityFlags": []
+    },
+    {
+      "segmentIndex": 3,
+      "sourceSegmentIds": [
+        10
+      ],
+      "startMs": 29960,
+      "endMs": 34080,
+      "speakerLabel": "SPK_0",
+      "memoryText": "신금자는 남향에게 미리 전화하고 오라고 말했다.",
+      "relatedPeople": [
+        "남향"
+      ],
+      "confidence": "confirmed",
+      "sensitivityFlags": []
+    },
+    {
+      "segmentIndex": 4,
+      "sourceSegmentIds": [
+        34,
+        36
+      ],
+      "startMs": 139060,
+      "endMs": 149670,
+      "speakerLabel": "SPK_0",
+      "memoryText": "신금자는 다음에 다시 보자고 하며 통화를 마무리했다.",
+      "relatedPeople": [],
+      "confidence": "confirmed",
+      "sensitivityFlags": []
+    }
+  ],
+  "validationDropped": {
+    "memories": 0,
+    "duplicates": 0
+  }
+}

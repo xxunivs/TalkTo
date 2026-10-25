@@ -1,0 +1,48 @@
+{
+  "sensitivityFlags": [
+    {
+      "type": "thirdParty",
+      "description": "살아 있는 가족인 시아의 존재와 외모 관련 언급",
+      "sourceSegmentIds": [
+        102,
+        103,
+        105,
+        106,
+        108,
+        109,
+        113,
+        114,
+        117,
+        124,
+        125,
+        127,
+        128
+      ]
+    },
+    {
+      "type": "familyConflict",
+      "description": "엄마가 애들이 팥죽을 안 좋아한다고 말했다는 가족 내 서운함과 불만 취지의 언급",
+      "sourceSegmentIds": [
+        20,
+        24,
+        28,
+        34,
+        36,
+        88,
+        96,
+        98,
+        99,
+        100,
+        101
+      ]
+    },
+    {
+      "type": "health",
+      "description": "본인이 아프지 않을 때는 왔었다는 과거 건강 상태 언급",
+      "sourceSegmentIds": [
+        24
+      ]
+    }
+  ],
+  "judgeDropped": []
+}

@@ -1,0 +1,16 @@
+{
+  "sensitivityFlags": [
+    {
+      "type": "health",
+      "description": "예방주사와 삼차 주사를 맞았는지와 그 후 괜찮았는지에 대한 언급",
+      "sourceSegmentIds": [
+        2,
+        3,
+        7,
+        9,
+        10
+      ]
+    }
+  ],
+  "judgeDropped": []
+}

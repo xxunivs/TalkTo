@@ -1,0 +1,60 @@
+# Render Blueprint — TalkTo
+# 대시보드 → Blueprints → 이 저장소를 연결하면 아래 서비스가 생성된다.
+#   TalkTo_PersonaAI_AI : 자동화 파이프라인 (repo 루트 / Docker / torch·ECAPA)
+# 시크릿(sync:false)은 커밋하지 않고 Render 대시보드/Secret에서 입력한다.
+services:
+  # ── 자동화 파이프라인 ──
+  - type: web
+    # 대시보드의 서비스 이름과 똑같아야 한다. 다르면 Blueprint 가 이 이름의
+    # 서비스를 새로 만든다(유료 플랜이라 그대로 돈이 나간다).
+    name: TalkTo_PersonaAI_AI
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    # free는 유휴 시 스핀다운(콜드스타트 ~1분) — BE가 호출하는 내부 서비스라 starter 권장.
+    plan: starter
+    healthCheckPath: /health
+    # main 에 푸시하면 바로 올라간다. BE 보다 먼저 올라가야 하는 변경이면
+    # AI 레포를 먼저 푸시하면 된다.
+    autoDeploy: true
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: LOG_LEVEL
+        value: INFO
+      # 화자식별(ECAPA/torch)이 워커당 메모리를 크게 쓰므로 1로 유지(2면 모델 2벌 →
+      # OOM). torch 로딩 탓에 Standard(2GB) 이상 인스턴스 권장.
+      - key: WEB_CONCURRENCY
+        value: "1"
+      # ── 시크릿: 값은 Render 대시보드에서 입력(리포에 커밋 안 함) ──
+      - key: AI_SERVER_TOKEN      # 미설정 시 서버가 뜨지 않음(production) — 반드시 설정
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ELEVENLABS_API_KEY
+        sync: false
+      # 폴백 음성 id. 배포마다 대시보드에서 정한다. voiceId 가 없거나 자리표시자
+      # 'default-voice' 인 요청이 이 목소리로 합성된다. 정석은 BE가 대상자별 voiceId를
+      # 보내는 것이고, 그때는 비워둔다(voiceId 없는 요청이 엉뚱한 목소리 대신 400으로 실패).
+      - key: ELEVENLABS_DEFAULT_VOICE_ID
+        sync: false
+      # ── 음성(기본값 있음, 조절할 때만 지정) ──
+      # TTS 말하기 속도(0.7~1.2, 낮을수록 느림). 0.7은 청취로 정한 값.
+      - key: ELEVENLABS_SPEED
+        value: "0.7"
+      # ── 모델(기본값 있음, 교체할 때만 지정) ──
+      # 페르소나 응답 생성 모델. 비용 때문에 gpt-6-luna 를 쓴다.
+      # 대시보드 Environment 에서 값만 바꿔 교체할 수 있다(재빌드 불필요).
+      - key: OPENAI_CHAT_MODEL
+        value: gpt-6-luna
+      # OPENAI_ANALYSIS_MODEL / OPENAI_JUDGE_MODEL 등은 config 기본값 사용,
+      # 바꿀 때만 여기에 추가.
+      # ── 페르소나 프롬프트(코드 기본값과 같음, 보이게 적어 둠) ──
+      # 새로 만드는 페르소나 지시문을 4층으로. 예전 조립은 legacy. 이미 만든 페르소나는
+      # BE DB 에 저장된 지시문을 쓰므로 이 값을 바꿔도 달라지지 않는다(README "켜는 법").
+      - key: PERSONA_PROMPT_BUILDER
+        value: layered
+      # 중간계층(PERSONA_ORCHESTRATOR)은 기본 꺼짐. 켤 때 쓰는 공통 규칙·주고받기 위치.
+      - key: ORCHESTRATOR_RULES
+        value: layered
+      - key: ORCHESTRATOR_SHOTS
+        value: messages

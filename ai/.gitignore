@@ -1,0 +1,47 @@
+# 비밀값 — 절대 커밋하지 않는다
+.env
+.env.*
+!.env.example
+
+# 가상환경·캐시·빌드 산물
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+.DS_Store
+*.log
+tmp/
+
+# 중간계층 실행 결과·추적 로그(대화 원문 포함)
+experiments/orchestrator/results/
+orchestrator_traces/
+
+# 로컬 전용 데이터(녹음·전사·페르소나 등록부 등 개인 정보) — 커밋하지 않는다
+input/
+output/
+personas_local/
+외부데이터/
+experiments/prompt_compare/data/
+experiments/prompt_compare/variants/
+experiments/prompt_compare/results/
+
+# 로컬 도구 작업 폴더
+.scratch/
+.wrangler/
+
+# 녹음·실험 파일은 올리지 않는다(이미 올라간 것은 그대로 남는다)
+.oss/
+.sr/
+.vf/
+**/voice_lab/
+*.wav
+*.m4a
+*.mp3

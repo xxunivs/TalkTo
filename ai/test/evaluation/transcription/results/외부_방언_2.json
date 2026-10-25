@@ -1,0 +1,156 @@
+{
+  "segments": [
+    {
+      "segmentIndex": 0,
+      "startMs": 0,
+      "endMs": 3000,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "농사는 기계가 하는 게 훨씬 나은 것 같애요 사람은 인제는 너무너무 골비이야",
+      "confidence": null,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "segmentIndex": 1,
+      "startMs": 3000,
+      "endMs": 6000,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "우리가 집에서 지금 밭이 있고 여러 그게 있는데 앉아가지고 하마 무릎 고뱅이가",
+      "confidence": null,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "segmentIndex": 2,
+      "startMs": 6000,
+      "endMs": 9000,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "아파가지고 등다리도 아프고 을매나 아픈지 기계도 요새는 발달 돼 가지고 다 잘",
+      "confidence": null,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "segmentIndex": 3,
+      "startMs": 9000,
+      "endMs": 12000,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "하더라고 하는 거 보니까 사람이 인력으로 하마 약을 치는데도 우리 아바이가 여름에",
+      "confidence": null,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "segmentIndex": 4,
+      "startMs": 12000,
+      "endMs": 15000,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "약을 쳤어 쉬고 난 뒤에 머리가 핑 돈다고 이 약을 마스크 하고",
+      "confidence": null,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "segmentIndex": 5,
+      "startMs": 15000,
+      "endMs": 18000,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "다 이래 해야 되는데 복숭아 나무에 약을 치다가 고마 뭐 어지럽다 하면서",
+      "confidence": null,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "segmentIndex": 6,
+      "startMs": 18000,
+      "endMs": 21000,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "집에 왔더라고 여름에 덥기는 덥지 그러니까 기계가 잘 돼가 우리들은 또 농사가",
+      "confidence": null,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "segmentIndex": 7,
+      "startMs": 21000,
+      "endMs": 24000,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "조그만하기 때문에 기계도 비싸 너무 비싸 사지도 못하잖아 기계는 근데 기계가 하면",
+      "confidence": null,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "segmentIndex": 8,
+      "startMs": 24000,
+      "endMs": 27000,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "좋아 근데 뭐 기계가 다 할 일이 있고 사람이 할 일이 따로",
+      "confidence": null,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "segmentIndex": 9,
+      "startMs": 27000,
+      "endMs": 30000,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "있지 뭐 다 기계만 가지고 다 할 수 없어 요즘 6뭐 풀",
+      "confidence": null,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "segmentIndex": 10,
+      "startMs": 30000,
+      "endMs": 33000,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "매는 것도 이리 밀어가지고 산 하니까 풀도 매두고만은 그래도 손으로 할 일은",
+      "confidence": null,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "segmentIndex": 11,
+      "startMs": 33000,
+      "endMs": 36000,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "손으로 해야지 그 골병 안고 있어 언니야 골병이야 근데 뭐 큰 대농을",
+      "confidence": null,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "segmentIndex": 12,
+      "startMs": 36000,
+      "endMs": 39000,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "해야 뭐 들어오는 기계로 약 치든가 하지 요런 쪼매한 데는 쪼매하게 농사",
+      "confidence": null,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "segmentIndex": 13,
+      "startMs": 39000,
+      "endMs": 42000,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "짓는 사람들은 다들 기계로 뭐 다 할 수는 없어 기계가 할 일이",
+      "confidence": null,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "segmentIndex": 14,
+      "startMs": 42000,
+      "endMs": 45000,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "있고 사람이 할 일이 있고",
+      "confidence": null,
+      "correctedText": null,
+      "needsReview": false
+    }
+  ],
+  "provider": "aihub",
+  "model": "dialect"
+}

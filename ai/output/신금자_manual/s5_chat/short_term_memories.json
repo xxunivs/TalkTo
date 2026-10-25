@@ -1,0 +1,79 @@
+[
+  {
+    "id": "st_001",
+    "content": "손녀가 회사를 그만둔 사실과 그로 인한 감정적 어려움",
+    "category": "직장",
+    "importance": 7,
+    "strength": 8.0,
+    "recall_count": 7,
+    "created_at": "2026-05-12T18:58:06.028868",
+    "last_recalled_at": "2026-05-13T14:25:17.897009",
+    "archived": false
+  },
+  {
+    "id": "st_002",
+    "content": "손녀가 무언가를 그만두려는 의사를 표현했고, 할머니가 그로 인해 속상해하는 감정을 드러냄.",
+    "category": "감정",
+    "importance": 7,
+    "strength": 9.0,
+    "recall_count": 8,
+    "created_at": "2026-05-12T18:58:47.209506",
+    "last_recalled_at": "2026-05-13T14:25:17.898191",
+    "archived": false
+  },
+  {
+    "id": "st_003",
+    "content": "손녀가 회사를 그만둔 사실",
+    "category": "직장",
+    "importance": 7,
+    "strength": 9.0,
+    "recall_count": 8,
+    "created_at": "2026-05-12T19:07:32.815253",
+    "last_recalled_at": "2026-05-13T14:25:17.898883",
+    "archived": false
+  },
+  {
+    "id": "st_004",
+    "content": "손녀가 요즘 어떻게 해야 할지 몰라서 고민 중임을 표현함",
+    "category": "감정",
+    "importance": 7,
+    "strength": 9.0,
+    "recall_count": 8,
+    "created_at": "2026-05-12T19:08:08.570341",
+    "last_recalled_at": "2026-05-13T14:25:17.899494",
+    "archived": false
+  },
+  {
+    "id": "st_005",
+    "content": "손녀가 회사를 그만둔 사실과 그 이유에 대해 대화 중임",
+    "category": "직장",
+    "importance": 7,
+    "strength": 8.0,
+    "recall_count": 7,
+    "created_at": "2026-05-12T19:08:32.219926",
+    "last_recalled_at": "2026-05-13T14:25:17.900074",
+    "archived": false
+  },
+  {
+    "id": "st_006",
+    "content": "손녀가 요즘 어떻게 해야 할지 몰라 고민 중임",
+    "category": "감정",
+    "importance": 7,
+    "strength": 7.0,
+    "recall_count": 6,
+    "created_at": "2026-05-12T19:08:44.861845",
+    "last_recalled_at": "2026-05-13T14:25:17.900577",
+    "archived": false
+  },
+  {
+    "id": "st_007",
+    "content": "할머니가 손녀의 상태에 대해 걱정하며 께름칙함을 느끼는지 물음",
+    "category": "감정",
+    "importance": 6,
+    "strength": 6.0,
+    "recall_count": 5,
+    "created_at": "2026-05-12T20:19:10.775424",
+    "last_recalled_at": "2026-05-13T14:25:17.901077",
+    "archived": false
+  }
+]

@@ -1,0 +1,156 @@
+{
+  "segments": [
+    {
+      "segmentIndex": 0,
+      "startMs": 0,
+      "endMs": 4000,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "저 사람이 나한테 저렇게 행동을 하는구나",
+      "confidence": null,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "segmentIndex": 1,
+      "startMs": 4000,
+      "endMs": 8000,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "그리고 내가 더 그 사람한테 저 사람이 모자란 게 무엇이고",
+      "confidence": null,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "segmentIndex": 2,
+      "startMs": 8000,
+      "endMs": 12000,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "저 사람이 원하는 게 무엇인가를 내가 생각해봐야지",
+      "confidence": null,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "segmentIndex": 3,
+      "startMs": 12000,
+      "endMs": 16000,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "그렇게 사람한테 베풀어주면 싸울일이 없다고 생각해",
+      "confidence": null,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "segmentIndex": 4,
+      "startMs": 16000,
+      "endMs": 20000,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "아무리 극에 달해서 화가 났어도 내가 좀 참고",
+      "confidence": null,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "segmentIndex": 5,
+      "startMs": 20000,
+      "endMs": 24000,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "아 여보 내가 미안해 미안해 소리를 그 말을 입에 달고",
+      "confidence": null,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "segmentIndex": 6,
+      "startMs": 24000,
+      "endMs": 28000,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "또 돌아서면 고마워 감사해 그 말이랑 그 마음만",
+      "confidence": null,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "segmentIndex": 7,
+      "startMs": 28000,
+      "endMs": 32000,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "가지고 살면은 가정이 평화롭다고 난 생각해",
+      "confidence": null,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "segmentIndex": 8,
+      "startMs": 32000,
+      "endMs": 36000,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "맞다 우리 휴일 날 로망이 뭐지",
+      "confidence": null,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "segmentIndex": 9,
+      "startMs": 36000,
+      "endMs": 40000,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "아침에 늦잠 자는 게 휴일 날 우리의 특권인데",
+      "confidence": null,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "segmentIndex": 10,
+      "startMs": 40000,
+      "endMs": 44000,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "사실 그거까지도 제대로 안 되잖아 식구들 챙기고",
+      "confidence": null,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "segmentIndex": 11,
+      "startMs": 44000,
+      "endMs": 48000,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "아침부터 정신 없잖아 나는 이제 휴일 날은 아침에 조금",
+      "confidence": null,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "segmentIndex": 12,
+      "startMs": 48000,
+      "endMs": 52000,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "늦게 일어나도 되고 토요일에도 늦잠 자도 돼",
+      "confidence": null,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "segmentIndex": 13,
+      "startMs": 52000,
+      "endMs": 56000,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "이제 오후에 손자들 오거든 그럼 손자들 오면",
+      "confidence": null,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "segmentIndex": 14,
+      "startMs": 56000,
+      "endMs": 60000,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "애들 오전에 교회 가는게 있어서 가서 데려다 주고",
+      "confidence": null,
+      "correctedText": null,
+      "needsReview": false
+    }
+  ],
+  "provider": "aihub",
+  "model": "elderly"
+}

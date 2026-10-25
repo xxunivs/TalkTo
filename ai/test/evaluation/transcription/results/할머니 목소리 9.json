@@ -1,0 +1,303 @@
+{
+  "segments": [
+    {
+      "id": null,
+      "segmentIndex": 0,
+      "startMs": 99,
+      "endMs": 1100,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "여보세요.",
+      "confidence": 0.9686,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "id": null,
+      "segmentIndex": 1,
+      "startMs": 1100,
+      "endMs": 2980,
+      "speakerLabel": "SPK_1",
+      "transcriptText": "어, 할머니, 나야.",
+      "confidence": 0.9844,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "id": null,
+      "segmentIndex": 2,
+      "startMs": 2980,
+      "endMs": 4839,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "어, 오랜만이구나.",
+      "confidence": 0.9999,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "id": null,
+      "segmentIndex": 3,
+      "startMs": 5940,
+      "endMs": 10399,
+      "speakerLabel": "SPK_1",
+      "transcriptText": "어, 어. 마지막 날이라 전화했어. 새해 복 많이 받으세요.",
+      "confidence": 0.9903,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "id": null,
+      "segmentIndex": 4,
+      "startMs": 10399,
+      "endMs": 15699,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "어, 너도 항상 건강하고 새해 복, 복 많이 받아.",
+      "confidence": 0.979,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "id": null,
+      "segmentIndex": 5,
+      "startMs": 15699,
+      "endMs": 19399,
+      "speakerLabel": "SPK_1",
+      "transcriptText": "어, 할머니 어. 밥 먹었어요?",
+      "confidence": 0.9846,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "id": null,
+      "segmentIndex": 6,
+      "startMs": 19399,
+      "endMs": 20819,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "아직 안 먹었다.",
+      "confidence": 0.9997,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "id": null,
+      "segmentIndex": 7,
+      "startMs": 20819,
+      "endMs": 20939,
+      "speakerLabel": "SPK_1",
+      "transcriptText": "어.",
+      "confidence": 0.9968,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "id": null,
+      "segmentIndex": 8,
+      "startMs": 20939,
+      "endMs": 22579,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "어디? 너네 먹었어?",
+      "confidence": 0.8584,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "id": null,
+      "segmentIndex": 9,
+      "startMs": 22579,
+      "endMs": 24579,
+      "speakerLabel": "SPK_1",
+      "transcriptText": "네, 나 먹었어요.",
+      "confidence": 0.9998,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "id": null,
+      "segmentIndex": 10,
+      "startMs": 24579,
+      "endMs": 25459,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "어, 집이야?",
+      "confidence": 0.9982,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "id": null,
+      "segmentIndex": 11,
+      "startMs": 26639,
+      "endMs": 27119,
+      "speakerLabel": "SPK_1",
+      "transcriptText": "네.",
+      "confidence": 0.9998,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "id": null,
+      "segmentIndex": 12,
+      "startMs": 28779,
+      "endMs": 33299,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "니가 전재 말씀니까 아주 그냥 좀 멀어진 것 같다.",
+      "confidence": 0.657,
+      "correctedText": null,
+      "needsReview": true
+    },
+    {
+      "id": null,
+      "segmentIndex": 13,
+      "startMs": 33299,
+      "endMs": 38739,
+      "speakerLabel": "SPK_1",
+      "transcriptText": "하 하. 아, 그래요. 맛있게 먹어요 할머니.",
+      "confidence": 0.779,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "id": null,
+      "segmentIndex": 14,
+      "startMs": 38739,
+      "endMs": 49139,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "어 문자 받는데도 일을 잘해서 상도 사고 상품 상품도 사고 여러 가지 많이 샀구나.",
+      "confidence": 0.903,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "id": null,
+      "segmentIndex": 15,
+      "startMs": 52299,
+      "endMs": 52719,
+      "speakerLabel": "SPK_1",
+      "transcriptText": "어.",
+      "confidence": 0.998,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "id": null,
+      "segmentIndex": 16,
+      "startMs": 52719,
+      "endMs": 56059,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "어. 일을 잘하는 거나 네가 영어를 잘하니까.",
+      "confidence": 0.8977,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "id": null,
+      "segmentIndex": 17,
+      "startMs": 56059,
+      "endMs": 59519,
+      "speakerLabel": "SPK_1",
+      "transcriptText": "아 그래? 할머니 저녁 맛있게 먹고.",
+      "confidence": 0.9633,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "id": null,
+      "segmentIndex": 18,
+      "startMs": 59520,
+      "endMs": 61239,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "어, 알았다.",
+      "confidence": 0.9971,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "id": null,
+      "segmentIndex": 19,
+      "startMs": 61239,
+      "endMs": 63019,
+      "speakerLabel": "SPK_1",
+      "transcriptText": "어, 안녕.",
+      "confidence": 0.9997,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "id": null,
+      "segmentIndex": 20,
+      "startMs": 63020,
+      "endMs": 65260,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "어 지금 들어가고 있는 거야?",
+      "confidence": 0.7119,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "id": null,
+      "segmentIndex": 21,
+      "startMs": 65260,
+      "endMs": 66919,
+      "speakerLabel": "SPK_1",
+      "transcriptText": "아니, 집이야.",
+      "confidence": 0.9169,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "id": null,
+      "segmentIndex": 22,
+      "startMs": 66919,
+      "endMs": 71099,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "어, 그래, 알았어. 잘 먹고 잘 쉬고. 잘 자.",
+      "confidence": 0.9775,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "id": null,
+      "segmentIndex": 23,
+      "startMs": 71099,
+      "endMs": 72760,
+      "speakerLabel": "SPK_1",
+      "transcriptText": "어, 안녕.",
+      "confidence": 0.9964,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "id": null,
+      "segmentIndex": 24,
+      "startMs": 72760,
+      "endMs": 75220,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "어, 안녕. 사랑한다.",
+      "confidence": 0.9984,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "id": null,
+      "segmentIndex": 25,
+      "startMs": 75220,
+      "endMs": 76919,
+      "speakerLabel": "SPK_1",
+      "transcriptText": "사랑해요.",
+      "confidence": 0.9996,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "id": null,
+      "segmentIndex": 26,
+      "startMs": 76919,
+      "endMs": 80720,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "어, 그래, 잘 들어가. 잘 쉬어.",
+      "confidence": 0.9391,
+      "correctedText": null,
+      "needsReview": false
+    }
+  ],
+  "provider": "elevenlabs",
+  "model": "scribe_v1"
+}

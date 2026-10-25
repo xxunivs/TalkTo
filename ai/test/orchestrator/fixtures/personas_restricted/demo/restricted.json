@@ -1,0 +1,7 @@
+{"policy": "brief", "brief_answer": "몸이 안 좋아서 그렇게 갔지",
+ "facts": {"cause": "가상병"},
+ "replace": [{"from": "2020년 3월 1일 가상병으로 별세.", "to": "2020년 별세."},
+             {"from": ", 임종을 지킴", "to": ""},
+             {"from": "없는 문장.", "to": ""}],
+ "memory_ids": ["m-death"],
+ "leak_terms": ["가상병"]}

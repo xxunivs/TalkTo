@@ -1,0 +1,11 @@
+{
+  "persons": [],
+  "unresolvedMentions": [],
+  "validationDropped": {
+    "persons": 2,
+    "relations": 0,
+    "facts": 0,
+    "unresolved": 0,
+    "mentions": 1
+  }
+}

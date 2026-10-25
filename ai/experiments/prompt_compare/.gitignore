@@ -1,0 +1,4 @@
+# 개인 데이터(운영 export·통화 발화·프롬프트 원문)와 결과 — 로컬 전용
+data/
+variants/
+results/

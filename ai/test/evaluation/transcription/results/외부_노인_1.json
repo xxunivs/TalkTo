@@ -1,0 +1,156 @@
+{
+  "segments": [
+    {
+      "segmentIndex": 0,
+      "startMs": 0,
+      "endMs": 4000,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "기도를 통해서 마음의 정리를 할 수 있지",
+      "confidence": null,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "segmentIndex": 1,
+      "startMs": 4000,
+      "endMs": 8000,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "근데 보면 자기는 그런 거를 참 잘 하는 거 같애",
+      "confidence": null,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "segmentIndex": 2,
+      "startMs": 8000,
+      "endMs": 12000,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "맞아 월화수목금은 이제 거의 아이들은 규칙적인 일과를 보내지",
+      "confidence": null,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "segmentIndex": 3,
+      "startMs": 12000,
+      "endMs": 16000,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "그 속에서 저녁에 잠깐 기도하고 잠들지",
+      "confidence": null,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "segmentIndex": 4,
+      "startMs": 16000,
+      "endMs": 20000,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "규칙적인 생활을 하는데 토일은 뭔가 아이들에게 특별한 날인데",
+      "confidence": null,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "segmentIndex": 5,
+      "startMs": 20000,
+      "endMs": 24000,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "우리가 못해 준다는 느낌 많이 들잖아",
+      "confidence": null,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "segmentIndex": 6,
+      "startMs": 24000,
+      "endMs": 28000,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "평일에 바쁘다가 토요일 일요일 되면은 너무 힘들어요",
+      "confidence": null,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "segmentIndex": 7,
+      "startMs": 28000,
+      "endMs": 32000,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "평일에 힘들어오니까 주말에 나도 피곤하고 하죠",
+      "confidence": null,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "segmentIndex": 8,
+      "startMs": 32000,
+      "endMs": 36000,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "그런 부분이 있는데 어쨌든 직장 다니는 엄마들의 애로사항 같아요",
+      "confidence": null,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "segmentIndex": 9,
+      "startMs": 36000,
+      "endMs": 40000,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "아이들을 신경쓰는 마음은 똑같은데 몸이 안따라주니까요",
+      "confidence": null,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "segmentIndex": 10,
+      "startMs": 40000,
+      "endMs": 44000,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "그 부분에서 휴일을 지내면서는 아이들에게 미안한 맘이 있죠",
+      "confidence": null,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "segmentIndex": 11,
+      "startMs": 44000,
+      "endMs": 48000,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "그니까 한 일 이주는 좀 열심히 일하고 그 다음주는",
+      "confidence": null,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "segmentIndex": 12,
+      "startMs": 48000,
+      "endMs": 52000,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "아이들한테 신경쓰고 이런 계획 된 그런 것도 필요해요",
+      "confidence": null,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "segmentIndex": 13,
+      "startMs": 52000,
+      "endMs": 56000,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "가족이랑 일 둘 다 신경쓰는게 많이 힘들죠 알아요",
+      "confidence": null,
+      "correctedText": null,
+      "needsReview": false
+    },
+    {
+      "segmentIndex": 14,
+      "startMs": 56000,
+      "endMs": 60000,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "짜장면 그런 것도 있지만 어른들 위한 복국집",
+      "confidence": null,
+      "correctedText": null,
+      "needsReview": false
+    }
+  ],
+  "provider": "aihub",
+  "model": "elderly"
+}

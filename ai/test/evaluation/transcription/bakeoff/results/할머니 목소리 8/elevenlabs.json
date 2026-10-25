@@ -1,0 +1,113 @@
+{
+  "provider": "elevenlabs",
+  "model": "scribe_v1",
+  "segments": [
+    {
+      "segmentIndex": 0,
+      "startMs": 239,
+      "endMs": 1779,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "미끄러워 가지고."
+    },
+    {
+      "segmentIndex": 1,
+      "startMs": 1779,
+      "endMs": 4500,
+      "speakerLabel": "SPK_1",
+      "transcriptText": "아, 거기도 눈 많이 왔어?"
+    },
+    {
+      "segmentIndex": 2,
+      "startMs": 4500,
+      "endMs": 9159,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "어. 너도 미끄러운데 일찍 들어가야지."
+    },
+    {
+      "segmentIndex": 3,
+      "startMs": 9159,
+      "endMs": 10679,
+      "speakerLabel": "SPK_1",
+      "transcriptText": "알았어."
+    },
+    {
+      "segmentIndex": 4,
+      "startMs": 10679,
+      "endMs": 12439,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "저녁 먹었어?"
+    },
+    {
+      "segmentIndex": 5,
+      "startMs": 12439,
+      "endMs": 12719,
+      "speakerLabel": "SPK_1",
+      "transcriptText": "어."
+    },
+    {
+      "segmentIndex": 6,
+      "startMs": 13840,
+      "endMs": 14159,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "어."
+    },
+    {
+      "segmentIndex": 7,
+      "startMs": 14159,
+      "endMs": 14719,
+      "speakerLabel": "SPK_1",
+      "transcriptText": "할머니는?"
+    },
+    {
+      "segmentIndex": 8,
+      "startMs": 15819,
+      "endMs": 20399,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "할머니도 먹었다. 잘 먹고 조심해서 잘 들어가."
+    },
+    {
+      "segmentIndex": 9,
+      "startMs": 20399,
+      "endMs": 24420,
+      "speakerLabel": "SPK_1",
+      "transcriptText": "그래요. 할머니도 조심해. 길 미끄러우니까."
+    },
+    {
+      "segmentIndex": 10,
+      "startMs": 24420,
+      "endMs": 31099,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "어, 그래. 할머니는 잘 안 나가니까 너네들 조심해야 돼."
+    },
+    {
+      "segmentIndex": 11,
+      "startMs": 31099,
+      "endMs": 32299,
+      "speakerLabel": "SPK_1",
+      "transcriptText": "예."
+    },
+    {
+      "segmentIndex": 12,
+      "startMs": 32299,
+      "endMs": 34000,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "어, 알았다."
+    },
+    {
+      "segmentIndex": 13,
+      "startMs": 34000,
+      "endMs": 35680,
+      "speakerLabel": "SPK_1",
+      "transcriptText": "어, 끊어."
+    },
+    {
+      "segmentIndex": 14,
+      "startMs": 35680,
+      "endMs": 36239,
+      "speakerLabel": "SPK_0",
+      "transcriptText": "어."
+    }
+  ],
+  "latencySeconds": 2.2,
+  "cer": 0.08411214953271028
+}

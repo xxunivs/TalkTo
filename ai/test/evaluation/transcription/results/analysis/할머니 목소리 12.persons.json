@@ -1,0 +1,33 @@
+{
+  "persons": [
+    {
+      "name": "이재산",
+      "relationToSubject": "배우자",
+      "mentions": [
+        "할아버지"
+      ],
+      "confidence": "inferred",
+      "sourceSegmentIds": [
+        269
+      ],
+      "relationsToOthers": [],
+      "facts": [
+        {
+          "fact": "주인공이 밥에 잡곡을 넣는 방식을 설명할 때 할아버지가 좋아하지 않는 것 같다고 언급된다.",
+          "sourceSegmentIds": [
+            269
+          ],
+          "confidence": "inferred"
+        }
+      ]
+    }
+  ],
+  "unresolvedMentions": [],
+  "validationDropped": {
+    "persons": 1,
+    "relations": 0,
+    "facts": 0,
+    "unresolved": 0,
+    "mentions": 1
+  }
+}

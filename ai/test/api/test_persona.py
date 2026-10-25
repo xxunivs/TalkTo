@@ -1,0 +1,140 @@
+import json
+import unittest
+from unittest.mock import MagicMock, patch
+
+from fastapi.testclient import TestClient
+from pydantic import SecretStr
+
+from infra.setting import Settings, get_settings
+from main import app
+from pipeline.s3_synthesis.c_build_system_prompt import extract_memory_candidates
+from infra.schema.persona import MemoryCandidateRequest
+
+
+def _mock_openai_returning(content: str) -> MagicMock:
+    """OpenAI 클라이언트 목 — chat.completions.create가 정해진 content를 반환."""
+    resp = MagicMock()
+    resp.choices = [MagicMock(message=MagicMock(content=content))]
+    client = MagicMock()
+    client.chat.completions.create.return_value = resp
+    return client
+
+
+class PersonaAssemblyTest(unittest.TestCase):
+    """POST /v1/persona/assembly — LLM 미사용(순수 조립)이라 실호출 없이 검증 가능.
+
+    아래 두 테스트는 예전 조립기(PERSONA_PROMPT_BUILDER=legacy)의 출력 문구를 본다. 기본(4층)은 DefaultAssemblyTest.
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.client = TestClient(app)
+
+    def setUp(self) -> None:
+        app.dependency_overrides[get_settings] = lambda: Settings(
+            openai_api_key=SecretStr("test-key"), persona_prompt_builder="legacy")
+        self.addCleanup(app.dependency_overrides.pop, get_settings, None)
+
+    def test_assembly_builds_prompt_from_context(self) -> None:
+        response = self.client.post(
+            "/v1/persona/assembly",
+            json={
+                "subjectContext": {
+                    "subject": {"name": "홍길동", "addressTerm": "할머니"},
+                },
+                "speechExamples": ["밥은 먹었냐?"],
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["subjectName"], "홍길동")
+        # 대상자 이름과 발화 예시가 조립본에 반영되어야 한다.
+        self.assertIn("홍길동", body["instructions"])
+        self.assertIn("밥은 먹었냐?", body["instructions"])
+
+    def test_assembly_death_context_not_leaked(self) -> None:
+        # 사후 페르소나여도 사인·경위 원문은 조립본에 넣지 않는다(안전).
+        response = self.client.post(
+            "/v1/persona/assembly",
+            json={
+                "subjectContext": {"subject": {"name": "최순례", "addressTerm": "할머니"}},
+                "intakeContext": {
+                    "basicProfile": {
+                        "status": "사망",
+                        "deathContext": "2024년 폐렴으로 별세",
+                    },
+                },
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        instructions = response.json()["instructions"]
+        self.assertIn("사후 페르소나", instructions)
+        self.assertNotIn("폐렴", instructions)
+
+
+class DefaultAssemblyTest(unittest.TestCase):
+    """설정을 따로 주지 않으면 /v1/persona/assembly 는 4층 프롬프트를 돌려준다."""
+
+    def test_default_builder_is_layered_and_hides_death_context(self) -> None:
+        app.dependency_overrides[get_settings] = lambda: Settings(openai_api_key=SecretStr("test-key"))
+        self.addCleanup(app.dependency_overrides.pop, get_settings, None)
+        response = TestClient(app).post(
+            "/v1/persona/assembly",
+            json={
+                "subjectContext": {"subject": {"name": "최순례", "addressTerm": "할머니"}},
+                "intakeContext": {"basicProfile": {"status": "사망", "deathContext": "2024년 폐렴으로 별세"}},
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        instructions = response.json()["instructions"]
+        self.assertIn("# 기억을 쓰는 법", instructions)  # 4층 L1
+        self.assertIn("최순례", instructions)
+        self.assertNotIn("폐렴", instructions)
+
+
+class MemoryCandidateTest(unittest.TestCase):
+    """extract_memory_candidates — LLM 응답을 목킹해 파싱·범위 강제 로직만 검증(무API)."""
+
+    def _settings(self) -> Settings:
+        return Settings(openai_api_key=SecretStr("test-key"))
+
+    @patch("infra.external_api.openai_client.OpenAI")
+    def test_clamps_out_of_range_and_skips_empty(self, mock_openai: MagicMock) -> None:
+        canned = json.dumps({
+            "candidates": [
+                # 범위를 벗어난 값 — 코드가 1~10 / 0~1로 강제해야 스키마 검증에서 안 터진다.
+                {"summary": "사용자가 취직했다.", "category": "직장",
+                 "importance": 15, "confidence": 2.0},
+                # summary 빈 값 — 건너뛰어야 한다.
+                {"summary": "  ", "importance": 5, "confidence": 0.5},
+            ]
+        })
+        mock_openai.return_value = _mock_openai_returning(canned)
+
+        result = extract_memory_candidates(
+            MemoryCandidateRequest(user_message="나 취직했어", assistant_message="잘됐다"),
+            settings=self._settings(),
+        )
+
+        self.assertEqual(len(result.candidates), 1)
+        c = result.candidates[0]
+        self.assertEqual(c.summary, "사용자가 취직했다.")
+        self.assertEqual(c.importance, 10)
+        self.assertEqual(c.confidence, 1.0)
+
+    @patch("infra.external_api.openai_client.OpenAI")
+    def test_empty_candidates_when_nothing_to_remember(self, mock_openai: MagicMock) -> None:
+        mock_openai.return_value = _mock_openai_returning('{"candidates": []}')
+
+        result = extract_memory_candidates(
+            MemoryCandidateRequest(user_message="보고 싶어", assistant_message="나도"),
+            settings=self._settings(),
+        )
+
+        self.assertEqual(result.candidates, [])
+
+
+if __name__ == "__main__":
+    unittest.main()
