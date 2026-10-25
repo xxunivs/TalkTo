@@ -14,12 +14,12 @@ import httpx
 import openai
 from pydantic import SecretStr
 
-from infra.error import AnalysisBadOutputError, AnalysisTooLongError, AppError
-from infra.external_api import openai_client
-from infra.schema.embedding import QueryEmbeddingRequest
-from infra.schema.persona import PersonaResponseRequest
-from infra.schema.transcript import TranscriptSegment
-from infra.setting import Settings
+from app.error import AnalysisBadOutputError, AnalysisTooLongError, AppError
+from app.external_api import openai_client
+from app.schema.embedding import QueryEmbeddingRequest
+from app.schema.persona import PersonaResponseRequest
+from app.schema.transcript import TranscriptSegment
+from app.setting import Settings
 
 SEGMENTS = [
     TranscriptSegment(segment_index=0, start_ms=0, end_ms=1000, speaker_label="SPK_0",
@@ -42,7 +42,7 @@ class ClientLimitsTest(unittest.TestCase):
         openai_client._clients.clear()  # 목 클래스 id 가 재사용돼 예전 클라이언트가 나오지 않게
         self.addCleanup(openai_client._clients.clear)
 
-    @patch("infra.external_api.openai_client.OpenAI")
+    @patch("app.external_api.openai_client.OpenAI")
     def test_each_purpose_gets_its_own_limits(self, cls: MagicMock) -> None:
         settings = _settings()
         openai_client.create_openai_client(settings)
@@ -60,7 +60,7 @@ class ClientLimitsTest(unittest.TestCase):
         worst = settings.openai_chat_timeout_seconds * (settings.openai_chat_max_retries + 1)
         self.assertLess(worst, 45)  # BE ai_server_timeout_seconds
 
-    @patch("infra.external_api.openai_client.OpenAI")
+    @patch("app.external_api.openai_client.OpenAI")
     def test_persona_response_uses_chat_limits(self, cls: MagicMock) -> None:
         from pipeline.s3_synthesis.c_build_system_prompt import generate_persona_response
 
@@ -71,7 +71,7 @@ class ClientLimitsTest(unittest.TestCase):
         generate_persona_response(request, settings=_settings())
         self.assertEqual(cls.call_args.kwargs["timeout"], 20)
 
-    @patch("infra.external_api.openai_client.OpenAI")
+    @patch("app.external_api.openai_client.OpenAI")
     def test_query_path_stays_under_the_backend_timeout(self, cls: MagicMock) -> None:
         from pipeline.s3_synthesis import d_build_memory_embedding as emb
 
@@ -89,7 +89,7 @@ class ClientLimitsTest(unittest.TestCase):
         self.assertLess(worst, 45)
         self.assertIn(0, retries)  # 질문 다시 쓰기는 다시 하지 않는다
 
-    @patch("infra.external_api.openai_client.OpenAI")
+    @patch("app.external_api.openai_client.OpenAI")
     def test_voice_message_stt_stays_under_the_backend_wait(self, cls: MagicMock) -> None:
         from pipeline.s4_voice import a_voice
 
@@ -104,14 +104,14 @@ class ClientLimitsTest(unittest.TestCase):
         self.assertLess(worst + 5, 60)  # BE ai.TRANSCRIBE_TIMEOUT(재시도 대기 몫 5초)
 
     def test_legacy_tts_timeouts_are_under_the_backend_timeout(self) -> None:
-        from infra.external_api.tts.elevenlabs import ElevenLabsTTSProvider
-        from infra.external_api.tts.minimax import MiniMaxTTSProvider
+        from app.external_api.tts.elevenlabs import ElevenLabsTTSProvider
+        from app.external_api.tts.minimax import MiniMaxTTSProvider
 
         self.assertLess(ElevenLabsTTSProvider(api_key="k").timeout_seconds, 45)
         self.assertLess(MiniMaxTTSProvider(api_key="k").timeout_seconds, 45)
 
     def test_health_does_not_use_the_threadpool(self) -> None:
-        from infra.be_ai_api.routes.health import health
+        from app.api.routes.health import health
 
         self.assertTrue(inspect.iscoroutinefunction(health))
 
@@ -129,13 +129,13 @@ class AnalysisErrorsTest(unittest.TestCase):
             persons_result=None, sensitivity_result=None, settings=_settings(),
         )
 
-    @patch("infra.external_api.openai_client.OpenAI")
+    @patch("app.external_api.openai_client.OpenAI")
     def test_analysis_uses_analysis_limits(self, cls: MagicMock) -> None:
         cls.return_value.chat.completions.create.return_value = _reply('{"memorySegments": []}')
         self.assertEqual(self._run_memory(cls)["memorySegments"], [])
         self.assertEqual(cls.call_args.kwargs["timeout"], 300)
 
-    @patch("infra.external_api.openai_client.OpenAI")
+    @patch("app.external_api.openai_client.OpenAI")
     def test_timeout_becomes_coded_422(self, cls: MagicMock) -> None:
         cls.return_value.chat.completions.create.side_effect = openai.APITimeoutError(
             request=httpx.Request("POST", "https://api.openai.com/v1/chat/completions")
@@ -144,22 +144,22 @@ class AnalysisErrorsTest(unittest.TestCase):
             self._run_memory(cls)
         self.assertEqual((caught.exception.code, caught.exception.status_code), ("ANALYSIS_TOO_LONG", 422))
 
-    @patch("infra.external_api.openai_client.OpenAI")
+    @patch("app.external_api.openai_client.OpenAI")
     def test_truncated_output_becomes_coded_422(self, cls: MagicMock) -> None:
         cls.return_value.chat.completions.create.return_value = _reply('{"memorySegments": [{"memo', "length")
         with self.assertRaises(AnalysisTooLongError):
             self._run_memory(cls)
 
-    @patch("infra.external_api.openai_client.OpenAI")
+    @patch("app.external_api.openai_client.OpenAI")
     def test_malformed_output_becomes_coded_502(self, cls: MagicMock) -> None:
         cls.return_value.chat.completions.create.return_value = _reply("not json")
         with self.assertRaises(AnalysisBadOutputError) as caught:
             self._run_memory(cls)
         self.assertEqual(caught.exception.status_code, 502)
 
-    @patch("infra.external_api.openai_client.OpenAI")
+    @patch("app.external_api.openai_client.OpenAI")
     def test_every_analysis_stage_maps_truncation(self, cls: MagicMock) -> None:
-        from infra.schema.insight import ReflectionRequest
+        from app.schema.insight import ReflectionRequest
         from pipeline.s2_extraction.a_extract_persons import run_persons_analysis
         from pipeline.s2_extraction.b_extract_sensitivity import run_sensitivity_analysis
         from pipeline.s2_extraction.c_extract_linguistic_style import run_linguistic_style_analysis
@@ -190,7 +190,7 @@ class AnalysisErrorsTest(unittest.TestCase):
         from main import app
 
         client = TestClient(app, raise_server_exceptions=False)
-        with patch("infra.be_ai_api.routes.analysis.run_recording_analysis",
+        with patch("app.api.routes.analysis.run_recording_analysis",
                    side_effect=AnalysisTooLongError("memory extraction")):
             response = client.post("/v1/analysis/recording", json={
                 "jobId": "00000000-0000-0000-0000-000000000001",
@@ -212,7 +212,7 @@ class EmbeddingBatchTest(unittest.TestCase):
     def _echo(**kwargs):
         return SimpleNamespace(data=[SimpleNamespace(embedding=[float(t[1:])]) for t in kwargs["input"]])
 
-    @patch("infra.external_api.openai_client.OpenAI")
+    @patch("app.external_api.openai_client.OpenAI")
     def test_many_items_go_in_batches_and_keep_order(self, cls: MagicMock) -> None:
         from pipeline.s3_synthesis.d_build_memory_embedding import EMBED_BATCH_ITEMS, embed_texts
 
@@ -223,7 +223,7 @@ class EmbeddingBatchTest(unittest.TestCase):
         sizes = [len(c.kwargs["input"]) for c in cls.return_value.embeddings.create.call_args_list]
         self.assertEqual(sizes, [EMBED_BATCH_ITEMS, EMBED_BATCH_ITEMS, 600 - 2 * EMBED_BATCH_ITEMS])
 
-    @patch("infra.external_api.openai_client.OpenAI")
+    @patch("app.external_api.openai_client.OpenAI")
     def test_long_texts_are_split_by_characters(self, cls: MagicMock) -> None:
         from pipeline.s3_synthesis.d_build_memory_embedding import EMBED_BATCH_CHARS, embed_texts
 
@@ -234,7 +234,7 @@ class EmbeddingBatchTest(unittest.TestCase):
         for c in cls.return_value.embeddings.create.call_args_list:
             self.assertLessEqual(sum(len(t) for t in c.kwargs["input"]), EMBED_BATCH_CHARS)
 
-    @patch("infra.external_api.openai_client.OpenAI")
+    @patch("app.external_api.openai_client.OpenAI")
     def test_count_mismatch_is_an_error_not_a_silent_shift(self, cls: MagicMock) -> None:
         from pipeline.s3_synthesis.d_build_memory_embedding import embed_texts
 

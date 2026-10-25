@@ -7,7 +7,7 @@ import httpx
 import openai
 from fastapi.testclient import TestClient
 
-from infra.error import (
+from app.error import (
     PROVIDER_AUTH,
     PROVIDER_BUSY,
     PROVIDER_INPUT_TOO_LARGE,
@@ -37,7 +37,7 @@ class ProviderErrorTest(unittest.TestCase):
     def test_reflection_returns_503_with_code_and_no_raw_text(self) -> None:
         client = TestClient(app, raise_server_exceptions=False)
         with patch(
-            "infra.be_ai_api.routes.persona.run_reflection",
+            "app.api.routes.persona.run_reflection",
             side_effect=_error(openai.RateLimitError, 429, QUOTA),
         ):
             response = client.post(
@@ -57,7 +57,7 @@ class MoreProviderErrorsTest(unittest.TestCase):
 
     def _post(self, error: Exception):
         client = TestClient(app, raise_server_exceptions=False)
-        with patch("infra.be_ai_api.routes.persona.run_reflection", side_effect=error):
+        with patch("app.api.routes.persona.run_reflection", side_effect=error):
             return client.post(
                 "/v1/persona/reflection",
                 json={"memories": [{"id": "m1", "memoryText": "기억", "importanceScore": 5}]},

@@ -5,9 +5,17 @@
 import importlib.util
 import unittest
 
-from infra.schema.subject import IntakeContext, SubjectContext
+from app.schema.subject import IntakeContext, SubjectContext
 from orchestrator.contracts import Generation, MemoryItem, MemorySelection, SessionState, TurnInput
-from orchestrator.guard import ASK_BACK, ASK_BACK_TOPIC, DONT_KNOW, GuardV1, GuardV11, PassGuard, ask_back_text
+from orchestrator.guard import (
+    ASK_BACK,
+    ASK_BACK_TOPIC,
+    DONT_KNOW,
+    GuardV1,
+    GuardV11,
+    PassGuard,
+    ask_back_text,
+)
 from orchestrator.lang_guard import ASK_BACK as LANG_ASK_BACK
 from orchestrator.lang_guard import LanguageGuard
 from orchestrator.persona import PersonaRegistry

@@ -106,8 +106,8 @@ class LLM:
         if mock:
             self.model = model or "mock"
             return
-        from infra.external_api.openai_client import create_openai_client
-        from infra.setting import load_settings
+        from app.external_api.openai_client import create_openai_client
+        from app.setting import load_settings
         s = load_settings(REPO / ".env")
         self.model = model or s.openai_chat_model
         self.client = create_openai_client(s, "prompt compare")
@@ -186,7 +186,7 @@ def build_orch(llm: "LLM", rules: str):
     """중간계층 구성(structured 조립 + 사전 판정 v11 + 가드 v11). 기억은 문항마다 미리 정한 것을 BE 가 준 것처럼 넘기고, 제한 기억은 선택기가 뺀다."""
     from orchestrator.llm import FakeLLM, OpenAIChatLLM
     from orchestrator.service import build_assembler, build_default, build_guard, build_precheck, build_registry, build_selector
-    from infra.setting import Settings, load_settings
+    from app.setting import Settings, load_settings
     from pydantic import SecretStr
     base = Settings(openai_api_key=SecretStr("sk-mock")) if llm.mock else load_settings(REPO / ".env")
     st = base.model_copy(update={"orchestrator_guard": "v11", "orchestrator_rules": rules,

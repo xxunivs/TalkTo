@@ -135,7 +135,7 @@ AI_INCLUDE = [
     "README.md",
     "requirements.lock",
     "main.py",
-    "infra",
+    "app",
     "pipeline",
     "orchestrator",
     "prompts",
@@ -757,8 +757,8 @@ def backend_keys() -> set[str]:
 
 
 def ai_keys() -> set[str]:
-    """AI 서버가 실제로 읽는 설정 이름(infra/setting.py 의 os.getenv). 이것 말고는 올리지 않는다."""
-    text = (AI / "infra" / "setting.py").read_text(encoding="utf-8")
+    """AI 서버가 실제로 읽는 설정 이름(app/setting.py 의 os.getenv). 이것 말고는 올리지 않는다."""
+    text = (AI / "app" / "setting.py").read_text(encoding="utf-8")
     return set(re.findall(r'os\.(?:getenv|environ\.get)\(\s*"([A-Z0-9_]+)"', text))
 
 

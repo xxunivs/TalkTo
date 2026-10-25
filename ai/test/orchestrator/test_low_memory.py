@@ -14,13 +14,33 @@ from unittest.mock import MagicMock, patch
 
 from pydantic import SecretStr, ValidationError
 
-from infra.schema.persona import PersonaResponseRequest
-from infra.setting import Settings
-from orchestrator.contracts import Generation, MemoryItem, MemorySelection, PrecheckResult, SessionState, Turn, TurnInput
-from orchestrator.guard import ASK_BACK, ASK_BACK_TOPIC, DONT_KNOW, TELL_ME, ask_back_text, says_forgot
+from app.schema.persona import PersonaResponseRequest
+from app.setting import Settings
+from orchestrator.contracts import (
+    Generation,
+    MemoryItem,
+    MemorySelection,
+    PrecheckResult,
+    SessionState,
+    Turn,
+    TurnInput,
+)
+from orchestrator.guard import (
+    ASK_BACK,
+    ASK_BACK_TOPIC,
+    DONT_KNOW,
+    TELL_ME,
+    ask_back_text,
+    says_forgot,
+)
 from orchestrator.persona import PersonaRegistry
 from orchestrator.service import build_assembler, turn_from_request
-from pipeline.persona_prompt.low_memory import LOW_MEMORY_HEAD, is_low_memory, low_memory_note, memory_count
+from pipeline.persona_prompt.low_memory import (
+    LOW_MEMORY_HEAD,
+    is_low_memory,
+    low_memory_note,
+    memory_count,
+)
 from pipeline.s3_synthesis.c_build_system_prompt import generate_persona_response
 from pipeline.s3_synthesis.common_rules import render_rules
 from pipeline.safety.minor_guard import FALLBACK, MINOR_NOTE
@@ -207,7 +227,7 @@ def _plain_messages(memories, memory_total=None, persona=None, message="밥 먹�
     if memory_total is not None:
         body["memoryTotal"] = memory_total
     req = PersonaResponseRequest.model_validate(body)
-    with patch("infra.external_api.openai_client.OpenAI") as cls:
+    with patch("app.external_api.openai_client.OpenAI") as cls:
         resp = MagicMock()
         resp.choices = [MagicMock(message=MagicMock(content=reply))]
         cls.return_value.chat.completions.create.return_value = resp
@@ -429,8 +449,8 @@ class TopicEchoSafetyTest(unittest.TestCase):
                         self.assertNotIn(word, r.text)
 
     def test_deceased_ask_back_never_has_topic_illness_or_sexual_words(self) -> None:
-        from pipeline.safety.minor_guard import DANGER, SEXUAL
         from orchestrator.guard import SENSITIVE_TOPIC
+        from pipeline.safety.minor_guard import DANGER, SEXUAL
         msgs = list(SENSITIVE_QS) + ["된장찌개 어떻게 끓였어?", "제주도 여행 어땠어?", "할머니 암 걸렸을 때 병원 어디였어?"]
         for guard in self.guards:
             for (kind, instructions), streak, msg in product(

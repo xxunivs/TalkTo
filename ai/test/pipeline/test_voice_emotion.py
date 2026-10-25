@@ -3,9 +3,9 @@ from unittest.mock import MagicMock, patch
 
 from pydantic import SecretStr
 
-from infra.external_api.tts.fish import FISH_INLINE_CUES
-from infra.schema.persona import PersonaResponseRequest
-from infra.setting import Settings
+from app.external_api.tts.fish import FISH_INLINE_CUES
+from app.schema.persona import PersonaResponseRequest
+from app.setting import Settings
 from pipeline.s3_synthesis.c_build_system_prompt import generate_persona_response
 from pipeline.s4_voice.b_emotion import (
     FISH_CUE_INSTRUCTION,
@@ -75,7 +75,7 @@ class InlineEmotionResponseTest(unittest.TestCase):
                         "voiceId": voice_id},
         })
 
-    @patch("infra.external_api.openai_client.OpenAI")
+    @patch("app.external_api.openai_client.OpenAI")
     def test_inline_returns_emotion_and_clean_text(self, mock_openai: MagicMock) -> None:
         client = _openai_returning("[감정:happy] 아이고 장하다 우리 강아지!")
         mock_openai.return_value = client
@@ -88,7 +88,7 @@ class InlineEmotionResponseTest(unittest.TestCase):
                   if m["role"] == "system"]
         self.assertTrue(any("[감정:이름]" in s for s in system))
 
-    @patch("infra.external_api.openai_client.OpenAI")
+    @patch("app.external_api.openai_client.OpenAI")
     def test_off_keeps_previous_behaviour(self, mock_openai: MagicMock) -> None:
         client = _openai_returning("아이고 장하다!")
         mock_openai.return_value = client
@@ -98,7 +98,7 @@ class InlineEmotionResponseTest(unittest.TestCase):
                   if m["role"] == "system"]
         self.assertFalse(any("[감정:이름]" in s for s in system))
 
-    @patch("infra.external_api.openai_client.OpenAI")
+    @patch("app.external_api.openai_client.OpenAI")
     def test_elevenlabs_voice_gets_no_emotion_instruction(self, mock_openai: MagicMock) -> None:
         # v4 는 글을 보고 감정을 싣는다. 감정 지침을 넣지 않는다.
         client = _openai_returning("아이고 장하다!")
@@ -110,7 +110,7 @@ class InlineEmotionResponseTest(unittest.TestCase):
                   if m["role"] == "system"]
         self.assertFalse(any("[감정:이름]" in s for s in system))
 
-    @patch("infra.external_api.openai_client.OpenAI")
+    @patch("app.external_api.openai_client.OpenAI")
     def test_fish_voice_gets_no_emotion_instruction(self, mock_openai: MagicMock) -> None:
         # drama-3 는 감정 표시 없이도 감정을 싣는다. [ ] 표시는 오히려 연기 지시로 읽힌다.
         client = _openai_returning("아이고 장하다!")
@@ -168,7 +168,7 @@ class FishCueEmotionTest(unittest.TestCase):
         voice = split_voice("[감정:sad] 아이고 [울면서] 보고 싶다 [미소].", "cue", deceased=True)
         self.assertEqual((voice.emotion, voice.text, voice.speech_text()), ("calm", "아이고 보고 싶다.", None))
 
-    @patch("infra.external_api.openai_client.OpenAI")
+    @patch("app.external_api.openai_client.OpenAI")
     def test_plain_path_one_call(self, mock_openai: MagicMock) -> None:
         client = _openai_returning("[감정:warm] 아이고 장하다 우리 강아지!")
         mock_openai.return_value = client
@@ -181,7 +181,7 @@ class FishCueEmotionTest(unittest.TestCase):
         self.assertEqual(system[0], "너는 할머니다.")
         self.assertEqual(system[1], FISH_CUE_INSTRUCTION)  # 지시문 바로 뒤
 
-    @patch("infra.external_api.openai_client.OpenAI")
+    @patch("app.external_api.openai_client.OpenAI")
     def test_cue_is_only_for_fish_voices(self, mock_openai: MagicMock) -> None:
         client = _openai_returning("[감정:warm] 아이고!")
         mock_openai.return_value = client
@@ -236,7 +236,7 @@ class FishInlineCueTest(unittest.TestCase):
         self.assertEqual(voice.speech_text("밥은 챙겨 먹어라."), "[걱정스럽게] 밥은 챙겨 먹어라.")
         self.assertIsNone(voice.speech_text("글쎄, 그건 기억이 잘 안 나네."))
 
-    @patch("infra.external_api.openai_client.OpenAI")
+    @patch("app.external_api.openai_client.OpenAI")
     def test_plain_path_returns_clean_content_and_speech_text(self, mock_openai: MagicMock) -> None:
         client = _openai_returning("[반갑게] 아이고, 장하다! [작게 웃으며] 우리 강아지 고생했다.")
         mock_openai.return_value = client
@@ -251,7 +251,7 @@ class FishInlineCueTest(unittest.TestCase):
         self.assertIn(" ".join(FISH_INLINE_CUES), system[1])
         self.assertFalse(any("울" in cue or "흐느" in cue for cue in FISH_INLINE_CUES))  # 고인 안전선
 
-    @patch("infra.external_api.openai_client.OpenAI")
+    @patch("app.external_api.openai_client.OpenAI")
     def test_fixed_prompt_persona_gets_it_too(self, mock_openai: MagicMock) -> None:
         # 가져온 지침(fixedPrompt)도 기존 경로로 같은 지침을 받는다(말투 덧붙임만 빠진다)
         client = _openai_returning("[웃으며] 왔니.")
@@ -261,7 +261,7 @@ class FishInlineCueTest(unittest.TestCase):
         self.assertEqual((result.content, result.speech_text), ("왔니.", "[웃으며] 왔니."))
         self.assertEqual(_system(client)[1], FISH_INLINE_INSTRUCTION)
 
-    @patch("infra.external_api.openai_client.OpenAI")
+    @patch("app.external_api.openai_client.OpenAI")
     def test_off_has_no_speech_text(self, mock_openai: MagicMock) -> None:
         client = _openai_returning("[웃으며] 왔니.")
         mock_openai.return_value = client

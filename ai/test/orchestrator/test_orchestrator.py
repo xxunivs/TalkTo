@@ -8,8 +8,8 @@ from unittest.mock import MagicMock, patch
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
 
-from infra.schema.persona import PersonaResponseRequest
-from infra.setting import Settings, get_settings
+from app.schema.persona import PersonaResponseRequest
+from app.setting import Settings, get_settings
 from main import app
 from orchestrator import cli
 from orchestrator.contracts import TurnInput
@@ -50,11 +50,11 @@ class LegacyEquivalenceTest(unittest.TestCase):
     def test_same_messages_and_result(self) -> None:
         req = PersonaResponseRequest.model_validate(REQUEST)
         settings = _settings()
-        with patch("infra.external_api.openai_client.OpenAI") as legacy_cls:
+        with patch("app.external_api.openai_client.OpenAI") as legacy_cls:
             legacy_cls.return_value = _mock_openai()
             legacy = generate_persona_response(req, settings=settings)
             legacy_kwargs = legacy_cls.return_value.chat.completions.create.call_args.kwargs
-        with patch("infra.external_api.openai_client.OpenAI") as orch_cls:
+        with patch("app.external_api.openai_client.OpenAI") as orch_cls:
             orch_cls.return_value = _mock_openai()
             orch = orchestrate_persona_response(req, settings=settings, orchestrator=build_default(settings))
             orch_kwargs = orch_cls.return_value.chat.completions.create.call_args.kwargs
@@ -87,8 +87,8 @@ class RouteFlagTest(unittest.TestCase):
         return self.client.post("/v1/persona/responses", json=body)
 
     def test_flag_off_uses_legacy(self) -> None:
-        with patch("infra.be_ai_api.routes.persona.orchestrate_persona_response") as orch, \
-                patch("infra.external_api.openai_client.OpenAI") as cls:
+        with patch("app.api.routes.persona.orchestrate_persona_response") as orch, \
+                patch("app.external_api.openai_client.OpenAI") as cls:
             cls.return_value = _mock_openai()
             r = self._post(False, REQUEST)
         self.assertEqual(r.status_code, 200)
@@ -96,8 +96,8 @@ class RouteFlagTest(unittest.TestCase):
         self.assertEqual(r.json()["content"], "남원이지.")
 
     def test_flag_on_uses_orchestrator_and_keeps_contract(self) -> None:
-        with patch("infra.be_ai_api.routes.persona.generate_persona_response") as legacy, \
-                patch("infra.external_api.openai_client.OpenAI") as cls:
+        with patch("app.api.routes.persona.generate_persona_response") as legacy, \
+                patch("app.external_api.openai_client.OpenAI") as cls:
             cls.return_value = _mock_openai()
             r = self._post(True, dict(REQUEST, sessionId="sess-1", speakerHint="손녀"))
         self.assertEqual(r.status_code, 200)
@@ -109,8 +109,8 @@ class RouteFlagTest(unittest.TestCase):
 
     def test_fixed_prompt_skips_orchestrator_even_when_flag_on(self) -> None:
         body = dict(REQUEST, persona=dict(REQUEST["persona"], fixedPrompt=True))
-        with patch("infra.be_ai_api.routes.persona.orchestrate_persona_response") as orch, \
-                patch("infra.external_api.openai_client.OpenAI") as cls:
+        with patch("app.api.routes.persona.orchestrate_persona_response") as orch, \
+                patch("app.external_api.openai_client.OpenAI") as cls:
             cls.return_value = _mock_openai()
             r = self._post(True, body)
             messages = cls.return_value.chat.completions.create.call_args.kwargs["messages"]
@@ -123,7 +123,7 @@ class RouteFlagTest(unittest.TestCase):
         self.assertEqual(r.json()["retrievedMemoryIds"], ["m1", "m2"])
 
     def test_new_optional_fields_accepted_by_legacy(self) -> None:
-        with patch("infra.external_api.openai_client.OpenAI") as cls:
+        with patch("app.external_api.openai_client.OpenAI") as cls:
             cls.return_value = _mock_openai()
             r = self._post(False, dict(REQUEST, sessionId="sess-1"))
         self.assertEqual(r.status_code, 200)

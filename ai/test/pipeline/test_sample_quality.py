@@ -7,7 +7,7 @@ from unittest import mock
 
 import numpy as np
 
-from infra.schema.voice import VoiceSampleSegment
+from app.schema.voice import VoiceSampleSegment
 from pipeline.s4_voice import a_voice
 from pipeline.s4_voice import c_sample_quality as quality
 

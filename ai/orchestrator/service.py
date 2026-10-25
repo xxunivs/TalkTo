@@ -8,13 +8,13 @@ import threading
 from datetime import UTC, datetime, timezone
 from pathlib import Path
 
-from infra.schema.persona import (
+from app.schema.persona import (
     MemoryContext,
     MemoryGap,
     PersonaResponseRequest,
     PersonaResponseResult,
 )
-from infra.setting import Settings
+from app.setting import Settings
 from orchestrator.assembler import LegacyAssembler, StructuredAssembler
 from orchestrator.contracts import MemoryItem, StyleFix, Turn, TurnInput
 from orchestrator.guard import GuardV1, GuardV11, PassGuard

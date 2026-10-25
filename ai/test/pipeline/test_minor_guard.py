@@ -4,11 +4,19 @@
 """
 import unittest
 
-from infra.schema.persona import ConversationMessage
+from app.schema.persona import ConversationMessage
 from orchestrator.precheck import is_safety_turn
 from pipeline.s3_synthesis.common_rules import RULES_DIR
 from pipeline.safety.minor_guard import (
-    FALLBACK, MINOR_NOTE, blocked_result, blocking_hits, filter_reply, input_blocked, is_minor, is_polite, reply_hits,
+    FALLBACK,
+    MINOR_NOTE,
+    blocked_result,
+    blocking_hits,
+    filter_reply,
+    input_blocked,
+    is_minor,
+    is_polite,
+    reply_hits,
     safe_history,
 )
 

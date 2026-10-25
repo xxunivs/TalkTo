@@ -3,16 +3,16 @@
 import json
 import logging
 
-from infra.error import AppError
-from infra.external_api.openai_client import create_openai_client
-from infra.schema.embedding import (
+from app.error import AppError
+from app.external_api.openai_client import create_openai_client
+from app.schema.embedding import (
     EmbeddingRequest,
     EmbeddingResponse,
     EmbeddingResult,
     QueryEmbeddingRequest,
     QueryEmbeddingResponse,
 )
-from infra.setting import Settings
+from app.setting import Settings
 
 logger = logging.getLogger(__name__)
 

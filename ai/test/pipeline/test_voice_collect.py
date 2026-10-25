@@ -1,14 +1,14 @@
 import unittest
 from uuid import uuid4
 
-from infra.error import InvalidVoiceSampleError
+from app.error import InvalidVoiceSampleError
+from app.schema.memory import PersistedTranscriptSegment
+from app.schema.voice import VoiceCloneFromTranscriptRequest, VoiceSampleSegment
 from pipeline.s4_voice.a_voice import (
     clone_voice_from_transcript,
     collect_subject_samples,
     select_clone_samples,
 )
-from infra.schema.memory import PersistedTranscriptSegment
-from infra.schema.voice import VoiceCloneFromTranscriptRequest, VoiceSampleSegment
 
 _URL = "https://storage/recording.wav"
 

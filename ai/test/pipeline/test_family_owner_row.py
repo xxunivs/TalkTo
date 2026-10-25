@@ -9,9 +9,9 @@ import unittest
 
 from pydantic import SecretStr
 
-from infra.schema.persona import PersonaAssemblyRequest
-from infra.schema.subject import FamilyNote, IntakeContext, SubjectContext
-from infra.setting import Settings
+from app.schema.persona import PersonaAssemblyRequest
+from app.schema.subject import FamilyNote, IntakeContext, SubjectContext
+from app.setting import Settings
 from pipeline.persona_prompt.from_intake import spec_from_intake
 from pipeline.persona_prompt.render import FAMILY_HEAD, render_layered_prompt
 from pipeline.s3_synthesis.c_build_system_prompt import (

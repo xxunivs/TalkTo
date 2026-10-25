@@ -9,8 +9,8 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
 
-from infra.schema.subject import IntakeContext, SubjectContext
-from infra.setting import Settings, get_settings
+from app.schema.subject import IntakeContext, SubjectContext
+from app.setting import Settings, get_settings
 from main import app
 from pipeline.persona_prompt.from_intake import spec_from_intake
 from pipeline.persona_prompt.layers import static_flags

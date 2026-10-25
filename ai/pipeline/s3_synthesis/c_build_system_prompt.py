@@ -4,9 +4,9 @@ import json
 import logging
 from collections import Counter
 
-from infra.error import EmptyReplyError
-from infra.external_api.openai_client import chat_client, create_openai_client
-from infra.schema.persona import (
+from app.error import EmptyReplyError
+from app.external_api.openai_client import chat_client, create_openai_client
+from app.schema.persona import (
     MemoryCandidate,
     MemoryCandidateRequest,
     MemoryCandidateResponse,
@@ -16,9 +16,9 @@ from infra.schema.persona import (
     PersonaResponseRequest,
     PersonaResponseResult,
 )
-from infra.schema.subject import FamilyNote, IntakeContext, SubjectContext
-from infra.schema.transcript import TranscriptSegment
-from infra.setting import Settings
+from app.schema.subject import FamilyNote, IntakeContext, SubjectContext
+from app.schema.transcript import TranscriptSegment
+from app.setting import Settings
 from orchestrator.guard import ASK_BACK, CRISIS_LINE, drop_forgetting, says_forgot
 from orchestrator.persona import infer_profile
 from orchestrator.precheck import is_safety_turn

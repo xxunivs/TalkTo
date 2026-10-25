@@ -2,10 +2,10 @@ import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from infra.setting import load_settings
-from pipeline.s1_transcription.b_speaker_id import SpeakerMatch
+from app.schema.transcript import TranscriptionRequest, TranscriptSegment
+from app.setting import load_settings
 from pipeline.s1_transcription.a_transcript import _identify_subject_speaker
-from infra.schema.transcript import TranscriptionRequest, TranscriptSegment
+from pipeline.s1_transcription.b_speaker_id import SpeakerMatch
 
 _SEGMENTS = [
     TranscriptSegment(
@@ -80,7 +80,7 @@ class SpeakerIdentificationTest(unittest.TestCase):
         self, mock_embedder: MagicMock, mock_download: MagicMock
     ) -> None:
         # 참조 샘플 주소가 만료돼도 전사를 막지 않는다. 로그에는 오류 코드만(주소는 남기지 않는다).
-        from infra.error import AudioUrlExpiredError
+        from app.error import AudioUrlExpiredError
 
         mock_download.side_effect = AudioUrlExpiredError()
         with self.assertLogs("pipeline.s1_transcription.a_transcript", level="WARNING") as logs:

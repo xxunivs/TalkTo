@@ -6,9 +6,9 @@ from unittest.mock import MagicMock, patch
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
 
-from infra.error import EmptyReplyError
-from infra.schema.persona import PersonaResponseRequest
-from infra.setting import Settings, get_settings
+from app.error import EmptyReplyError
+from app.schema.persona import PersonaResponseRequest
+from app.setting import Settings, get_settings
 from main import app
 from orchestrator.contracts import Generation, MemoryItem, MemorySelection, SessionState, TurnInput
 from orchestrator.guard import ASK_BACK, GuardV1, GuardV11
@@ -113,9 +113,9 @@ class EmptyReplyTest(unittest.TestCase):
             orch.run(t)
         self.assertNotIn("sess", orch.sessions._data)  # 실패한 턴은 세션에 남기지 않는다
 
-    @patch("infra.external_api.openai_client.OpenAI")
+    @patch("app.external_api.openai_client.OpenAI")
     def test_api_returns_502_and_skips_empty_history(self, cls: MagicMock) -> None:
-        from infra.external_api import openai_client
+        from app.external_api import openai_client
 
         openai_client._clients.clear()
         self.addCleanup(openai_client._clients.clear)

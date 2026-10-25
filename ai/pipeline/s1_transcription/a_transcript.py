@@ -1,16 +1,16 @@
 import logging
 from pathlib import Path
 
-from infra.error import AppError, AudioTooShortError, EmptyTranscriptError
-from infra.external_api.audio import download_audio
-from infra.external_api.stt import STTProvider
-from infra.schema.transcript import (
+from app.error import AppError, AudioTooShortError, EmptyTranscriptError
+from app.external_api.audio import download_audio
+from app.external_api.stt import STTProvider
+from app.schema.transcript import (
     TranscriptionRequest,
     TranscriptionResponse,
     TranscriptSegment,
 )
-from infra.scratch import scratch_dir
-from infra.setting import Settings
+from app.scratch import scratch_dir
+from app.setting import Settings
 from pipeline.s1_transcription.c_correction import build_glossary, correct_segments
 
 logger = logging.getLogger(__name__)

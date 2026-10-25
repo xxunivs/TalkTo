@@ -4,9 +4,21 @@ from pathlib import Path
 
 from pydantic import SecretStr
 
-from infra.setting import Settings
-from orchestrator.assembler import StructuredAssembler, adopt_death_rule, death_rule_lead, dedupe_rules
-from orchestrator.contracts import MemoryItem, MemorySelection, PrecheckResult, SessionState, Turn, TurnInput
+from app.setting import Settings
+from orchestrator.assembler import (
+    StructuredAssembler,
+    adopt_death_rule,
+    death_rule_lead,
+    dedupe_rules,
+)
+from orchestrator.contracts import (
+    MemoryItem,
+    MemorySelection,
+    PrecheckResult,
+    SessionState,
+    Turn,
+    TurnInput,
+)
 from orchestrator.persona import PersonaRegistry, infer_profile
 from orchestrator.service import build_default
 from pipeline.s3_synthesis.c_build_system_prompt import fixed_rules

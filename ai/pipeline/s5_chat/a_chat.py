@@ -8,13 +8,13 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from infra.schema.persona import (
+from app.schema.persona import (
     ConversationMessage,
     MemoryContext,
     PersonaContext,
     PersonaResponseRequest,
 )
-from infra.setting import Settings, load_settings
+from app.setting import Settings, load_settings
 from pipeline.s3_synthesis.c_build_system_prompt import generate_persona_response
 from pipeline.s3_synthesis.d_build_memory_embedding import embed_texts
 
@@ -224,7 +224,7 @@ def _maybe_synthesize(
     emotion: str | None = None,
 ) -> str | None:
     """--tts 응답 음성 합성, mp3 저장 (실패해도 대화 계속)"""
-    from infra.schema.voice import SpeechSynthesisRequest
+    from app.schema.voice import SpeechSynthesisRequest
     from pipeline.s4_voice.a_voice import synthesize_speech
 
     try:

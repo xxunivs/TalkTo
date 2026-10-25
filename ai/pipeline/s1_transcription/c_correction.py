@@ -6,10 +6,10 @@ import re
 
 from openai import OpenAI  # 타입 힌트용
 
-from infra.external_api.openai_client import create_openai_client
-from infra.schema.subject import IntakeContext, SubjectContext
-from infra.schema.transcript import TranscriptSegment
-from infra.setting import Settings
+from app.external_api.openai_client import create_openai_client
+from app.schema.subject import IntakeContext, SubjectContext
+from app.schema.transcript import TranscriptSegment
+from app.setting import Settings
 
 logger = logging.getLogger(__name__)
 

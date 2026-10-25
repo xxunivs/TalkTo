@@ -4,7 +4,7 @@ import unittest
 
 from pydantic import SecretStr
 
-from infra.setting import Settings
+from app.setting import Settings
 from orchestrator.contracts import MemoryItem, MemorySelection, SessionState, TurnInput
 from orchestrator.precheck import is_question, profile_section, strip_preamble
 

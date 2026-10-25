@@ -3,9 +3,9 @@
 import logging
 import re
 
-from infra.external_api.openai_client import analysis_client, analysis_completion, json_reply
-from infra.schema.transcript import TranscriptSegment
-from infra.setting import Settings
+from app.external_api.openai_client import analysis_client, analysis_completion, json_reply
+from app.schema.transcript import TranscriptSegment
+from app.setting import Settings
 from pipeline.s2_extraction.e_extract_memory import _ALLOWED_TAGS
 
 logger = logging.getLogger(__name__)

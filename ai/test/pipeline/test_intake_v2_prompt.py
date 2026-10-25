@@ -9,8 +9,8 @@ import unittest
 
 from pydantic import SecretStr
 
-from infra.schema.persona import PersonaAssemblyRequest
-from infra.setting import Settings
+from app.schema.persona import PersonaAssemblyRequest
+from app.setting import Settings
 from pipeline.s3_synthesis.c_build_system_prompt import assemble_persona_instructions
 
 # BE intake.build_intake 의 모양(개편 뒤 가족·고인, C-05·M3-01 없음)

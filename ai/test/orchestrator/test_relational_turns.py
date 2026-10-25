@@ -9,7 +9,14 @@ import importlib.util
 import unittest
 from pathlib import Path
 
-from orchestrator.contracts import Generation, MemoryItem, MemorySelection, PersonaProfile, SessionState, TurnInput
+from orchestrator.contracts import (
+    Generation,
+    MemoryItem,
+    MemorySelection,
+    PersonaProfile,
+    SessionState,
+    TurnInput,
+)
 from orchestrator.guard import ASK_BACK, GuardV1, GuardV11
 from orchestrator.persona import PersonaRegistry
 from orchestrator.precheck import CoveragePrecheck, CoveragePrecheckV11, strip_relational

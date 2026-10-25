@@ -1,7 +1,14 @@
 """언어 누출 가드: 맥락에 없던 문자·영어 낱말·추론 문장만 잡고, 영어로 대화하면 영어 답은 통과."""
 import unittest
 
-from orchestrator.contracts import Generation, GuardResult, MemoryItem, MemorySelection, SessionState, TurnInput
+from orchestrator.contracts import (
+    Generation,
+    GuardResult,
+    MemoryItem,
+    MemorySelection,
+    SessionState,
+    TurnInput,
+)
 from orchestrator.guard import PassGuard
 from orchestrator.lang_guard import LanguageGuard, findings, scripts
 from orchestrator.persona import PersonaRegistry

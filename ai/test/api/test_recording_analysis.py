@@ -20,7 +20,7 @@ class RecordingAnalysisTest(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.client = TestClient(app)
 
-    @patch("infra.external_api.openai_client.OpenAI")
+    @patch("app.external_api.openai_client.OpenAI")
     def test_combined_analysis_maps_all_sections(self, mock_openai: MagicMock) -> None:
         seg_id = str(uuid.uuid4())
         client = MagicMock()
@@ -96,7 +96,7 @@ class SubjectSpeakerTest(unittest.TestCase):
             for i, label in enumerate(labels)
         ]
 
-    @patch("infra.external_api.openai_client.OpenAI")
+    @patch("app.external_api.openai_client.OpenAI")
     def test_suggests_label_from_content(self, mock_openai: MagicMock) -> None:
         client = MagicMock()
         client.chat.completions.create.return_value = _chat_response('{"subjectSpeakerLabel": "SPK_0"}')
@@ -108,7 +108,7 @@ class SubjectSpeakerTest(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["subjectSpeakerLabel"], "SPK_0")
 
-    @patch("infra.external_api.openai_client.OpenAI")
+    @patch("app.external_api.openai_client.OpenAI")
     def test_unknown_label_from_llm_is_dropped(self, mock_openai: MagicMock) -> None:
         client = MagicMock()
         client.chat.completions.create.return_value = _chat_response('{"subjectSpeakerLabel": "SPK_9"}')
@@ -117,7 +117,7 @@ class SubjectSpeakerTest(unittest.TestCase):
             "transcriptSegments": self._segments(["SPK_0", "SPK_1"])})
         self.assertIsNone(response.json()["subjectSpeakerLabel"])
 
-    @patch("infra.external_api.openai_client.OpenAI")
+    @patch("app.external_api.openai_client.OpenAI")
     def test_single_speaker_needs_no_llm(self, mock_openai: MagicMock) -> None:
         response = self.client.post("/v1/analysis/subject-speaker", json={
             "transcriptSegments": self._segments(["SPK_3", "SPK_3"])})

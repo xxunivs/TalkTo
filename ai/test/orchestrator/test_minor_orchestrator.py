@@ -7,15 +7,27 @@ from unittest.mock import MagicMock, patch
 
 from pydantic import SecretStr
 
-from infra.schema.persona import PersonaResponseRequest
-from infra.setting import Settings
+from app.schema.persona import PersonaResponseRequest
+from app.setting import Settings
 from orchestrator.assembler import StructuredAssembler
-from orchestrator.contracts import Generation, GuardResult, MemorySelection, PrecheckResult, SessionState, TurnInput
+from orchestrator.contracts import (
+    Generation,
+    GuardResult,
+    MemorySelection,
+    PrecheckResult,
+    SessionState,
+    TurnInput,
+)
 from orchestrator.guard import PassGuard
 from orchestrator.llm import FakeLLM
 from orchestrator.minor_guard import MinorGuard
 from orchestrator.persona import PersonaRegistry
-from orchestrator.service import build_default, build_guard, orchestrate_persona_response, turn_from_request
+from orchestrator.service import (
+    build_default,
+    build_guard,
+    orchestrate_persona_response,
+    turn_from_request,
+)
 from pipeline.s3_synthesis.c_build_system_prompt import generate_persona_response
 from pipeline.s3_synthesis.common_rules import RULES_DIR
 from pipeline.safety.minor_guard import FALLBACK, MINOR_NOTE
@@ -106,11 +118,11 @@ class AssemblerTest(unittest.TestCase):
     def test_legacy_assembler_matches_plain_path(self) -> None:
         settings = Settings(openai_api_key=SecretStr("sk-test"))
         req = request(minor=True)
-        with patch("infra.external_api.openai_client.OpenAI") as cls:
+        with patch("app.external_api.openai_client.OpenAI") as cls:
             cls.return_value = _mock_openai("급식에 떡볶이 나왔어!")
             plain = generate_persona_response(req, settings=settings)
             plain_messages = cls.return_value.chat.completions.create.call_args.kwargs["messages"]
-        with patch("infra.external_api.openai_client.OpenAI") as cls:
+        with patch("app.external_api.openai_client.OpenAI") as cls:
             cls.return_value = _mock_openai("급식에 떡볶이 나왔어!")
             orch = orchestrate_persona_response(req, settings=settings, orchestrator=build_default(settings))
             orch_messages = cls.return_value.chat.completions.create.call_args.kwargs["messages"]

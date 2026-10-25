@@ -4,7 +4,7 @@ from pathlib import Path
 
 from pydantic import SecretStr
 
-from infra.setting import Settings
+from app.setting import Settings
 from orchestrator.contracts import Generation, MemoryItem, MemorySelection, SessionState, TurnInput
 from orchestrator.guard import ASK_BACK, GuardV1, parse_header
 from orchestrator.llm import FakeLLM

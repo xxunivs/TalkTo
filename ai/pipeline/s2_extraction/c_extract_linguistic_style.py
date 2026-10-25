@@ -2,10 +2,10 @@
 
 import logging
 
-from infra.external_api.openai_client import analysis_client, analysis_completion, json_reply
-from infra.schema.subject import SubjectContext
-from infra.schema.transcript import TranscriptSegment
-from infra.setting import Settings
+from app.external_api.openai_client import analysis_client, analysis_completion, json_reply
+from app.schema.subject import SubjectContext
+from app.schema.transcript import TranscriptSegment
+from app.setting import Settings
 
 logger = logging.getLogger(__name__)
 

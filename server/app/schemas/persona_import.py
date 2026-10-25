@@ -65,7 +65,7 @@ DEATH_POLICIES = ("deny", "brief", "ask_only", "open")
 DEATH_RULE_SLOT = "{{death_rule}}"
 DEATH_ANSWER_SLOT = "{{death_answer}}"
 LISTENER_SLOT = "{{listener_line}}"
-# AI 서버 /v1/persona/responses 의 지침 상한(AI 레포 infra/schema/persona.py)
+# AI 서버 /v1/persona/responses 의 지침 상한(AI 레포 app/schema/persona.py)
 MAX_INSTRUCTIONS = 50_000
 MAX_MEMORIES = 200
 MAX_PROBES = 5

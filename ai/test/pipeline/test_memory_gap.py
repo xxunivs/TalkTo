@@ -10,8 +10,8 @@ from unittest.mock import MagicMock, patch
 from fastapi.testclient import TestClient
 from pydantic import SecretStr, ValidationError
 
-from infra.schema.persona import GapQuestionRequest, PersonaResponseRequest, StyleExample
-from infra.setting import Settings, get_settings
+from app.schema.persona import GapQuestionRequest, PersonaResponseRequest, StyleExample
+from app.setting import Settings, get_settings
 from main import app
 from orchestrator.contracts import GuardResult, PrecheckResult, StyleFix, TurnInput
 from orchestrator.guard import PassGuard
@@ -59,7 +59,7 @@ def _mock_openai(content: str) -> MagicMock:
 
 def _legacy(body: dict, reply: str, **settings_kw):
     req = PersonaResponseRequest.model_validate(body)
-    with patch("infra.external_api.openai_client.OpenAI") as cls:
+    with patch("app.external_api.openai_client.OpenAI") as cls:
         cls.return_value = _mock_openai(reply)
         result = generate_persona_response(req, settings=_settings(**settings_kw))
         messages = cls.return_value.chat.completions.create.call_args.kwargs["messages"]
@@ -187,7 +187,7 @@ class OrchestratorTest(unittest.TestCase):
         reply = "노래? 많이 불렀지. [기억없음:노래]"
         plain, plain_messages = _legacy(body, reply)
         settings = _settings()
-        with patch("infra.external_api.openai_client.OpenAI") as cls:
+        with patch("app.external_api.openai_client.OpenAI") as cls:
             cls.return_value = _mock_openai(reply)
             orch = orchestrate_persona_response(PersonaResponseRequest.model_validate(body), settings=settings,
                                                 orchestrator=build_default(settings))
@@ -283,7 +283,7 @@ class RouteTest(unittest.TestCase):
 
     def test_responses_route_returns_memory_gap_on_both_paths(self) -> None:
         for flag in (False, True):
-            with patch("infra.external_api.openai_client.OpenAI") as cls:
+            with patch("app.external_api.openai_client.OpenAI") as cls:
                 cls.return_value = _mock_openai("글쎄다. [기억없음:노래]")
                 r = self._post("/v1/persona/responses", dict(REQUEST, flagGaps=True), persona_orchestrator=flag)
             self.assertEqual(r.status_code, 200, r.text)
@@ -308,7 +308,7 @@ class RouteTest(unittest.TestCase):
             ({"action": "new", "question": ""}, {"action": "skip"}),
         ]
         for reply, expected in answers:
-            with patch("infra.external_api.openai_client.OpenAI") as cls:
+            with patch("app.external_api.openai_client.OpenAI") as cls:
                 cls.return_value = _mock_openai(json.dumps(reply, ensure_ascii=False))
                 r = self._post("/v1/persona/gap-question", body)
                 sent = cls.return_value.chat.completions.create.call_args.kwargs["messages"]
@@ -321,21 +321,21 @@ class RouteTest(unittest.TestCase):
 
     def test_gap_question_bad_json_skips(self) -> None:
         req = GapQuestionRequest.model_validate({"candidate": {"userMessage": "뭐 좋아하셨어요?"}})
-        with patch("infra.external_api.openai_client.OpenAI") as cls:
+        with patch("app.external_api.openai_client.OpenAI") as cls:
             cls.return_value = _mock_openai("not json")
             self.assertEqual(make_gap_question(req, settings=_settings()).action, "skip")
 
     def test_gap_question_tense_follows_subject(self) -> None:
         for extra, phrase in (({"deceased": False}, "살아 계신 분이다"), ({"subjectSelf": True}, "만든 분 자신이 그분이다")):
             req = GapQuestionRequest.model_validate({"candidate": {"userMessage": "뭐 좋아해요?"}, **extra})
-            with patch("infra.external_api.openai_client.OpenAI") as cls:
+            with patch("app.external_api.openai_client.OpenAI") as cls:
                 cls.return_value = _mock_openai('{"action": "skip"}')
                 make_gap_question(req, settings=_settings())
                 sent = cls.return_value.chat.completions.create.call_args.kwargs["messages"]
             self.assertIn(phrase, sent[0]["content"])
 
     def _gap_question(self, body: dict, reply: dict):
-        with patch("infra.external_api.openai_client.OpenAI") as cls:
+        with patch("app.external_api.openai_client.OpenAI") as cls:
             cls.return_value = _mock_openai(json.dumps(reply, ensure_ascii=False))
             r = self._post("/v1/persona/gap-question", body)
             sent = cls.return_value.chat.completions.create.call_args.kwargs["messages"]
@@ -433,7 +433,7 @@ class NoGapTopicTest(unittest.TestCase):
 
     def _make(self, candidate: dict, reply: dict | None = None, **extra):
         req = GapQuestionRequest.model_validate({"candidate": candidate, "subjectLabel": "할머니", **extra})
-        with patch("infra.external_api.openai_client.OpenAI") as cls:
+        with patch("app.external_api.openai_client.OpenAI") as cls:
             cls.return_value = _mock_openai(json.dumps(reply or {"action": "skip"}, ensure_ascii=False))
             out = make_gap_question(req, settings=_settings())
             create = cls.return_value.chat.completions.create
@@ -506,7 +506,7 @@ class MemberGapQuestionTest(unittest.TestCase):
     def _make(self, reply: dict, **extra):
         req = GapQuestionRequest.model_validate(
             {"candidate": self.CANDIDATE, "subjectLabel": "할머니", "fromMember": True, **extra})
-        with patch("infra.external_api.openai_client.OpenAI") as cls:
+        with patch("app.external_api.openai_client.OpenAI") as cls:
             cls.return_value = _mock_openai(json.dumps(reply, ensure_ascii=False))
             out = make_gap_question(req, settings=_settings())
             messages = cls.return_value.chat.completions.create.call_args.kwargs["messages"]

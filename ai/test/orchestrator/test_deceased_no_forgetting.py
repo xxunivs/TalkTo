@@ -11,9 +11,9 @@ from unittest.mock import MagicMock, patch
 
 from pydantic import SecretStr
 
-from infra.schema.persona import PersonaResponseRequest
-from infra.schema.subject import IntakeContext, SubjectContext
-from infra.setting import Settings
+from app.schema.persona import PersonaResponseRequest
+from app.schema.subject import IntakeContext, SubjectContext
+from app.setting import Settings
 from orchestrator.contracts import Generation, MemoryItem, MemorySelection, SessionState, TurnInput
 from orchestrator.guard import (
     ASK_BACK,
@@ -237,7 +237,7 @@ def _plain(reply: str, message: str = "할머니 그 노래 생각나?", *, dece
     resp.choices = [MagicMock(message=MagicMock(content=reply))]
     client = MagicMock()
     client.chat.completions.create.return_value = resp
-    with patch("infra.external_api.openai_client.OpenAI", return_value=client):
+    with patch("app.external_api.openai_client.OpenAI", return_value=client):
         return generate_persona_response(req, settings=Settings(openai_api_key=SecretStr("k"),
                                                                 fish_emotion=fish_emotion))
 

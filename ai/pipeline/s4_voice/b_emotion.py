@@ -4,8 +4,8 @@ import re
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
 
-from infra.external_api.tts import wants_emotion_hint
-from infra.external_api.tts.fish import FISH_INLINE_CUES, cue_key, is_fish_voice
+from app.external_api.tts import wants_emotion_hint
+from app.external_api.tts.fish import FISH_INLINE_CUES, cue_key, is_fish_voice
 
 EMOTIONS = ("neutral", "calm", "happy", "sad", "surprised")
 # Fish(FISH_EMOTION=cue) 감정 이름 (warm, worried 는 Fish 전용, MiniMax 에선 None)

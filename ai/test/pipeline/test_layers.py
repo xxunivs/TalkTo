@@ -4,9 +4,14 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from infra.schema.subject import IntakeContext, SubjectContext
+from app.schema.subject import IntakeContext, SubjectContext
 from pipeline.persona_prompt.from_intake import spec_from_intake
-from pipeline.persona_prompt.layers import RuntimeContext, load_layers, runtime_section, static_modules
+from pipeline.persona_prompt.layers import (
+    RuntimeContext,
+    load_layers,
+    runtime_section,
+    static_modules,
+)
 from pipeline.persona_prompt.render import render_layered_prompt, shot_messages
 from pipeline.persona_prompt.spec import Relation, Shot
 from test.pipeline.test_persona_prompt import INTAKE, SUBJECT

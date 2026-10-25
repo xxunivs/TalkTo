@@ -10,8 +10,8 @@ from unittest.mock import MagicMock, patch
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
 
-from infra.schema.persona import PersonaResponseRequest
-from infra.setting import Settings, get_settings
+from app.schema.persona import PersonaResponseRequest
+from app.setting import Settings, get_settings
 from main import app
 from orchestrator.contracts import (
     GuardResult,
@@ -89,11 +89,11 @@ class SameAsPlainPathTest(unittest.TestCase):
 
     def _both(self, settings: Settings, reply: str, **extra):
         req = PersonaResponseRequest.model_validate({**REQUEST, **extra})
-        with patch("infra.external_api.openai_client.OpenAI") as cls:
+        with patch("app.external_api.openai_client.OpenAI") as cls:
             cls.return_value = _mock_openai(reply)
             plain = generate_persona_response(req, settings=settings)
             plain_messages = cls.return_value.chat.completions.create.call_args.kwargs["messages"]
-        with patch("infra.external_api.openai_client.OpenAI") as cls:
+        with patch("app.external_api.openai_client.OpenAI") as cls:
             cls.return_value = _mock_openai(reply)
             orch = orchestrate_persona_response(req, settings=settings, orchestrator=build_default(settings))
             orch_messages = cls.return_value.chat.completions.create.call_args.kwargs["messages"]
@@ -251,7 +251,7 @@ class RouteTest(unittest.TestCase):
 
     def _post(self, body: dict, reply: str, **kw):
         app.dependency_overrides[get_settings] = lambda: _settings(persona_orchestrator=True, **kw)
-        with patch("infra.external_api.openai_client.OpenAI") as cls:
+        with patch("app.external_api.openai_client.OpenAI") as cls:
             cls.return_value = _mock_openai(reply)
             return TestClient(app).post("/v1/persona/responses", json=body)
 

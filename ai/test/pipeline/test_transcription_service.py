@@ -3,10 +3,10 @@ from pathlib import Path
 from unittest.mock import patch
 from uuid import uuid4
 
-from infra.setting import Settings
-from infra.error import AudioTooShortError, EmptyTranscriptError
-from infra.external_api.stt import STTResult
-from infra.schema.transcript import TranscriptionRequest, TranscriptSegment
+from app.error import AudioTooShortError, EmptyTranscriptError
+from app.external_api.stt import STTResult
+from app.schema.transcript import TranscriptionRequest, TranscriptSegment
+from app.setting import Settings
 from pipeline.s1_transcription.a_transcript import transcribe_recording
 
 
@@ -40,7 +40,7 @@ def request(**overrides) -> TranscriptionRequest:
 
 class ReferenceSampleFailureTest(unittest.TestCase):
     def test_expired_reference_sample_does_not_block_transcription(self) -> None:
-        from infra.error import AudioUrlExpiredError
+        from app.error import AudioUrlExpiredError
 
         provider = FakeProvider([segment(0, 0, 5_000)])
         with patch(

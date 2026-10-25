@@ -36,7 +36,7 @@ ENV SPEAKER_MODEL_DIR=/opt/ecapa \
     OMP_NUM_THREADS=1
 
 COPY pyproject.toml README.md ./
-COPY infra ./infra
+COPY app ./app
 COPY pipeline ./pipeline
 COPY orchestrator ./orchestrator
 COPY prompts ./prompts

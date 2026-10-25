@@ -3,7 +3,15 @@ import unittest
 from pathlib import Path
 
 from orchestrator.assembler import StructuredAssembler
-from orchestrator.contracts import MemoryItem, MemorySelection, PrecheckResult, RestrictedFacts, SessionState, Turn, TurnInput
+from orchestrator.contracts import (
+    MemoryItem,
+    MemorySelection,
+    PrecheckResult,
+    RestrictedFacts,
+    SessionState,
+    Turn,
+    TurnInput,
+)
 from orchestrator.persona import PersonaRegistry
 from orchestrator.restricted import redact_instructions
 

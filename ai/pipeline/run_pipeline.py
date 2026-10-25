@@ -1,5 +1,5 @@
 # 로컬 실행 (input/<대상자> -> output/<대상자>/sN, 전체 또는 단계 선택)
-# 단계 순서는 infra/be_ai_api/recording_analysis.py 와 공유 (변경 시 양쪽 확인)
+# 단계 순서는 app/api/recording_analysis.py 와 공유 (변경 시 양쪽 확인)
 #   python -m pipeline.run_pipeline --subject <대상자폴더> [--only s2 | --only s2_e | --from s2 --to s3]
 # 자동 입력은 persona_intake.json 과 음성/ 뿐 (나머지 자료는 수동 투입, 매뉴얼 산출물은 output/<대상자>_manual/)
 
@@ -9,18 +9,18 @@ import logging
 import sys
 from pathlib import Path
 
-from infra.external_api.stt import create_stt_provider
-from infra.schema.insight import ReflectionMemoryInput, ReflectionRequest
-from infra.schema.persona import PersonaAssemblyRequest
-from infra.schema.subject import (
+from app.external_api.stt import create_stt_provider
+from app.schema.insight import ReflectionMemoryInput, ReflectionRequest
+from app.schema.persona import PersonaAssemblyRequest
+from app.schema.subject import (
     FamilyNote,
     IntakeContext,
     SpeechStyle,
     SubjectContext,
     TabooTopic,
 )
-from infra.schema.transcript import TranscriptSegment
-from infra.setting import Settings, load_settings
+from app.schema.transcript import TranscriptSegment
+from app.setting import Settings, load_settings
 from pipeline.s1_transcription.b_speaker_id import identify_subject_by_content
 from pipeline.s1_transcription.c_correction import build_glossary, correct_segments
 from pipeline.s2_extraction.a_extract_persons import run_persons_analysis

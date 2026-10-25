@@ -6,9 +6,12 @@ from unittest.mock import MagicMock, patch
 
 from pydantic import SecretStr
 
-from infra.schema.persona import PersonaResponseRequest
-from infra.setting import Settings
-from pipeline.s3_synthesis.c_build_system_prompt import build_memory_block, generate_persona_response
+from app.schema.persona import PersonaResponseRequest
+from app.setting import Settings
+from pipeline.s3_synthesis.c_build_system_prompt import (
+    build_memory_block,
+    generate_persona_response,
+)
 
 MEMS = [SimpleNamespace(id=f"{i:02d}-aaaa", title=("고향" if i == 0 else ""), content=f"기억 {i}번 내용.")
         for i in range(6)]
@@ -56,7 +59,7 @@ class MemoryFullMaxTest(unittest.TestCase):
 
     def test_over_limit_warns_but_keeps_all(self) -> None:
         settings = Settings(openai_api_key=SecretStr("k"), memory_full_max=3)
-        with patch("infra.external_api.openai_client.OpenAI") as cls:
+        with patch("app.external_api.openai_client.OpenAI") as cls:
             cls.return_value = _mock_openai()
             with self.assertLogs("pipeline.s3_synthesis.c_build_system_prompt", "WARNING") as logs:
                 generate_persona_response(_request(4), settings=settings)
@@ -66,7 +69,7 @@ class MemoryFullMaxTest(unittest.TestCase):
 
     def test_at_limit_no_warning(self) -> None:
         settings = Settings(openai_api_key=SecretStr("k"), memory_full_max=4)
-        with patch("infra.external_api.openai_client.OpenAI") as cls:
+        with patch("app.external_api.openai_client.OpenAI") as cls:
             cls.return_value = _mock_openai()
             with self.assertNoLogs("pipeline.s3_synthesis.c_build_system_prompt", "WARNING"):
                 generate_persona_response(_request(4), settings=settings)

@@ -13,7 +13,7 @@ from main import app
 
 
 def _settings(**extra):
-    from infra.setting import Settings
+    from app.setting import Settings
 
     values = {"fish_audio_api_key": "f", "elevenlabs_api_key": "e", "minimax_api_key": "m"}
     return Settings(**{**values, **extra})
@@ -21,7 +21,7 @@ def _settings(**extra):
 
 def _use_settings(test: unittest.TestCase, **extra) -> None:
     """로컬 .env 와 무관하게 정한 설정으로 라우트를 부른다."""
-    from infra.setting import get_settings
+    from app.setting import get_settings
 
     app.dependency_overrides[get_settings] = lambda: _settings(**extra)
     test.addCleanup(app.dependency_overrides.pop, get_settings, None)
@@ -69,7 +69,7 @@ class FakeFish:
 
     def patch(self):
         return patch.multiple(
-            "infra.external_api.tts.fish.httpx", request=self.request, stream=self.stream)
+            "app.external_api.tts.fish.httpx", request=self.request, stream=self.stream)
 
 
 class FakeClock:
@@ -115,7 +115,7 @@ class VoiceTest(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.client = TestClient(app)
 
-    @patch("infra.external_api.openai_client.OpenAI")
+    @patch("app.external_api.openai_client.OpenAI")
     def test_voice_transcription_returns_text(self, mock_openai: MagicMock) -> None:
         client = MagicMock()
         client.audio.transcriptions.create.return_value = MagicMock(text="할머니 보고 싶어요")
@@ -132,7 +132,7 @@ class VoiceTest(unittest.TestCase):
         self.assertEqual(body["text"], "할머니 보고 싶어요")
         self.assertEqual(body["provider"], "openai")
 
-    @patch("infra.external_api.tts.elevenlabs.httpx.post")
+    @patch("app.external_api.tts.elevenlabs.httpx.post")
     def test_speech_returns_audio_bytes(self, mock_post: MagicMock) -> None:
         # 예전 ElevenLabs 목소리(앞글자 없음)는 다시 만들기 전까지 ElevenLabs 로 합성한다
         mock_post.return_value = MagicMock(status_code=200, content=b"ID3fakemp3")
@@ -176,17 +176,17 @@ class ElevenLabsModelTest(unittest.TestCase):
     """v4 에는 style·speed 를 보내지 않고, 즉시 복제 목소리(IVC)가 아니면 v2 로 되돌린다."""
 
     def setUp(self) -> None:
-        from infra.external_api.tts.elevenlabs import ElevenLabsTTSProvider
+        from app.external_api.tts.elevenlabs import ElevenLabsTTSProvider
 
         ElevenLabsTTSProvider._v4_cache.clear()
 
     def _provider(self, model_id: str):
-        from infra.external_api.tts.elevenlabs import ElevenLabsTTSProvider
+        from app.external_api.tts.elevenlabs import ElevenLabsTTSProvider
 
         return ElevenLabsTTSProvider(api_key="k", model_id=model_id)
 
-    @patch("infra.external_api.tts.elevenlabs.httpx.get")
-    @patch("infra.external_api.tts.elevenlabs.httpx.post")
+    @patch("app.external_api.tts.elevenlabs.httpx.get")
+    @patch("app.external_api.tts.elevenlabs.httpx.post")
     def test_v4_sends_only_supported_settings(self, mock_post, mock_get) -> None:
         mock_get.return_value = MagicMock(status_code=200, json=lambda: {"category": "cloned"})
         mock_post.return_value = MagicMock(status_code=200, content=b"ID3")
@@ -196,8 +196,8 @@ class ElevenLabsModelTest(unittest.TestCase):
         self.assertEqual(set(body["voice_settings"]), {"stability", "similarity_boost"})
         self.assertEqual(result.model, "eleven_v4_turbo")
 
-    @patch("infra.external_api.tts.elevenlabs.httpx.get")
-    @patch("infra.external_api.tts.elevenlabs.httpx.post")
+    @patch("app.external_api.tts.elevenlabs.httpx.get")
+    @patch("app.external_api.tts.elevenlabs.httpx.post")
     def test_legacy_pvc_is_spoken_with_v2(self, mock_post, mock_get) -> None:
         # 예전 똑 닮은 목소리(PVC)는 다시 만들기 전까지 예전 ElevenLabs 목소리로 v2 합성한다
         for state in ({"eleven_multilingual_v2": "fine_tuned"}, {"eleven_v4": "fine_tuned"}):
@@ -212,7 +212,7 @@ class ElevenLabsModelTest(unittest.TestCase):
             self.assertIn("style", body["voice_settings"])
         self.assertEqual(mock_get.call_count, 2)  # 요청마다 provider 가 새로 생겨도 목소리마다 한 번만 묻는다
 
-    @patch("infra.external_api.tts.elevenlabs.httpx.get")
+    @patch("app.external_api.tts.elevenlabs.httpx.get")
     def test_v2_does_not_check_training(self, mock_get) -> None:
         self.assertEqual(self._provider(None).model_for("any"), "eleven_multilingual_v2")
         mock_get.assert_not_called()
@@ -222,7 +222,7 @@ class MiniMaxProviderTest(unittest.TestCase):
     """MiniMax(예전 목소리): 합성은 hex 음성을 bytes 로. 목소리 id 로 회사를 고른다."""
 
     def _provider(self, **kwargs):
-        from infra.external_api.tts.minimax import MiniMaxTTSProvider
+        from app.external_api.tts.minimax import MiniMaxTTSProvider
 
         return MiniMaxTTSProvider(api_key="k", **kwargs)
 
@@ -230,7 +230,7 @@ class MiniMaxProviderTest(unittest.TestCase):
     def _ok(**extra):
         return MagicMock(status_code=200, json=lambda: {"base_resp": {"status_code": 0}, **extra})
 
-    @patch("infra.external_api.tts.minimax.httpx.post")
+    @patch("app.external_api.tts.minimax.httpx.post")
     def test_synthesize_decodes_hex_and_leaves_emotion_to_minimax(self, mock_post) -> None:
         mock_post.return_value = self._ok(data={"audio": b"ID3".hex()})
         result = self._provider().synthesize("밥은 먹었냐", voice_id="TalkToabc", speed=0.9)
@@ -242,9 +242,9 @@ class MiniMaxProviderTest(unittest.TestCase):
         self.assertNotIn("emotion", body["voice_setting"])
         self.assertNotIn("voice_modify", body)
 
-    @patch("infra.external_api.tts.minimax.httpx.post")
+    @patch("app.external_api.tts.minimax.httpx.post")
     def test_error_inside_200_is_raised(self, mock_post) -> None:
-        from infra.error import TTSProviderError
+        from app.error import TTSProviderError
 
         mock_post.return_value = MagicMock(
             status_code=200, json=lambda: {"base_resp": {"status_code": 2013, "status_msg": "invalid"}})
@@ -252,8 +252,8 @@ class MiniMaxProviderTest(unittest.TestCase):
             self._provider().synthesize("안녕", voice_id="TalkToabc")
 
     def test_legacy_providers_no_longer_clone(self) -> None:
-        from infra.external_api.tts.elevenlabs import ElevenLabsTTSProvider
-        from infra.external_api.tts.minimax import MiniMaxTTSProvider
+        from app.external_api.tts.elevenlabs import ElevenLabsTTSProvider
+        from app.external_api.tts.minimax import MiniMaxTTSProvider
 
         self.assertFalse(hasattr(MiniMaxTTSProvider, "clone_voice"))
         self.assertFalse(hasattr(ElevenLabsTTSProvider, "clone_voice"))
@@ -262,9 +262,9 @@ class MiniMaxProviderTest(unittest.TestCase):
 class MiniMaxEmotionTest(unittest.TestCase):
     """대답마다 고른 감정을 MiniMax 감정으로 바꿔 보내고, neutral·없음은 MiniMax 에 맡긴다."""
 
-    @patch("infra.external_api.tts.minimax.httpx.post")
+    @patch("app.external_api.tts.minimax.httpx.post")
     def test_emotion_mapping(self, mock_post) -> None:
-        from infra.external_api.tts.minimax import MiniMaxTTSProvider
+        from app.external_api.tts.minimax import MiniMaxTTSProvider
 
         mock_post.return_value = MagicMock(
             status_code=200, json=lambda: {"base_resp": {"status_code": 0}, "data": {"audio": "00"}})
@@ -286,7 +286,7 @@ class VoiceRoutingTest(unittest.TestCase):
     """voice_id 앞글자로 회사를 고른다: fish_ → Fish, TalkTo → MiniMax(예전), 그 밖 → ElevenLabs(예전)."""
 
     def test_speech_routes_by_voice_id_prefix(self) -> None:
-        from infra.external_api.tts import create_tts_provider, provider_for_voice
+        from app.external_api.tts import create_tts_provider, provider_for_voice
 
         settings = _settings(tts_provider="minimax")
         self.assertEqual(create_tts_provider(settings, voice_id="fish_0123abcd").name, "fish")
@@ -298,8 +298,8 @@ class VoiceRoutingTest(unittest.TestCase):
         self.assertEqual(create_tts_provider(settings).name, "minimax")
 
     def test_fish_needs_its_key(self) -> None:
-        from infra.error import ProviderNotConfiguredError
-        from infra.external_api.tts import create_clone_provider, create_tts_provider
+        from app.error import ProviderNotConfiguredError
+        from app.external_api.tts import create_clone_provider, create_tts_provider
 
         settings = _settings(fish_audio_api_key=None)
         with self.assertRaises(ProviderNotConfiguredError):
@@ -308,14 +308,14 @@ class VoiceRoutingTest(unittest.TestCase):
             create_clone_provider(settings)
 
     def test_tts_provider_defaults_to_fish(self) -> None:
-        from infra.external_api.tts import create_tts_provider
-        from infra.setting import Settings
+        from app.external_api.tts import create_tts_provider
+        from app.setting import Settings
 
         self.assertEqual(Settings().tts_provider, "fish")
         self.assertEqual(create_tts_provider(_settings()).name, "fish")
 
     def test_fish_voice_gets_no_emotion_hint(self) -> None:
-        from infra.external_api.tts import wants_emotion_hint
+        from app.external_api.tts import wants_emotion_hint
 
         self.assertFalse(wants_emotion_hint("fish_0123abcd"))
         self.assertTrue(wants_emotion_hint("TalkTo123"))
@@ -326,12 +326,12 @@ class FishSpeechTest(unittest.TestCase):
 
     def setUp(self) -> None:
         self.clock = FakeClock()
-        clock = patch("infra.external_api.tts.fish.time", self.clock)
+        clock = patch("app.external_api.tts.fish.time", self.clock)
         clock.start()
         self.addCleanup(clock.stop)
 
     def _provider(self, **kwargs):
-        from infra.external_api.tts.fish import FishAudioTTSProvider
+        from app.external_api.tts.fish import FishAudioTTSProvider
 
         return FishAudioTTSProvider(api_key="f", **kwargs)
 
@@ -397,7 +397,7 @@ class FishSpeechTest(unittest.TestCase):
 
     def test_slow_stream_is_cut_at_the_deadline(self) -> None:
         # 조각마다 5초씩 걸려 단계별 읽기 제한에는 안 걸려도, 전체 40초를 넘기면 끊는다
-        from infra.error import VoiceProviderError
+        from app.error import VoiceProviderError
 
         start = self.clock.now
 
@@ -429,7 +429,7 @@ class FishSpeechTest(unittest.TestCase):
         self.assertEqual(result.audio, b"ID3fishmp3")
 
     def test_error_codes(self) -> None:
-        from infra.error import VoiceProviderError
+        from app.error import VoiceProviderError
 
         cases = [
             ([_fish_error(401)], "VOICE_PROVIDER_KEY", 1),
@@ -450,7 +450,7 @@ class FishSpeechTest(unittest.TestCase):
             self.assertEqual(len(fake.sent), calls, answers)
 
     def test_no_retry_when_time_is_short(self) -> None:
-        from infra.error import VoiceProviderError
+        from app.error import VoiceProviderError
 
         fake = FakeFish(_fish_error(429), _audio())
         with fake.patch(), self.assertRaises(VoiceProviderError):
@@ -458,7 +458,7 @@ class FishSpeechTest(unittest.TestCase):
         self.assertEqual(len(fake.sent), 1)
 
     def test_empty_voice_id_is_not_sent(self) -> None:
-        from infra.error import TTSProviderError
+        from app.error import TTSProviderError
 
         fake = FakeFish(_audio())
         with fake.patch(), self.assertRaises(TTSProviderError):
@@ -466,7 +466,7 @@ class FishSpeechTest(unittest.TestCase):
         self.assertEqual(fake.sent, [])
 
     def test_other_4xx_and_empty_audio_are_plain_errors(self) -> None:
-        from infra.error import TTSProviderError, VoiceProviderError
+        from app.error import TTSProviderError, VoiceProviderError
 
         for answer in (
             httpx.Response(400, json={"status": 400, "message": "bad"}),
@@ -494,7 +494,7 @@ class FishTextTest(unittest.TestCase):
     """drama-3 가 연기 지시로 읽는 [ ]·< >·<| |> 표시를 지운다. 말은 그대로 둔다."""
 
     def test_strips_directions_and_tags(self) -> None:
-        from infra.external_api.tts.fish import fish_plain_text
+        from app.external_api.tts.fish import fish_plain_text
 
         cases = {
             "[웃음] 그래, 잘했다.": "그래, 잘했다.",
@@ -511,13 +511,13 @@ class FishTextTest(unittest.TestCase):
             self.assertEqual(fish_plain_text(raw), want, raw)
 
     def test_falls_back_when_everything_is_a_direction(self) -> None:
-        from infra.external_api.tts.fish import fish_plain_text
+        from app.external_api.tts.fish import fish_plain_text
 
         self.assertEqual(fish_plain_text("[웃음]"), "[웃음]")
 
     def test_keeps_whitelisted_cues_and_strips_the_rest(self) -> None:
         # FISH_EMOTION=cue·inline: 정해 둔 한국어 연기 표시만 남기고 나머지는 지금처럼 지운다
-        from infra.external_api.tts.fish import FISH_CUES, FISH_INLINE_CUES, fish_plain_text
+        from app.external_api.tts.fish import FISH_CUES, FISH_INLINE_CUES, fish_plain_text
 
         cases = {  # 글: (남길 때, off 일 때)
             "[웃으며] 그래, [미소] <whisper>잘</whisper> 왔다 [잠깐 멈췄다가] 응.":
@@ -534,7 +534,7 @@ class FishTextTest(unittest.TestCase):
             self.assertEqual(fish_plain_text(f"{cue} 응."), f"{cue} 응.", cue)
 
     def test_cue_table(self) -> None:
-        from infra.external_api.tts.fish import FISH_CUES, FISH_INLINE_CUES
+        from app.external_api.tts.fish import FISH_CUES, FISH_INLINE_CUES
 
         self.assertEqual(FISH_CUES, {
             "neutral": None, "calm": "[차분하게]", "warm": "[다정하게]", "happy": "[반갑게 웃으며]",
@@ -596,7 +596,7 @@ class FishEmotionSpeechTest(unittest.TestCase):
     def test_other_providers_never_read_fish_cues(self) -> None:
         # MiniMax 는 warm 을 모른다(None → 서버 기본값). 연기 표시는 소리 내어 읽지 않게 지운다
         _use_settings(self, fish_emotion="inline")
-        with patch("infra.external_api.tts.minimax.httpx.post") as mock_post:
+        with patch("app.external_api.tts.minimax.httpx.post") as mock_post:
             mock_post.return_value = MagicMock(
                 status_code=200, json=lambda: {"base_resp": {"status_code": 0}, "data": {"audio": "00"}})
             response = TestClient(app).post(
@@ -609,7 +609,7 @@ class FishEmotionSpeechTest(unittest.TestCase):
     def test_off_leaves_other_providers_byte_identical(self) -> None:
         # FISH_EMOTION=off 면 예전 목소리(MiniMax)에 가는 글은 예전과 글자까지 같다
         _use_settings(self)
-        with patch("infra.external_api.tts.minimax.httpx.post") as mock_post:
+        with patch("app.external_api.tts.minimax.httpx.post") as mock_post:
             mock_post.return_value = MagicMock(
                 status_code=200, json=lambda: {"base_resp": {"status_code": 0}, "data": {"audio": "00"}})
             response = TestClient(app).post(
@@ -622,13 +622,13 @@ class FishCloneTest(unittest.TestCase):
     """Fish 즉시 복제: 멀티파트 칸, 상태 기다리기, 실패하면 지우기, 다시 보내지 않기."""
 
     def setUp(self) -> None:
-        sleep = patch("infra.external_api.tts.fish.time.sleep")
+        sleep = patch("app.external_api.tts.fish.time.sleep")
         self.sleep = sleep.start()
         self.addCleanup(sleep.stop)
         self.sample = _temp_audio(self)
 
     def _provider(self):
-        from infra.external_api.tts.fish import FishAudioTTSProvider
+        from app.external_api.tts.fish import FishAudioTTSProvider
 
         return FishAudioTTSProvider(api_key="f")
 
@@ -668,7 +668,7 @@ class FishCloneTest(unittest.TestCase):
         self.assertEqual(str(fake.sent[1].url), "https://api.fish.audio/model/m1")
 
     def test_failed_model_is_deleted(self) -> None:
-        from infra.error import TTSProviderError, VoiceProviderError
+        from app.error import TTSProviderError, VoiceProviderError
 
         fake = FakeFish(_model("failed"), httpx.Response(200))
         with fake.patch(), self.assertRaises(TTSProviderError) as caught:
@@ -678,7 +678,7 @@ class FishCloneTest(unittest.TestCase):
             ("POST", "https://api.fish.audio/model"), ("DELETE", "https://api.fish.audio/model/m1")])
 
     def test_never_trained_is_deleted_and_unavailable(self) -> None:
-        from infra.error import VoiceProviderError
+        from app.error import VoiceProviderError
 
         polls = [httpx.Response(200, json={"_id": "m1", "state": "created"}) for _ in range(15)]
         fake = FakeFish(_model("created"), *polls, httpx.Response(200))
@@ -689,7 +689,7 @@ class FishCloneTest(unittest.TestCase):
         self.assertEqual(len(fake.sent), 17)
 
     def test_clone_is_never_retried(self) -> None:
-        from infra.error import VoiceProviderError
+        from app.error import VoiceProviderError
 
         for status, code in ((429, "VOICE_PROVIDER_RATE_LIMIT"), (503, "VOICE_PROVIDER_UNAVAILABLE"),
                              (402, "VOICE_PROVIDER_CREDITS"), (401, "VOICE_PROVIDER_KEY")):
@@ -701,7 +701,7 @@ class FishCloneTest(unittest.TestCase):
 
     def test_clone_log_has_voice_id_but_not_name(self) -> None:
         fake = FakeFish(_model(model_id="abc123"))
-        with fake.patch(), self.assertLogs("infra.external_api.tts.fish", level="INFO") as logs:
+        with fake.patch(), self.assertLogs("app.external_api.tts.fish", level="INFO") as logs:
             voice_id = self._provider().clone_voice("김할머니", self.sample)
         text = "\n".join(logs.output)
         self.assertIn(voice_id, text)
@@ -711,8 +711,8 @@ class FishCloneTest(unittest.TestCase):
 class CloneProviderChoiceTest(unittest.TestCase):
     """BE 가 무엇을 보내도 새 목소리는 Fish 에서 만든다(예전 회사로 가지 않는다)."""
 
-    @patch("infra.external_api.tts.elevenlabs.httpx.post")
-    @patch("infra.external_api.tts.minimax.httpx.post")
+    @patch("app.external_api.tts.elevenlabs.httpx.post")
+    @patch("app.external_api.tts.minimax.httpx.post")
     @patch("pipeline.s4_voice.a_voice.download_audio")
     def test_clone_always_uses_fish(self, mock_download, minimax_post, elevenlabs_post) -> None:
         _use_settings(self, tts_provider="minimax")
@@ -730,8 +730,8 @@ class CloneProviderChoiceTest(unittest.TestCase):
         elevenlabs_post.assert_not_called()
 
     def test_multi_sample_clone_sends_one_built_wav(self) -> None:
-        from infra.schema.voice import VoiceCloneRequest
-        from infra.setting import Settings
+        from app.schema.voice import VoiceCloneRequest
+        from app.setting import Settings
         from pipeline.s4_voice import a_voice
 
         workdir = Path(tempfile.mkdtemp(prefix="voice_clone_test_"))
@@ -753,7 +753,7 @@ class VoiceSchemaContractTest(unittest.TestCase):
     """BE 가 보내는 provider:"fish" 를 받는다(모르는 값은 422). PVC 경로는 없다."""
 
     def test_fish_provider_is_accepted(self) -> None:
-        from infra.schema.voice import VoiceCloneRequest, VoiceDeleteRequest
+        from app.schema.voice import VoiceCloneRequest, VoiceDeleteRequest
 
         clone = VoiceCloneRequest.model_validate(
             {"name": "TalkTo_x", "sampleAudioUrl": "https://a/b.wav", "provider": "fish"})
@@ -789,10 +789,10 @@ class VoiceDeleteTest(unittest.TestCase):
         return send
 
     def test_minimax_provider_deletes_cloned_voice(self) -> None:
-        from infra.external_api.tts.minimax import MiniMaxTTSProvider
+        from app.external_api.tts.minimax import MiniMaxTTSProvider
 
         ok = {"base_resp": {"status_code": 0, "status_msg": "success"}}
-        with patch("infra.external_api.tts.minimax.httpx.post", self._fake("POST", ok)):
+        with patch("app.external_api.tts.minimax.httpx.post", self._fake("POST", ok)):
             MiniMaxTTSProvider(api_key="k").delete_voice("TalkToabc")
         request = self.sent[0]
         self.assertEqual(str(request.url), "https://api.minimax.io/v1/delete_voice")
@@ -801,19 +801,19 @@ class VoiceDeleteTest(unittest.TestCase):
             json.loads(request.content), {"voice_type": "voice_cloning", "voice_id": "TalkToabc"})
 
     def test_minimax_error_inside_200_is_raised(self) -> None:
-        from infra.error import TTSProviderError
-        from infra.external_api.tts.minimax import MiniMaxTTSProvider
+        from app.error import TTSProviderError
+        from app.external_api.tts.minimax import MiniMaxTTSProvider
 
         bad = {"base_resp": {"status_code": 2054, "status_msg": "voice not found"}}
         with (
-            patch("infra.external_api.tts.minimax.httpx.post", self._fake("POST", bad)),
+            patch("app.external_api.tts.minimax.httpx.post", self._fake("POST", bad)),
             self.assertRaises(TTSProviderError),
         ):
             MiniMaxTTSProvider(api_key="k").delete_voice("TalkToabc")
 
     def test_route_uses_minimax_by_prefix_or_when_asked(self) -> None:
         ok = {"base_resp": {"status_code": 0}}
-        with patch("infra.external_api.tts.minimax.httpx.post", self._fake("POST", ok)):
+        with patch("app.external_api.tts.minimax.httpx.post", self._fake("POST", ok)):
             for body in ({"voiceId": "TalkToabc", "provider": "minimax"}, {"voiceId": "TalkToabc"}):
                 response = TestClient(app).post("/v1/voice/delete", json=body)
                 self.assertEqual(response.status_code, 200, response.text)
@@ -821,7 +821,7 @@ class VoiceDeleteTest(unittest.TestCase):
 
     def test_route_defaults_to_elevenlabs(self) -> None:
         # 예전 IVC·PVC 모두 ElevenLabs 의 같은 API 로 지운다(PVC 모듈 없이)
-        with patch("infra.external_api.tts.elevenlabs.httpx.delete", self._fake("DELETE")):
+        with patch("app.external_api.tts.elevenlabs.httpx.delete", self._fake("DELETE")):
             response = TestClient(app).post("/v1/voice/delete", json={"voiceId": "aBcD1234efGH5678ijKL"})
         self.assertEqual(response.status_code, 200, response.text)
         request = self.sent[0]
@@ -832,11 +832,11 @@ class VoiceDeleteTest(unittest.TestCase):
         self.assertIn(bad.status_code, (400, 422))
 
     def test_elevenlabs_delete_error_is_raised(self) -> None:
-        from infra.error import TTSProviderError
-        from infra.external_api.tts.elevenlabs import ElevenLabsTTSProvider
+        from app.error import TTSProviderError
+        from app.external_api.tts.elevenlabs import ElevenLabsTTSProvider
 
         with (
-            patch("infra.external_api.tts.elevenlabs.httpx.delete", self._fake("DELETE", {}, 400)),
+            patch("app.external_api.tts.elevenlabs.httpx.delete", self._fake("DELETE", {}, 400)),
             self.assertRaises(TTSProviderError),
         ):
             ElevenLabsTTSProvider(api_key="k").delete_voice("aBcD1234efGH5678ijKL")
@@ -846,7 +846,7 @@ class VoiceDeleteTest(unittest.TestCase):
         for body in ({"voiceId": "fish_m1"}, {"voiceId": "fish_m1", "provider": "elevenlabs"},
                      {"voiceId": "m1", "provider": "fish"}):
             fake = FakeFish(httpx.Response(200))
-            with fake.patch(), patch("infra.external_api.tts.elevenlabs.httpx.delete") as el_delete:
+            with fake.patch(), patch("app.external_api.tts.elevenlabs.httpx.delete") as el_delete:
                 response = TestClient(app).post("/v1/voice/delete", json=body)
             self.assertEqual(response.status_code, 200, response.text)
             el_delete.assert_not_called()
@@ -855,8 +855,8 @@ class VoiceDeleteTest(unittest.TestCase):
             self.assertEqual(fake.sent[0].headers["authorization"], "Bearer f")
 
     def test_fish_delete_tolerates_missing_and_maps_errors(self) -> None:
-        from infra.error import TTSProviderError, VoiceProviderError
-        from infra.external_api.tts.fish import FishAudioTTSProvider
+        from app.error import TTSProviderError, VoiceProviderError
+        from app.external_api.tts.fish import FishAudioTTSProvider
 
         fake = FakeFish(httpx.Response(404, json={"status": 404, "message": "gone"}))
         with fake.patch():
@@ -878,13 +878,13 @@ class VoiceTranscriptionLimitTest(unittest.TestCase):
     def test_limit_is_25_mib_and_route_runs_in_threadpool(self) -> None:
         import inspect
 
-        from infra.be_ai_api.routes import voice as voice_routes
+        from app.api.routes import voice as voice_routes
 
         self.assertEqual(voice_routes.VOICE_MESSAGE_MAX_BYTES, 25 * 1024 * 1024)
         self.assertFalse(inspect.iscoroutinefunction(voice_routes.create_voice_transcription))
 
-    @patch("infra.be_ai_api.routes.voice.VOICE_MESSAGE_MAX_BYTES", 8)
-    @patch("infra.be_ai_api.routes.voice.transcribe_voice_message")
+    @patch("app.api.routes.voice.VOICE_MESSAGE_MAX_BYTES", 8)
+    @patch("app.api.routes.voice.transcribe_voice_message")
     def test_over_limit_returns_413(self, mock_transcribe: MagicMock) -> None:
         response = TestClient(app).post(
             "/v1/voice/transcriptions",
@@ -894,10 +894,10 @@ class VoiceTranscriptionLimitTest(unittest.TestCase):
         self.assertEqual(response.json()["error"]["code"], "AUDIO_TOO_LARGE")
         mock_transcribe.assert_not_called()
 
-    @patch("infra.be_ai_api.routes.voice.VOICE_MESSAGE_MAX_BYTES", 8)
-    @patch("infra.be_ai_api.routes.voice.transcribe_voice_message")
+    @patch("app.api.routes.voice.VOICE_MESSAGE_MAX_BYTES", 8)
+    @patch("app.api.routes.voice.transcribe_voice_message")
     def test_at_limit_is_transcribed_whole(self, mock_transcribe: MagicMock) -> None:
-        from infra.schema.voice import VoiceTranscriptionResponse
+        from app.schema.voice import VoiceTranscriptionResponse
 
         mock_transcribe.return_value = VoiceTranscriptionResponse(
             text="응", provider="openai", model="whisper-1"

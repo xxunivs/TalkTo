@@ -392,7 +392,7 @@ def member_voice_ok(persona: Persona) -> bool:
 
     예전 목소리(ElevenLabs·MiniMax)는 다시 만들 때까지 만든 분만 듣는다(모듈 설명). AI 서버는 회사
     칸이 아니라 voice_id 앞글자로 회사를 고르므로(AI 레포
-    infra/external_api/tts provider_for_voice: 'fish_' → Fish, 'TalkTo' → MiniMax, 그 밖 →
+    app/external_api/tts provider_for_voice: 'fish_' → Fish, 'TalkTo' → MiniMax, 그 밖 →
     ElevenLabs) 앞글자만 본다(가져온 목소리는 회사 칸이 비어 있기도 하다). 목소리가 없으면 False."""
     return (persona.voice_id or "").startswith(FISH_VOICE_PREFIX)
 

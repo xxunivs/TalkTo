@@ -5,7 +5,7 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass, field
 
-from infra.error import EmptyReplyError
+from app.error import EmptyReplyError
 from orchestrator.contracts import (
     LLM,
     Assembler,

@@ -84,7 +84,7 @@ jobs:
             /README.md
             /requirements.lock
             /main.py
-            /infra/
+            /app/
             /pipeline/
             /orchestrator/
             /prompts/

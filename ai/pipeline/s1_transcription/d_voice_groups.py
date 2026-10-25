@@ -4,10 +4,10 @@ import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from infra.external_api.audio import download_audio
-from infra.schema.transcript import TranscriptSegment
-from infra.scratch import scratch_dir
-from infra.setting import Settings
+from app.external_api.audio import download_audio
+from app.schema.transcript import TranscriptSegment
+from app.scratch import scratch_dir
+from app.setting import Settings
 
 logger = logging.getLogger(__name__)
 

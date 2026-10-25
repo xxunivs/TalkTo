@@ -8,15 +8,15 @@ import re
 import tempfile
 from pathlib import Path
 
-from infra.error import NoSpeechError, ProviderNotConfiguredError
-from infra.external_api.stt.elevenlabs_scribe import (
+from app.error import NoSpeechError, ProviderNotConfiguredError
+from app.external_api.stt.elevenlabs_scribe import (
     ElevenLabsScribeProvider,
     STTProvider,
     strip_non_speech_notes,
 )
-from infra.schema.voice import AnswerTranscriptionResponse
-from infra.scratch import scratch_dir
-from infra.setting import Settings
+from app.schema.voice import AnswerTranscriptionResponse
+from app.scratch import scratch_dir
+from app.setting import Settings
 
 logger = logging.getLogger(__name__)
 

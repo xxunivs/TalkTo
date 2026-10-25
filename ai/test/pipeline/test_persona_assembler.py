@@ -1,13 +1,13 @@
 import unittest
 
+from app.schema.subject import IntakeContext, SubjectContext
+from app.schema.transcript import TranscriptSegment
 from pipeline.s3_synthesis.c_build_system_prompt import (
     aggregate_taboo,
     assemble_persona_prompt,
     collect_speech_examples,
     merge_persons,
 )
-from infra.schema.subject import IntakeContext, SubjectContext
-from infra.schema.transcript import TranscriptSegment
 
 
 class MergePersonsTest(unittest.TestCase):

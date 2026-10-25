@@ -7,10 +7,10 @@ from types import SimpleNamespace
 
 from pydantic import SecretStr
 
-from infra.schema.persona import PersonaAssemblyRequest
-from infra.schema.subject import IntakeContext, SubjectContext
-from infra.schema.transcript import TranscriptSegment
-from infra.setting import Settings
+from app.schema.persona import PersonaAssemblyRequest
+from app.schema.subject import IntakeContext, SubjectContext
+from app.schema.transcript import TranscriptSegment
+from app.setting import Settings
 from pipeline.persona_prompt.from_intake import merge_recording, spec_from_intake, split_c10
 from pipeline.persona_prompt.from_interview import apply_candidates, extract_candidates, verify
 from pipeline.persona_prompt.from_transcript import card_from_utterances, shots_from_segments

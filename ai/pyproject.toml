@@ -37,7 +37,7 @@ speaker = [
 ]
 
 [tool.setuptools.packages.find]
-include = ["infra*", "pipeline*", "orchestrator*"]
+include = ["app*", "pipeline*", "orchestrator*"]
 
 [tool.pytest.ini_options]
 testpaths = ["test"]

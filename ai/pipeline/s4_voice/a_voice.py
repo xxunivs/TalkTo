@@ -8,17 +8,17 @@ from pathlib import Path
 
 from pydantic import HttpUrl
 
-from infra.error import (
+from app.error import (
     InvalidVoiceSampleError,
     MissingVoiceError,
     TTSProviderError,
 )
-from infra.external_api.audio import download_audio
-from infra.external_api.openai_client import create_openai_client
-from infra.external_api.tts import TTSResult, create_clone_provider, create_tts_provider
-from infra.external_api.tts.fish import strip_fish_cues
-from infra.schema.memory import PersistedTranscriptSegment
-from infra.schema.voice import (
+from app.external_api.audio import download_audio
+from app.external_api.openai_client import create_openai_client
+from app.external_api.tts import TTSResult, create_clone_provider, create_tts_provider
+from app.external_api.tts.fish import strip_fish_cues
+from app.schema.memory import PersistedTranscriptSegment
+from app.schema.voice import (
     SpeechSynthesisRequest,
     VoiceCloneFromTranscriptRequest,
     VoiceCloneRequest,
@@ -26,8 +26,8 @@ from infra.schema.voice import (
     VoiceSampleSegment,
     VoiceTranscriptionResponse,
 )
-from infra.scratch import scratch_dir
-from infra.setting import Settings
+from app.scratch import scratch_dir
+from app.setting import Settings
 from pipeline.s4_voice import c_sample_quality as quality
 from pipeline.s4_voice.b_emotion import strip_emotion_tags
 
@@ -154,7 +154,7 @@ def _build_multi_sample(segments: list[VoiceSampleSegment], *, settings: Setting
     """대상자 구간 -> 깨끗한 구간만 이어붙인 단일 wav (최대 _CLONE_SAMPLE_MAX_SECONDS)"""
     if shutil.which("ffmpeg") is None:  # 배포는 Dockerfile 에 설치, 로컬 설정 문제
         raise TTSProviderError("ffmpeg가 필요합니다(다구간 샘플 이어붙이기).")
-    # 서버 시작 시 비우는 임시 폴더 (강제 종료 잔여 녹음 방지, infra/scratch.py)
+    # 서버 시작 시 비우는 임시 폴더 (강제 종료 잔여 녹음 방지, app/scratch.py)
     workdir = Path(tempfile.mkdtemp(prefix="voice_clone_", dir=scratch_dir(settings)))
     try:
         # 서명 URL 만료 대비: 컷 전에 녹음별 1회 선다운로드

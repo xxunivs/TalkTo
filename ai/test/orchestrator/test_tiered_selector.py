@@ -4,11 +4,17 @@ from unittest.mock import patch
 
 from pydantic import SecretStr
 
-from infra.schema.persona import PersonaResponseRequest
-from infra.setting import Settings
+from app.schema.persona import PersonaResponseRequest
+from app.setting import Settings
 from orchestrator.contracts import MemoryItem, PersonaProfile, SessionState, TurnInput
-from orchestrator.memory import CachedEmbedder, EmbedOnDemandVectors, RequestMemoryStore, TieredSelector
+from orchestrator.memory import (
+    CachedEmbedder,
+    EmbedOnDemandVectors,
+    RequestMemoryStore,
+    TieredSelector,
+)
 from orchestrator.service import build_selector, turn_from_request
+
 
 # 2차원 가짜 임베딩: '고향' 계열 → x 축, '회사' 계열 → y 축, 나머지 → 대각선 반대
 def fake_vec(text: str) -> list[float]:
@@ -141,7 +147,7 @@ class WiringTest(unittest.TestCase):
     def test_env(self):
         with patch.dict("os.environ", {"ORCHESTRATOR_SELECTOR": "tiered", "ORCHESTRATOR_SELECTOR_ST_TOPK": "3",
                                        "OPENAI_API_KEY": "sk-test"}):
-            from infra.setting import load_settings
+            from app.setting import load_settings
             s = load_settings()
         self.assertEqual((s.orchestrator_selector, s.orchestrator_selector_st_top_k), ("tiered", 3))
 

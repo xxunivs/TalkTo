@@ -1,6 +1,6 @@
 import unittest
 
-from infra.schema.subject import IntakeContext, SubjectContext
+from app.schema.subject import IntakeContext, SubjectContext
 from pipeline.s1_transcription.c_correction import build_glossary
 
 

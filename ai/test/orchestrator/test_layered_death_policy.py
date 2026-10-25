@@ -3,14 +3,17 @@ import unittest
 
 from pydantic import SecretStr
 
-from infra.schema.persona import PersonaAssemblyRequest
-from infra.schema.subject import IntakeContext, SubjectContext
-from infra.setting import Settings
+from app.schema.persona import PersonaAssemblyRequest
+from app.schema.subject import IntakeContext, SubjectContext
+from app.setting import Settings
 from orchestrator.assembler import StructuredAssembler
 from orchestrator.contracts import MemorySelection, PrecheckResult, SessionState, TurnInput
 from orchestrator.persona import PersonaRegistry
 from pipeline.s3_synthesis.c_build_system_prompt import assemble_persona_instructions
-from test.pipeline.test_persona_prompt import INTAKE, SUBJECT  # 가상 인물(김할매), 설문 M9-01 사망 = 물으면만
+from test.pipeline.test_persona_prompt import (  # 가상 인물(김할매), 설문 M9-01 사망 = 물으면만
+    INTAKE,
+    SUBJECT,
+)
 
 DEATH_HEAD = "**사망·임종 화제는 자해와 다르다.**"
 ASK_ONLY = "물으면 피하지 말고"  # ask_only 변형에만 있는 말

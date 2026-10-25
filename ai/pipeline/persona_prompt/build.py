@@ -5,9 +5,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from infra.schema.persona import PersonaAssemblyRequest
-from infra.schema.subject import IntakeContext, SubjectContext
-from infra.schema.transcript import TranscriptSegment
+from app.schema.persona import PersonaAssemblyRequest
+from app.schema.subject import IntakeContext, SubjectContext
+from app.schema.transcript import TranscriptSegment
 from pipeline.persona_prompt.from_intake import (
     apply_death_toggle,
     merge_recording,

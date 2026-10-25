@@ -77,7 +77,7 @@ def plan(tiers: set[int], scale: float) -> list[tuple[str, int]]:
 
 
 def judge_model() -> str:
-    from infra.setting import load_settings
+    from app.setting import load_settings
     return load_settings(REPO / ".env").openai_judge_model
 
 
@@ -95,8 +95,8 @@ def ensure_interview(mock: bool) -> None:
     if src is None:
         print("인터뷰 후보: 가족 인터뷰 파일이 없어 건너뜀(layered_ivauto 는 빠짐)")
         return
-    from infra.external_api.openai_client import create_openai_client
-    from infra.setting import load_settings
+    from app.external_api.openai_client import create_openai_client
+    from app.setting import load_settings
     s = load_settings(REPO / ".env")
     cands = extract_candidates(src.read_text(encoding="utf-8-sig"),
                                client=create_openai_client(s, "interview extraction"), model=s.openai_analysis_model)

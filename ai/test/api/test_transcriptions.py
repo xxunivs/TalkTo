@@ -4,10 +4,10 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
-from infra.error import AudioUrlExpiredError
+from app.error import AudioUrlExpiredError
+from app.external_api.stt import STTResult
+from app.schema.transcript import TranscriptSegment
 from main import app
-from infra.external_api.stt import STTResult
-from infra.schema.transcript import TranscriptSegment
 
 
 def request_body(**overrides) -> dict:
@@ -51,7 +51,7 @@ class TranscriptionsEndpointTest(unittest.TestCase):
     def test_success_returns_camel_case_contract(self) -> None:
         with (
             patch(
-                "infra.be_ai_api.routes.analysis.create_stt_provider",
+                "app.api.routes.analysis.create_stt_provider",
                 return_value=FakeProvider(SEGMENTS),
             ),
             patch(
@@ -89,7 +89,7 @@ class TranscriptionsEndpointTest(unittest.TestCase):
     def test_expired_url_maps_to_422_with_code(self) -> None:
         with (
             patch(
-                "infra.be_ai_api.routes.analysis.create_stt_provider",
+                "app.api.routes.analysis.create_stt_provider",
                 return_value=FakeProvider(SEGMENTS),
             ),
             patch(

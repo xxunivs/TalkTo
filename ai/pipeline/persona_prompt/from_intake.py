@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from collections import Counter
 
-from infra.schema.subject import IntakeContext, SubjectContext
+from app.schema.subject import IntakeContext, SubjectContext
 from orchestrator.guard import says_forgot
 from orchestrator.intake_policy import death_policy
 from pipeline.persona_prompt.spec import (

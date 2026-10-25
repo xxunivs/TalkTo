@@ -1,4 +1,4 @@
-"""AI 서버(TalkTo_PersonaAI_AI) 호출. 요청·응답 모양은 그 레포의 infra/schema 를 따른다.
+"""AI 서버(TalkTo_PersonaAI_AI) 호출. 요청·응답 모양은 그 레포의 app/schema 를 따른다.
 
 AI 서버는 모르는 필드를 거부한다(extra=forbid). 여기에 필드를 더하려면 AI 레포를 먼저 고친다.
 """
@@ -34,7 +34,7 @@ TRANSPORT_CODES = {TIMEOUT_CODE, UNREACHABLE_CODE}
 # AI 서버가 빈 대답을 돌려줬을 때(저장하면 그 대화방의 다음 대화가 모두 막힌다)
 EMPTY_REPLY_CODE = "ai_empty_reply"
 
-# AI 서버가 알려 주는 AI 회사 문제(AI 레포 infra/error.py 와 같은 코드)
+# AI 서버가 알려 주는 AI 회사 문제(AI 레포 app/error.py 와 같은 코드)
 PROVIDER_CODES = {"AI_PROVIDER_QUOTA", "AI_PROVIDER_AUTH", "AI_PROVIDER_BUSY"}
 # 목소리 회사(Fish Audio) 문제. AI 회사 문제와 따로 센다(목소리가 막혀도 대화는 된다).
 VOICE_PROVIDER_CODES = {
@@ -53,7 +53,7 @@ FISH_VOICE_PREFIX = "fish_"
 TRANSCRIBE_TIMEOUT = 60
 # 말로 답하기(3분까지) 받아쓰기를 기다리는 시간(초). CloudFront 시간(120초) 안에 끝낸다.
 ANSWER_TRANSCRIBE_TIMEOUT = 90
-# AI 서버가 '말소리가 없다'고 답할 때의 코드(AI 레포 infra/error.py NoSpeechError)
+# AI 서버가 '말소리가 없다'고 답할 때의 코드(AI 레포 app/error.py NoSpeechError)
 NO_SPEECH_CODE = "NO_SPEECH"
 # 기억 검색 질문에 붙이는 앞 대화 수. AI 서버가 질문을 다시 쓸 때 보는 수와 같다
 # (AI 레포 d_build_memory_embedding.REWRITE_HISTORY).

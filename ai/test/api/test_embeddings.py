@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
 
-from infra.setting import Settings, get_settings
+from app.setting import Settings, get_settings
 from main import app
 
 
@@ -15,7 +15,7 @@ class EmbeddingsTest(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.client = TestClient(app)
 
-    @patch("infra.external_api.openai_client.OpenAI")
+    @patch("app.external_api.openai_client.OpenAI")
     def test_maps_each_item_to_a_vector(self, mock_openai: MagicMock) -> None:
         resp = MagicMock()
         resp.data = [MagicMock(embedding=[0.1, 0.2]), MagicMock(embedding=[0.3, 0.4])]
@@ -43,7 +43,7 @@ class EmbeddingsTest(unittest.TestCase):
         self.assertEqual(out[0]["embedding"], [0.1, 0.2])
         self.assertEqual(out[1]["embedding"], [0.3, 0.4])
 
-    @patch("infra.external_api.openai_client.OpenAI")
+    @patch("app.external_api.openai_client.OpenAI")
     def test_query_embedding_needs_only_text(self, mock_openai: MagicMock) -> None:
         """기억을 찾는 질문에는 job 도 segment id 도 없다. 그걸 요구하면 422 로 튕겨
         기억 검색이 통째로 죽는다."""
@@ -87,7 +87,7 @@ class QueryRewriteTest(unittest.TestCase):
     def _post(self, body: dict, client: MagicMock, **settings):
         app.dependency_overrides[get_settings] = lambda: Settings(openai_api_key=SecretStr("k"), **settings)
         self.addCleanup(app.dependency_overrides.pop, get_settings, None)
-        with patch("infra.external_api.openai_client.OpenAI", return_value=client):
+        with patch("app.external_api.openai_client.OpenAI", return_value=client):
             return TestClient(app).post("/v1/embeddings/query", json=body)
 
     def test_off_by_default_response_unchanged(self) -> None:

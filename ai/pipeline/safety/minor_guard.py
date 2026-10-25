@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 
-from infra.schema.persona import PersonaResponseResult
+from app.schema.persona import PersonaResponseResult
 from orchestrator.guard import CRISIS_LINE
 from orchestrator.text import listener_speech_level
 from pipeline.s3_synthesis.common_rules import RULES_DIR, render_block_file

@@ -6,7 +6,7 @@ from pathlib import Path
 
 from pydantic import SecretStr
 
-from infra.setting import Settings
+from app.setting import Settings
 from orchestrator.contracts import MemoryItem, RestrictedFacts, TurnInput
 from orchestrator.llm import FakeLLM
 from orchestrator.restricted import brief_rule, redact_instructions

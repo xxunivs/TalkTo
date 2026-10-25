@@ -54,8 +54,8 @@ def ops_prompt() -> str:
 
 def auto_now_prompt() -> str:
     """run_pipeline step_s3_c 와 같은 재료·합치기(Ctx.prompt_material)를 그대로 따른다."""
-    from infra.schema.persona import PersonaAssemblyRequest
-    from infra.schema.subject import FamilyNote, IntakeContext, SpeechStyle, SubjectContext, TabooTopic
+    from app.schema.persona import PersonaAssemblyRequest
+    from app.schema.subject import FamilyNote, IntakeContext, SpeechStyle, SubjectContext, TabooTopic
     from pipeline.s3_synthesis.c_build_system_prompt import assemble_persona_instructions
     intake = json.loads((MANUAL / "s2_extraction/b_intake_prompt.json").read_text(encoding="utf-8"))
     rec = json.loads((OUT / "s2_extraction/d_recording_prompt.json").read_text(encoding="utf-8"))

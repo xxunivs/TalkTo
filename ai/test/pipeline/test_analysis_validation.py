@@ -1,6 +1,6 @@
 import unittest
 
-from infra.schema.transcript import TranscriptSegment
+from app.schema.transcript import TranscriptSegment
 from pipeline.s2_extraction.a_extract_persons import validate_persons_payload
 
 

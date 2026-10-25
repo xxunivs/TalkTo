@@ -4,11 +4,15 @@ from unittest.mock import patch
 
 from pydantic import SecretStr
 
-from infra.schema.persona import PersonaResponseRequest
-from infra.setting import Settings
+from app.schema.persona import PersonaResponseRequest
+from app.setting import Settings
 from orchestrator.contracts import MemorySelection, PrecheckResult, SessionState, Turn, TurnInput
 from orchestrator.service import build_assembler
-from pipeline.s3_synthesis.c_build_system_prompt import STYLE_LATE_NOTE, generate_persona_response, late_style_note
+from pipeline.s3_synthesis.c_build_system_prompt import (
+    STYLE_LATE_NOTE,
+    generate_persona_response,
+    late_style_note,
+)
 from test.pipeline.test_memory_block import _mock_openai
 
 SHORT = "# 말투\n- 기본은 1~2문장으로 짧게. 상담사처럼 풀어 설명하지 않고, 매 턴 되묻지 않는다."
@@ -26,7 +30,7 @@ def _request(instructions: str) -> PersonaResponseRequest:
 
 
 def _sent(settings: Settings, instructions: str) -> list[dict]:
-    with patch("infra.external_api.openai_client.OpenAI") as cls:
+    with patch("app.external_api.openai_client.OpenAI") as cls:
         cls.return_value = _mock_openai()
         generate_persona_response(_request(instructions), settings=settings)
         return cls.return_value.chat.completions.create.call_args.kwargs["messages"]
@@ -42,7 +46,7 @@ class LateStyleNoteTest(unittest.TestCase):
     def test_not_for_polite_listener_or_visitors(self) -> None:
         # 덧붙임 예시("어.", "응.", "뭐?")는 반말이다. 가족 공유에서 존댓말로 대하는 사위가 대화하거나
         # 공개 본인 페르소나(방문자에게 존댓말)면 넣지 않는다. 반말 듣는 사람(아들)은 그대로 넣는다.
-        from infra.schema.persona import PersonaAssemblyRequest
+        from app.schema.persona import PersonaAssemblyRequest
         from pipeline.s3_synthesis.c_build_system_prompt import assemble_persona_instructions
         from test.pipeline.test_family_owner_row import MEMBER_ROWS, POLITE_ROWS, SUBJECT
 
@@ -105,7 +109,7 @@ class LateStyleNoteTest(unittest.TestCase):
         # 지침 + 기억 + 대화만 보낸다(중간계층을 켜도 같은 기존 경로)
         from fastapi.testclient import TestClient
 
-        from infra.setting import get_settings
+        from app.setting import get_settings
         from main import app
 
         body = _request(WITH).model_dump(by_alias=True)
@@ -113,7 +117,7 @@ class LateStyleNoteTest(unittest.TestCase):
         app.dependency_overrides[get_settings] = lambda: Settings(
             openai_api_key=SecretStr("k"), persona_orchestrator=True, orchestrator_assembler="structured")
         self.addCleanup(app.dependency_overrides.pop, get_settings, None)
-        with patch("infra.external_api.openai_client.OpenAI") as cls:
+        with patch("app.external_api.openai_client.OpenAI") as cls:
             cls.return_value = _mock_openai()
             r = TestClient(app).post("/v1/persona/responses", json=body)
             msgs = cls.return_value.chat.completions.create.call_args.kwargs["messages"]

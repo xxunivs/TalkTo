@@ -87,7 +87,7 @@ class ClipReadingTest(unittest.TestCase):
             raw.unlink()
 
     def test_embed_speakers_leaves_no_raw_file(self) -> None:
-        from infra.schema.transcript import TranscriptSegment
+        from app.schema.transcript import TranscriptSegment
         from pipeline.s1_transcription.b_speaker_id import SpeakerEmbedder
 
         embedder = SpeakerEmbedder()
@@ -108,7 +108,7 @@ class ClipReadingTest(unittest.TestCase):
         """혼자 몇 분씩 이어 말한 구간도 화자당 한도(운영 60초)까지만 넣는다(메모리가 길이만큼 는다)."""
         from unittest.mock import patch
 
-        from infra.schema.transcript import TranscriptSegment
+        from app.schema.transcript import TranscriptSegment
         from pipeline.s1_transcription import b_speaker_id
         from pipeline.s1_transcription.b_speaker_id import SpeakerEmbedder
 

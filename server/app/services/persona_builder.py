@@ -371,7 +371,7 @@ async def _creep(write, step: str, lo: float, hi: float, expect_seconds: float):
 
 
 NO_SPEECH = "이 녹음에서는 말소리를 찾지 못했어요."
-# AI 서버 오류 코드(AI 레포 infra/error.py) 가운데 그 녹음 탓인 것
+# AI 서버 오류 코드(AI 레포 app/error.py) 가운데 그 녹음 탓인 것
 NO_SPEECH_CODES = {"EMPTY_TRANSCRIPT", "AUDIO_TOO_SHORT"}
 
 

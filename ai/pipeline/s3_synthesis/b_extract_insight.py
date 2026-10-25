@@ -2,13 +2,13 @@
 
 import logging
 
-from infra.external_api.openai_client import analysis_client, analysis_completion, json_reply
-from infra.schema.insight import (
+from app.external_api.openai_client import analysis_client, analysis_completion, json_reply
+from app.schema.insight import (
     Reflection,
     ReflectionRequest,
     ReflectionResponse,
 )
-from infra.setting import Settings
+from app.setting import Settings
 
 logger = logging.getLogger(__name__)
 

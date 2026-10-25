@@ -1,5 +1,12 @@
 """발화 분해(orchestrator/split.py) + 사전 판정·가드 v1.1 의 분해 단서 사용. 가짜 가족 데이터."""
-from orchestrator.contracts import Generation, MemoryItem, MemorySelection, PersonaProfile, SessionState, TurnInput
+from orchestrator.contracts import (
+    Generation,
+    MemoryItem,
+    MemorySelection,
+    PersonaProfile,
+    SessionState,
+    TurnInput,
+)
 from orchestrator.guard import GuardV11
 from orchestrator.precheck import CoveragePrecheckV11
 from orchestrator.split import Splitter, lexicon_from_intake_json, lexicon_from_terms

@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
 
-from infra.setting import Settings, get_settings
+from app.setting import Settings, get_settings
 from main import app
 from pipeline.safety.minor_guard import FALLBACK, MINOR_NOTE
 
@@ -47,7 +47,7 @@ class MinorChatTest(unittest.TestCase):
         self.client = TestClient(app)
 
     def post(self, payload: dict, reply: str = "급식에 떡볶이 나왔어!"):
-        with patch("infra.external_api.openai_client.OpenAI") as cls:
+        with patch("app.external_api.openai_client.OpenAI") as cls:
             cls.return_value = _mock_openai(reply)
             r = self.client.post("/v1/persona/responses", json=payload)
             create = cls.return_value.chat.completions.create

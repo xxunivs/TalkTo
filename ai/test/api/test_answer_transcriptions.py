@@ -29,7 +29,7 @@ def _word(text: str, start: float, end: float, type_: str = "word") -> dict:
 
 class AnswerTranscriptionTest(unittest.TestCase):
     def setUp(self) -> None:
-        from infra.setting import Settings, get_settings
+        from app.setting import Settings, get_settings
 
         self.tmp = Path(tempfile.mkdtemp(prefix="answer_stt_test_"))
         self.addCleanup(shutil.rmtree, self.tmp, True)
@@ -56,7 +56,7 @@ class AnswerTranscriptionTest(unittest.TestCase):
 
         return post
 
-    @patch("infra.external_api.stt.elevenlabs_scribe.forget_transcript")
+    @patch("app.external_api.stt.elevenlabs_scribe.forget_transcript")
     def test_returns_plain_korean_text_and_keeps_nothing(self, forget: MagicMock) -> None:
         words = [
             _word("밥은", 0.0, 0.5),
@@ -67,7 +67,7 @@ class AnswerTranscriptionTest(unittest.TestCase):
             _word("하셨어요", 1.6, 2.0),
         ]
         with patch(
-            "infra.external_api.stt.elevenlabs_scribe.httpx.post",
+            "app.external_api.stt.elevenlabs_scribe.httpx.post",
             side_effect=self._fake_post(_scribe("밥은 먹었냐 하셨어요", words)),
         ):
             response = self._post()
@@ -89,11 +89,11 @@ class AnswerTranscriptionTest(unittest.TestCase):
         self.assertFalse(self.seen[0].exists())
         self.assertEqual(self._leftovers(), [])
 
-    @patch("infra.external_api.stt.elevenlabs_scribe.forget_transcript")
+    @patch("app.external_api.stt.elevenlabs_scribe.forget_transcript")
     def test_no_speech_is_a_coded_error(self, forget: MagicMock) -> None:
         for answer in (_scribe(""), _scribe("(침묵)"), _scribe("  ", [_word(" ", 0, 0, "spacing")])):
             with patch(
-                "infra.external_api.stt.elevenlabs_scribe.httpx.post",
+                "app.external_api.stt.elevenlabs_scribe.httpx.post",
                 side_effect=self._fake_post(answer),
             ):
                 response = self._post()
@@ -103,10 +103,10 @@ class AnswerTranscriptionTest(unittest.TestCase):
         self.assertEqual(forget.call_count, 3)
         self.assertEqual(self._leftovers(), [])
 
-    @patch("infra.external_api.stt.elevenlabs_scribe.forget_transcript")
+    @patch("app.external_api.stt.elevenlabs_scribe.forget_transcript")
     def test_provider_failure_still_removes_the_recording(self, _forget: MagicMock) -> None:
         with patch(
-            "infra.external_api.stt.elevenlabs_scribe.httpx.post",
+            "app.external_api.stt.elevenlabs_scribe.httpx.post",
             side_effect=self._fake_post(httpx.Response(500, text="scribe down")),
         ):
             response = self._post(name="answer.m4a")
@@ -119,17 +119,17 @@ class AnswerTranscriptionTest(unittest.TestCase):
     def test_too_large_is_413_before_calling_scribe(self) -> None:
         from pipeline.s4_voice.d_answer_transcription import ANSWER_AUDIO_MAX_BYTES
 
-        with patch("infra.external_api.stt.elevenlabs_scribe.httpx.post") as post:
+        with patch("app.external_api.stt.elevenlabs_scribe.httpx.post") as post:
             response = self._post(b"\x00" * (ANSWER_AUDIO_MAX_BYTES + 1))
         self.assertEqual(response.status_code, 413)
         post.assert_not_called()
 
     def test_needs_the_elevenlabs_key(self) -> None:
-        from infra.setting import Settings, get_settings
+        from app.setting import Settings, get_settings
 
         settings = Settings(fish_audio_api_key="f", temp_dir=self.tmp)
         app.dependency_overrides[get_settings] = lambda: settings
-        with patch("infra.external_api.stt.elevenlabs_scribe.httpx.post") as post:
+        with patch("app.external_api.stt.elevenlabs_scribe.httpx.post") as post:
             response = self._post()
         self.assertEqual(response.status_code, 500)
         self.assertEqual(response.json()["error"]["code"], "provider_not_configured")

@@ -6,10 +6,10 @@ import threading
 from dataclasses import dataclass
 from pathlib import Path
 
-from infra.external_api.openai_client import create_openai_client
-from infra.schema.subject import SubjectContext
-from infra.schema.transcript import TranscriptSegment
-from infra.setting import Settings
+from app.external_api.openai_client import create_openai_client
+from app.schema.subject import SubjectContext
+from app.schema.transcript import TranscriptSegment
+from app.setting import Settings
 
 logger = logging.getLogger(__name__)
 

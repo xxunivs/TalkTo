@@ -1,7 +1,7 @@
 import unittest
 
-from infra.setting import Settings
-from infra.schema.transcript import TranscriptSegment
+from app.schema.transcript import TranscriptSegment
+from app.setting import Settings
 from pipeline.s1_transcription.c_correction import apply_corrections, correct_segments
 
 

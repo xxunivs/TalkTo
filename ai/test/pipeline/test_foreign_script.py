@@ -2,7 +2,7 @@
 
 import unittest
 
-from infra.schema.transcript import TranscriptSegment
+from app.schema.transcript import TranscriptSegment
 from pipeline.s2_extraction.e_extract_memory import has_foreign_script, validate_memory_payload
 
 SEGMENTS = [TranscriptSegment(segment_index=0, start_ms=0, end_ms=1000, speaker_label="SPK_0",

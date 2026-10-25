@@ -86,7 +86,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--out", type=Path)
     args = ap.parse_args(argv)
 
-    from infra.setting import load_settings
+    from app.setting import load_settings
 
     settings = load_settings()
     if args.persona_dir:

@@ -21,7 +21,7 @@ class ReflectionTest(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.client = TestClient(app)
 
-    @patch("infra.external_api.openai_client.OpenAI")
+    @patch("app.external_api.openai_client.OpenAI")
     def test_maps_evidence_and_drops_unsupported(self, mock_openai: MagicMock) -> None:
         client = MagicMock()
         client.chat.completions.create.return_value = _chat_response(

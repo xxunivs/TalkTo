@@ -60,8 +60,8 @@ def main() -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
 
     if a.cmd == "extract-interview":
-        from infra.external_api.openai_client import create_openai_client
-        from infra.setting import load_settings
+        from app.external_api.openai_client import create_openai_client
+        from app.setting import load_settings
         from pipeline.persona_prompt.from_interview import extract_candidates
 
         src = next(input_dir.glob("가족인터뷰_*.txt"))

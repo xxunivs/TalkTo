@@ -1,4 +1,4 @@
-"""통화별 a(인물), b(민감도), c(말투) -> 설문(b_intake_prompt.json)과 같은 칸의 프롬프트 재료 한 장 (칸: infra/schema/subject.py IntakeContext)"""
+"""통화별 a(인물), b(민감도), c(말투) -> 설문(b_intake_prompt.json)과 같은 칸의 프롬프트 재료 한 장 (칸: app/schema/subject.py IntakeContext)"""
 
 from collections import Counter
 

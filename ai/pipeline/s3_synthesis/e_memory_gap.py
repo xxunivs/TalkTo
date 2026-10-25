@@ -6,9 +6,9 @@ import json
 import logging
 import re
 
-from infra.external_api.openai_client import chat_client
-from infra.schema.persona import GapQuestionRequest, GapQuestionResponse, StyleExample
-from infra.setting import Settings
+from app.external_api.openai_client import chat_client
+from app.schema.persona import GapQuestionRequest, GapQuestionResponse, StyleExample
+from app.setting import Settings
 from orchestrator.guard import CRISIS_LINE
 from orchestrator.precheck import is_safety_turn
 
